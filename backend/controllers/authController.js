@@ -4,12 +4,12 @@ const User = require('../Model/user');
 
 // Login Controller
 const login = async (req, res) => {
-    console.log("📝 Login request received:", req.body);
+    console.log(" Login request received:", req.body);
     const { email, password } = req.body;
 
     // Check if both email and password are provided
     if (!email || !password) {
-        console.log("❌ Missing email or password");
+        console.log(" Missing email or password");
         return res.status(400).json({
             error: true,
             message: "Credentials required.",
@@ -19,26 +19,24 @@ const login = async (req, res) => {
     // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
-        console.log("❌ User not found:", email);
+        console.log(" User not found:", email);
         return res.status(404).json({
             error: true,
             message: "User does not exist.",
         });
     }
 
-    console.log("✅ User found:", email);
+    console.log("User found:", email);
 
     // Compare passwords
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-        console.log("❌ Invalid password for:", email);
+        console.log("Invalid password for:", email);
         return res.status(401).json({
             error: true,
             message: "Invalid credentials",
         });
     }
-
-    console.log("✅ Password valid for:", email);
 
     try {
         // Generate JWT Token
@@ -48,7 +46,6 @@ const login = async (req, res) => {
             { expiresIn: "72h" }
         );
 
-        console.log("✅ Login successful for:", email);
         return res.json({
             error: false,
             message: "Login successful",
@@ -56,7 +53,7 @@ const login = async (req, res) => {
             accessToken,
         });
     } catch (error) {
-        console.log("❌ Token creation error:", error.message);
+        console.log(" Token creation error:", error.message);
         return res.status(500).json({ error: true, message: "Error creating token" });
     }
 };
