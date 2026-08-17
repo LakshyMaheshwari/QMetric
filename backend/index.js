@@ -13,18 +13,6 @@ const usersRouter = require('./routes/auth');
 
 const app = express();
 
-// Cloudinary connection test
-const cloudinary = require('./config/cloudinary');
-cloudinary.api.ping((error, result) => {
-    if (error) {
-        console.error('❌ Cloudinary connection failed:', error.message);
-        process.exit(1);
-    } else {
-        console.log('✅ Cloudinary connected successfully');
-    }
-});
-
-
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
@@ -60,13 +48,26 @@ app.use(logger('dev'));
     next(createError(404));
   });
 
-  // Error handler
+  // Multer error handler (file type / size rejections)
   app.use((err, req, res, next) => {
-    res.locals.message = err.message;
-    res.locals.error = req.app.get('env') === 'development' ? err : {};
-    res.status(err.status || 500);
-    res.json({ error: 'An error occurred' }); 
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: true, message: 'File too large. Maximum size is 5MB.' });
+    }
+    if (err.message && err.message.includes('Invalid file type')) {
+      return res.status(400).json({ error: true, message: err.message });
+    }
+    next(err);
+  });
 
+  // General error handler — surface real error in dev, generic in prod
+  app.use((err, req, res, next) => {
+    console.error('🔴 Unhandled error:', err);
+    const isDev = req.app.get('env') === 'development';
+    res.status(err.status || 500).json({
+      error: true,
+      message: isDev ? err.message : 'An internal server error occurred.',
+      ...(isDev && { stack: err.stack })
+    });
   });
 
   // Start server

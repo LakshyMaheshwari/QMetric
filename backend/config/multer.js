@@ -1,21 +1,23 @@
 const multer = require('multer');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
-const cloudinary = require('./cloudinary');
 
-const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: 'qmetric_id_photos',
-        allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
-        // Optionally resize images before saving
-        transformation: [{ width: 800, height: 800, crop: 'limit' }]
+// Use memoryStorage so we can manually upload to Cloudinary
+// with the ocr: 'adv_ocr' parameter for ID verification.
+// CloudinaryStorage adapter does not support passing OCR params.
+const storage = multer.memoryStorage();
+
+const fileFilter = (req, file, cb) => {
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error('Invalid file type. Only JPG, PNG, and WEBP are allowed.'), false);
     }
-});
+};
 
-// Set a file size limit (e.g., 5MB)
-const upload = multer({ 
+const upload = multer({
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 } // 5 MB
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+    fileFilter: fileFilter
 });
 
 module.exports = upload;

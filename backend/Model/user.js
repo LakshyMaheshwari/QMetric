@@ -91,6 +91,39 @@ const userSchema = new mongoose.Schema({
         default: null
     },
 
+    // --- OCR ID Verification sub-document ---
+    idVerification: {
+        status: {
+            type: String,
+            enum: ['verified', 'flagged', 'unverified'],
+            default: 'unverified'
+        },
+        extractedData: {
+            fullName: { type: String, default: '' },
+            employeeId: { type: String, default: '' },
+            collegeName: { type: String, default: '' },
+            department: { type: String, default: '' }
+        },
+        matchedFields: {
+            type: [String],
+            default: []
+        },
+        confidence: {
+            type: Number,
+            default: 0,
+            min: 0,
+            max: 100
+        },
+        ocrRawText: {
+            type: String,
+            default: ''
+        },
+        updatedAt: {
+            type: Date,
+            default: Date.now
+        }
+    }
+
 }, { timestamps: true });
 
 // Indexes for faster lookups
