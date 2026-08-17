@@ -13,6 +13,18 @@ const usersRouter = require('./routes/auth');
 
 const app = express();
 
+// Cloudinary connection test
+const cloudinary = require('./config/cloudinary');
+cloudinary.api.ping((error, result) => {
+    if (error) {
+        console.error('❌ Cloudinary connection failed:', error.message);
+        process.exit(1);
+    } else {
+        console.log('✅ Cloudinary connected successfully');
+    }
+});
+
+
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
