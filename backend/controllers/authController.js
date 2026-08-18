@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../Model/user');
+const OCRLog = require('../Model/OCRLog');
 const cloudinary = require('../config/cloudinary');
 
 // ============================================================
@@ -245,7 +246,7 @@ function runOcrVerification(ocrText, userInputs) {
         extractedData,
         matchedFields,
         confidence,
-        ocrRawText: ocrText ? ocrText.substring(0, 2000) : '',
+        ocrRawText: ocrText || '',   // full text — caller decides what to store where
         updatedAt: new Date()
     };
 }
@@ -372,12 +373,12 @@ const register = async (req, res) => {
 
         // --- Step 2 & 3 & 4: Upload image and perform OCR Verification ---
         let uploadResult = null;
+        let ocrRawText = '';          // full OCR text — goes to OCRLog, NOT to User
         let idVerification = {
             status: 'unverified',
             extractedData: { fullName: '', employeeId: '', collegeName: '', department: '' },
             matchedFields: [],
             confidence: 0,
-            ocrRawText: '',
             updatedAt: new Date()
         };
 
@@ -392,7 +393,20 @@ const register = async (req, res) => {
 
             if (ocrText && ocrText.trim().length > 0) {
                 // Compare extracted values and determine status
-                idVerification = runOcrVerification(ocrText, { fullName, employeeId, collegeName, department });
+                const verificationResult = runOcrVerification(ocrText, { fullName, employeeId, collegeName, department });
+
+                // Separate the raw text (goes to OCRLog) from the summary (goes to User)
+                ocrRawText = verificationResult.ocrRawText;
+
+                // Build User-safe idVerification (no ocrRawText)
+                idVerification = {
+                    status:        verificationResult.status,
+                    extractedData: verificationResult.extractedData,
+                    matchedFields: verificationResult.matchedFields,
+                    confidence:    verificationResult.confidence,
+                    updatedAt:     verificationResult.updatedAt
+                };
+
                 console.log(' OCR verification result:', {
                     status: idVerification.status,
                     confidence: idVerification.confidence,
@@ -428,6 +442,25 @@ const register = async (req, res) => {
 
         await newUser.save();
         console.log(' User created:', email, '| Verification:', idVerification.status);
+
+        // --- Save OCR Log (non-blocking) ---
+        // Full ocrRawText lives here; failure must NOT affect registration.
+        try {
+            await OCRLog.create({
+                userId:        newUser._id,
+                userInput:     { fullName, employeeId, collegeName, department },
+                extractedData: idVerification.extractedData,
+                matchedFields: idVerification.matchedFields,
+                status:        idVerification.status,
+                confidence:    idVerification.confidence,
+                ocrRawText,
+                imageUrl:      uploadResult ? uploadResult.secure_url : ''
+            });
+            console.log(' OCR log saved for user:', newUser._id);
+        } catch (logErr) {
+            // Log the error but do NOT fail the registration
+            console.error(' OCR log save failed (non-blocking):', logErr.message);
+        }
 
         // --- Step 9: Generate JWT Token ---
         const accessToken = jwt.sign(

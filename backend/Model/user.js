@@ -91,7 +91,7 @@ const userSchema = new mongoose.Schema({
         default: null
     },
 
-    // --- OCR ID Verification sub-document ---
+    // --- OCR ID Verification sub-document (summary only — full log in OCRLog collection) ---
     idVerification: {
         status: {
             type: String,
@@ -114,10 +114,7 @@ const userSchema = new mongoose.Schema({
             min: 0,
             max: 100
         },
-        ocrRawText: {
-            type: String,
-            default: ''
-        },
+        // ocrRawText intentionally removed — stored in OCRLog collection
         updatedAt: {
             type: Date,
             default: Date.now
