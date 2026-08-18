@@ -126,6 +126,7 @@ function extractDepartment(ocrText) {
 /**
  * Compare two strings with fuzzy matching.
  * Returns true if one string contains the other (case-insensitive, normalized).
+ * Suitable for names, college names, departments — NOT for IDs.
  */
 function fuzzyMatch(inputValue, extractedValue) {
     if (!inputValue || !extractedValue) return false;
@@ -134,6 +135,21 @@ function fuzzyMatch(inputValue, extractedValue) {
     if (!a || !b) return false;
     // Check if either string contains the other
     return a.includes(b) || b.includes(a);
+}
+
+/**
+ * Exact token match for identifiers (Employee ID).
+ * Splits text into tokens (by whitespace, slashes, dashes, commas, pipes)
+ * and checks if the normalized user value exists as a whole token.
+ * This prevents partial matches like '24610900' matching '246109009'.
+ */
+function exactTokenMatch(userValue, text) {
+    if (!userValue || !text) return false;
+    const normalizedUser = normalize(userValue);
+    if (!normalizedUser) return false;
+    // Split on common delimiters: whitespace, slash, dash, comma, pipe, colon, semicolon
+    const tokens = normalize(text).split(/[\s\/\-,|;:]+/).filter(Boolean);
+    return tokens.includes(normalizedUser);
 }
 
 /**
@@ -149,39 +165,87 @@ function runOcrVerification(ocrText, userInputs) {
     };
 
     const fieldsToCheck = ['fullName', 'employeeId', 'collegeName', 'department'];
-    const mismatchedFields = [];
-    let matchCount = 0;
+    const matchedFields = [];
+    let strictMatchCount = 0;
+    let fallbackMatchCount = 0;
+    
+    const normalizedOcrText = normalize(ocrText);
 
     for (const field of fieldsToCheck) {
         const extracted = extractedData[field];
         const userValue = userInputs[field];
+        
+        let isMatch = false;
 
-        if (extracted && userValue && fuzzyMatch(userValue, extracted)) {
-            matchCount++;
-        } else if (extracted) {
-            // OCR found something but it doesn't match user input
-            mismatchedFields.push(field);
+        // Employee ID requires exact matching; other fields use fuzzy (substring) matching
+        const isIdField = (field === 'employeeId');
+
+        // Step 1: Strict match (regex-extracted value vs user input)
+        if (extracted && userValue) {
+            const strictMatch = isIdField
+                ? normalize(userValue) === normalize(extracted)  // exact equality for IDs
+                : fuzzyMatch(userValue, extracted);              // substring ok for names
+            if (strictMatch) {
+                isMatch = true;
+                strictMatchCount++;
+            }
         }
-        // If OCR didn't extract the field at all, we don't penalize
+
+        // Step 2: Fallback — search the full OCR text (only if strict didn't match)
+        if (!isMatch && userValue) {
+            let fallbackHit = false;
+
+            if (isIdField) {
+                // Token-level exact match: split OCR text into tokens and look for a whole match
+                fallbackHit = exactTokenMatch(userValue, ocrText);
+            } else {
+                // Substring match for names / college / department
+                const normalizedUserValue = normalize(userValue);
+                fallbackHit = normalizedUserValue && normalizedOcrText.includes(normalizedUserValue);
+            }
+
+            if (fallbackHit) {
+                isMatch = true;
+                fallbackMatchCount++;
+                // Capture the matched user value to store in extractedData
+                extractedData[field] = userValue;
+            } else {
+                // If not found at all, reset the extractedData for this field to avoid confusion
+                if (!extracted) {
+                    extractedData[field] = '';
+                }
+            }
+        }
+
+        if (isMatch) {
+            matchedFields.push(field);
+        }
     }
 
-    // Calculate confidence as percentage of matched fields
-    const confidence = Math.round((matchCount / fieldsToCheck.length) * 100);
-
+    const totalMatches = strictMatchCount + fallbackMatchCount;
     let status = 'unverified';
-    if (matchCount === fieldsToCheck.length) {
+    let confidence = 0;
+
+    if (totalMatches === 4) {
         status = 'verified';
-    } else if (mismatchedFields.length > 0) {
+        confidence = strictMatchCount === 4 ? 100 : 95;
+    } else if (totalMatches === 3) {
         status = 'flagged';
+        confidence = 85;
+    } else if (totalMatches === 2) {
+        status = 'flagged';
+        confidence = 70;
+    } else if (totalMatches === 1) {
+        status = 'flagged';
+        confidence = 50;
     }
-    // If nothing was extracted at all, stays 'unverified'
 
     return {
         status,
         extractedData,
-        matchedFields: mismatchedFields, // fields that MISMATCHED
+        matchedFields,
         confidence,
-        ocrRawText: ocrText.substring(0, 2000), // cap raw text storage
+        ocrRawText: ocrText ? ocrText.substring(0, 2000) : '',
         updatedAt: new Date()
     };
 }
@@ -306,34 +370,28 @@ const register = async (req, res) => {
             return res.status(409).json({ error: true, message: `${conflictField} already exists in the system.` });
         }
 
-        // --- Step 2: Upload image to Cloudinary with OCR ---
-        let uploadResult;
+        // --- Step 2 & 3 & 4: Upload image and perform OCR Verification ---
+        let uploadResult = null;
+        let idVerification = {
+            status: 'unverified',
+            extractedData: { fullName: '', employeeId: '', collegeName: '', department: '' },
+            matchedFields: [],
+            confidence: 0,
+            ocrRawText: '',
+            updatedAt: new Date()
+        };
+
         try {
+            // Upload to Cloudinary
             uploadResult = await uploadToCloudinaryWithOcr(file.buffer);
             console.log(' Cloudinary upload successful:', uploadResult.secure_url);
-        } catch (uploadErr) {
-            console.error(' Cloudinary upload failed:', uploadErr.message);
-            return res.status(500).json({ error: true, message: "Failed to upload ID photo. Please try again." });
-        }
 
-        // --- Step 3 & 4: Parse OCR response and extract fields ---
-        let idVerification;
-        try {
+            // Extract OCR Text
             const ocrText = extractOcrText(uploadResult);
             console.log(' OCR raw text:', ocrText ? ocrText.substring(0, 200) + '...' : '(empty)');
 
-            if (!ocrText || ocrText.trim().length === 0) {
-                console.log(' No text detected by OCR — marking as unverified');
-                idVerification = {
-                    status: 'unverified',
-                    extractedData: { fullName: '', employeeId: '', collegeName: '', department: '' },
-                    matchedFields: [],
-                    confidence: 0,
-                    ocrRawText: '',
-                    updatedAt: new Date()
-                };
-            } else {
-                // --- Step 5 & 6: Compare extracted values and determine status ---
+            if (ocrText && ocrText.trim().length > 0) {
+                // Compare extracted values and determine status
                 idVerification = runOcrVerification(ocrText, { fullName, employeeId, collegeName, department });
                 console.log(' OCR verification result:', {
                     status: idVerification.status,
@@ -341,18 +399,12 @@ const register = async (req, res) => {
                     matchedFields: idVerification.matchedFields,
                     extractedData: idVerification.extractedData
                 });
+            } else {
+                console.log(' No text detected by OCR — marking as unverified');
             }
-        } catch (ocrErr) {
-            // --- Step 7: On ANY OCR error, default to unverified ---
-            console.error(' OCR processing error (non-blocking):', ocrErr.message);
-            idVerification = {
-                status: 'unverified',
-                extractedData: { fullName: '', employeeId: '', collegeName: '', department: '' },
-                matchedFields: [],
-                confidence: 0,
-                ocrRawText: '',
-                updatedAt: new Date()
-            };
+        } catch (err) {
+            // On ANY error (upload or OCR), default to unverified but do NOT block registration
+            console.error(' Cloudinary/OCR processing error (non-blocking):', err.message);
         }
 
         // --- Step 8: Hash password and create user document ---
@@ -370,7 +422,7 @@ const register = async (req, res) => {
             employeeId,
             department,
             stream,
-            collegeIdPhoto: uploadResult.secure_url,
+            collegeIdPhoto: uploadResult ? uploadResult.secure_url : '', // empty string if upload failed
             idVerification
         });
 
