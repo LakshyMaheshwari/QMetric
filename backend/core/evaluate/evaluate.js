@@ -39,7 +39,7 @@
 //         const actualScore = CO_Map[coNumber] || 0; 
 //         const expectedWeight = item[1].weight;  
 //         const diff = (expectedWeight - actualScore) / expectedWeight || 0;
-        
+
 //         if (diff > 0) {
 //             C3 += diff;
 //         }
@@ -168,7 +168,7 @@
 //             highestVerb: highestVerb,
 //             remark: remark
 //         });
-              
+
 //         BT_Weights[i["Bloom's Taxonomy Level"]].marks += (+i.Marks);
 //         BT_Weights[i["Bloom's Taxonomy Level"]].No_Of_Questions++;
 //         CO_Map[co] = (CO_Map[co] || 0) + (+i.Marks);
@@ -262,28 +262,28 @@ function calculateModulePenalty(ModuleWeights) {
             C2 += diff;
         }
     });
-    return C2/n;
+    return C2 / n;
 }
 
 // Function to handle CO Penalty
 function calculateCOPenalty(dataArray, CO_Map) {
-    let C3 = 0;    
+    let C3 = 0;
 
     dataArray.forEach(item => {
-        const coKey = item[0]; 
+        const coKey = item[0];
         const coNumber = coKey.replace('CO', '');
-        const actualScore = CO_Map[coNumber] || 0; 
-        const expectedWeight = item[1].weight;  
+        const actualScore = CO_Map[coNumber] || 0;
+        const expectedWeight = item[1].weight;
         const diff = (expectedWeight - actualScore) / expectedWeight || 0;
-        
+
         if (diff > 0) {
             C3 += diff;
         }
     });
 
-    const COCount = Object.keys(CO_Map).length;  
-    return COCount > 0 ? C3 / COCount : 0;  
-}    
+    const COCount = Object.keys(CO_Map).length;
+    return COCount > 0 ? C3 / COCount : 0;
+}
 
 function obtainD(QHBTL, COBTL, returnRemark = false) {
     const D = QHBTL - COBTL;
@@ -296,7 +296,7 @@ function obtainD(QHBTL, COBTL, returnRemark = false) {
     } else if (D < -1) {
         remark = "Higher than Expected Blooms Level";
         qScore = 2;
-    } else if(D >= 1) {
+    } else if (D >= 1) {
         remark = "Lower than Expected Blooms Level";
         qScore = -1;
     }
@@ -384,14 +384,14 @@ exports.Evaluate = (SequenceData, pre_data, Module_Hrs, bloomLevelMap) => {
 
         // Ensure QHBTL is valid (1-6)
         let QHBTL = parseInt(i["Bloom's Taxonomy Level"]);
-        
+
         if (isNaN(QHBTL) || QHBTL < 1 || QHBTL > 6) {
             console.warn(`Warning: Invalid Bloom level ${i["Bloom's Taxonomy Level"]} for question ${i["Question No"]}, defaulting to 6`);
             QHBTL = 6;
             i["Bloom's Taxonomy Level"] = 6;
         }
 
-        const {qScore, remark} = obtainD(QHBTL, COBTL, true);
+        const { qScore, remark } = obtainD(QHBTL, COBTL, true);
         i["Remark"] = remark;
         QP += qScore;
         QPMax += obtainD(1, COBTL);
@@ -413,7 +413,7 @@ exports.Evaluate = (SequenceData, pre_data, Module_Hrs, bloomLevelMap) => {
             bloomLevelName: bloomLevelName,
             remark: remark
         });
-              
+
         BT_Weights[QHBTL].marks += (+i.Marks);
         BT_Weights[QHBTL].No_Of_Questions++;
         CO_Map[co] = (CO_Map[co] || 0) + (+i.Marks);
@@ -449,10 +449,10 @@ exports.Evaluate = (SequenceData, pre_data, Module_Hrs, bloomLevelMap) => {
     console.log("BT_Weights: ", BT_Weights);
 
     const coRecommendations = generateCORecommendations(pre_data, CO_Map);
-    console.log("CO Recommendations:", coRecommendations); 
+    console.log("CO Recommendations:", coRecommendations);
 
     const moduleRecommendations = generateModuleRecommendations(ModuleWeights);
-    console.log("Module Recommendations:", moduleRecommendations); 
+    console.log("Module Recommendations:", moduleRecommendations);
 
     console.log("Question Recommendations:", questionRecommendations);
 

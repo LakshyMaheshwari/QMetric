@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, BarChart3, ArrowRight, Eye, Target, BookOpen, Brain } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+
 
 export default function LandingPage() {
   const [activeFeature, setActiveFeature] = useState(0);
-  const [user, setUser] = useState(null);
+  const { user, isAuthenticated } = useAuth();
+  // const [user, setUser] = useState(null);
   const navigate = useNavigate();
 
   const features = [
@@ -60,55 +63,56 @@ export default function LandingPage() {
     { value: '100%', label: 'CO Mapping Accuracy' },
   ];
 
-  // Function to check user authentication status
-  const checkUserAuth = () => {
-    const token = sessionStorage.getItem('accessToken');
-    const userData = sessionStorage.getItem('user');
-    if (token && userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
-        return parsedUser;
-      } catch {
-        // Clear invalid data
-        sessionStorage.removeItem('accessToken');
-        sessionStorage.removeItem('user');
-        setUser(null);
-        return null;
-      }
-    } else {
-      setUser(null);
-      return null;
-    }
-  };
-
-  // Check for existing user session on component mount
-  useEffect(() => { checkUserAuth(); }, []);
-
-  // Listen for storage changes (when user logs in/out in another tab/component)
-  useEffect(() => {
-    const handleStorageChange = (e) => {
-      // Listen for storage events
-      if (e.key === 'accessToken' || e.key === 'user') checkUserAuth();
-    };
-    window.addEventListener('storage', handleStorageChange);
-    // Also listen for a custom event that we can dispatch when login state changes
-    window.addEventListener('authStateChanged', checkUserAuth);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('authStateChanged', checkUserAuth);
-    };
-  }, []);
-
-  // Alternative: Poll for changes every few seconds (less efficient but more reliable)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Check if auth state has changed
-      const currentToken = sessionStorage.getItem('accessToken');
-      if ((!currentToken && user) || (currentToken && !user)) checkUserAuth();
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [user]);
+  // [DEMO/FIX DISABLED] - Using useAuth instead
+  // // Function to check user authentication status
+  // const checkUserAuth = () => {
+  //   const token = sessionStorage.getItem('accessToken');
+  //   const userData = sessionStorage.getItem('user');
+  //   if (token && userData) {
+  //     try {
+  //       const parsedUser = JSON.parse(userData);
+  //       setUser(parsedUser);
+  //       return parsedUser;
+  //     } catch {
+  //       // Clear invalid data
+  //       sessionStorage.removeItem('accessToken');
+  //       sessionStorage.removeItem('user');
+  //       setUser(null);
+  //       return null;
+  //     }
+  //   } else {
+  //     setUser(null);
+  //     return null;
+  //   }
+  // };
+  //
+  // // Check for existing user session on component mount
+  // useEffect(() => { checkUserAuth(); }, []);
+  //
+  // // Listen for storage changes (when user logs in/out in another tab/component)
+  // useEffect(() => {
+  //   const handleStorageChange = (e) => {
+  //     // Listen for storage events
+  //     if (e.key === 'accessToken' || e.key === 'user') checkUserAuth();
+  //   };
+  //   window.addEventListener('storage', handleStorageChange);
+  //   // Also listen for a custom event that we can dispatch when login state changes
+  //   window.addEventListener('authStateChanged', checkUserAuth);
+  //   return () => {
+  //     window.removeEventListener('storage', handleStorageChange);
+  //     window.removeEventListener('authStateChanged', checkUserAuth);
+  //   };
+  // }, []);
+  //
+  // // Alternative: Poll for changes every few seconds (less efficient but more reliable)
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     // Check if auth state has changed
+  //     const currentToken = sessionStorage.getItem('accessToken');
+  //     if ((!currentToken && user) || (currentToken && !user)) checkUserAuth();
+  //   }, 1000);
+  //   return () => clearInterval(interval);
+  // }, [user]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -118,9 +122,10 @@ export default function LandingPage() {
   }, [features.length]);
 
   const handleAnalyzeClick = () => {
-    // Double-check user state before proceeding
-    const currentUser = checkUserAuth();
-    if (!currentUser) { 
+    // [DEMO/FIX DISABLED] Double-check user state before proceeding
+    // const currentUser = checkUserAuth();
+    // if (!currentUser) { 
+    if (!isAuthenticated) {
       // Handle demo functionality - always accessible
       alert('Please log in to access the analyze feature'); 
       return; 

@@ -35,7 +35,7 @@
 
 //             const StructurizedData = tableData.map(row => {
 //                 const questionText = row.question || row.Question || row.QUESTION || '';
-                
+
 //                 if (!questionText) {
 //                     console.warn(`Missing question text for row: ${JSON.stringify(row)}`);
 //                     return null; // Skip this row if no question text is found
@@ -97,7 +97,7 @@
 //             highestLevel = Math.min(highestLevel, levelIndex);
 
 //             // Check if this word is a verb and if it has the highest bloom level so far
-            
+
 //         }
 //     }
 
@@ -158,7 +158,7 @@
 
 //             const StructurizedData = tableData.map(row => {
 //                 const questionText = row.question || row.Question || row.QUESTION || '';
-                
+
 //                 if (!questionText) {
 //                     console.warn(`Missing question text for row: ${JSON.stringify(row)}`);
 //                     return null; // Skip this row if no question text is found
@@ -277,7 +277,7 @@ exports.Structurize = (data, inputFile, bloomLevelMap) => {
 
             const StructurizedData = tableData.map(row => {
                 const questionText = row.question || row.Question || row.QUESTION || '';
-                
+
                 if (!questionText) {
                     console.warn(`Missing question text for row: ${JSON.stringify(row)}`);
                     return null;
@@ -301,7 +301,7 @@ exports.Structurize = (data, inputFile, bloomLevelMap) => {
                     "Module": moduleNumber,
                     "Extracted Verbs": extractedVerbs.join(', ')
                 } : null;
-            }).filter(row => row !== null); 
+            }).filter(row => row !== null);
 
             resolve(StructurizedData);
         } catch (error) {
@@ -336,8 +336,8 @@ exports.FindBloomLevelsInText = (text, bloomLevelMap) => {
             const levelIndex = getBloomLevelIndex(level, bloomLevelMap);
             wordResult.push(word);
             levelResult.push(levelIndex);
-            
-            if(levelIndex < highestLevel){
+
+            if (levelIndex < highestLevel) {
                 highestLevel = levelIndex;
                 highestVerb = word;
             }
@@ -345,7 +345,7 @@ exports.FindBloomLevelsInText = (text, bloomLevelMap) => {
     }
 
     // If no Bloom verbs found, assign default level 6
-    if (highestLevel === Infinity) {
+    if (highestLevel === Infinity || highestLevel === 7) {
         console.warn(`Warning: No Bloom verbs found in: "${text.substring(0, 50)}..."`);
         highestLevel = 6;
         highestVerb = "N/A";
@@ -362,11 +362,11 @@ exports.FindBloomLevelsInText = (text, bloomLevelMap) => {
 // Helper to convert level to number using bloomLevelMap
 function getBloomLevelIndex(level, bloomLevelMap) {
     const mappedLevel = bloomLevelMap[level];
-    
+
     if (mappedLevel === undefined) {
         console.warn(`Warning: Bloom level "${level}" not found in bloomLevelMap, defaulting to 6`);
         return 6;
     }
-    
+
     return mappedLevel;
 }

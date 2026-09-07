@@ -1,27 +1,45 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
+import { Turnstile } from "@marsidev/react-turnstile";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { cn } from "../../utils/cn.js";
+import apiClient from "../../api/client";
+import { useAuth } from "../../context/AuthContext";
+
+const TURNSTILE_SITE_KEY = process.env.REACT_APP_TURNSTILE_SITE_KEY || "1x00000000000000000000AA";
 
 export function SignupFormDemo() {
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError]     = useState("");
   const [success, setSuccess] = useState("");
+
+  // Turnstile
+  const turnstileRef   = useRef(null);
+  const [turnstileToken, setTurnstileToken] = useState("");
 
   // Pre-existing login credentials for reference
   const demoAccounts = [
     { email: "test@user1.com", password: "password123" },
-    { email: "test@euser2.com", password: "password123" },
-    { email: "test@euser3.com", password: "password123" },
+    { email: "test@user2.com", password: "password123" },
+    { email: "test@user3.com", password: "password123" },
     { email: "test@user4.com", password: "password123" },
     { email: "test@user5.com", password: "password123" },
   ];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Guard: Turnstile must be verified before submitting
+    const token = turnstileRef.current?.getResponse() || turnstileToken;
+    if (!token) {
+      setError("Please complete the CAPTCHA verification.");
+      return;
+    }
+
     setLoading(true);
     setError("");
     setSuccess("");
@@ -33,36 +51,26 @@ export function SignupFormDemo() {
     }
 
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ 
-          email, 
-          password
-        }),
+      const response = await apiClient.post('/auth/login', {
+        email, 
+        password,
+        turnstileToken: token
       });
 
-      const data = await response.json();
-
-      if (data.error) {
-        setError(data.message || "Login failed");
-      } else {
-        setSuccess("Login successful!");
-        console.log("Access Token:", data.accessToken);
-        // Store token in localStorage
-        localStorage.setItem("accessToken", data.accessToken);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        
-        setEmail("");
-        setPassword("");
-        setTimeout(() => setSuccess(""), 3000);
-        // Redirect or update app state here
-      }
+      const data = response.data;
+      setSuccess("Login successful!");
+      login(data.accessToken, data.user);
+      
+      setEmail("");
+      setPassword("");
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
+      setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
-      setError("Error connecting to server");
-      console.error(err);
+      const message = err.response?.data?.message || err.message || "Error connecting to server";
+      setError(message);
+      turnstileRef.current?.reset();
+      setTurnstileToken("");
     } finally {
       setLoading(false);
     }
@@ -117,10 +125,33 @@ export function SignupFormDemo() {
           />
         </LabelInputContainer>
 
+        <div className="flex justify-center mb-8">
+          <Turnstile
+            id="login-turnstile"
+            ref={turnstileRef}
+            siteKey={TURNSTILE_SITE_KEY}
+            onSuccess={(token) => {
+              console.log('[Turnstile/Login] verified');
+              setTurnstileToken(token);
+              if (error) setError('');
+            }}
+            onExpire={() => {
+              console.log('[Turnstile/Login] expired');
+              setTurnstileToken("");
+            }}
+            onError={(err) => {
+              console.error('[Turnstile/Login] error:', err);
+              setTurnstileToken("");
+              setError("CAPTCHA verification failed. Please try again.");
+            }}
+            options={{ theme: "dark", size: "normal" }}
+          />
+        </div>
+
         <button
           className="bg-gradient-to-br relative group/btn from-black dark:from-zinc-900 dark:to-zinc-900 to-neutral-600 block dark:bg-zinc-800 w-full text-white rounded-md h-10 font-medium shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] dark:shadow-[0px_1px_0px_0px_var(--zinc-800)_inset,0px_-1px_0px_0px_var(--zinc-800)_inset] disabled:opacity-50"
           type="submit"
-          disabled={loading}
+          disabled={loading || !turnstileToken}
         >
           {loading ? "Signing in..." : "Sign In →"}
           <BottomGradient />

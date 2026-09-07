@@ -1,17 +1,23 @@
-import React, { useState } from 'react';
-import { FileText, Menu, X, User, Mail, Lock, Eye, EyeOff, Home, BarChart3, Users } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Turnstile } from '@marsidev/react-turnstile';
+import { FileText, Menu, X, User, Mail, Lock, Eye, EyeOff, Home, BarChart3, Users, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AccessRestrictionModal from './AccessRestrictionModal';
 import useAccessRestriction from './hooks/useAccessRestriction';
+import { useAuth } from '../context/AuthContext';
+import apiClient from '../api/client';
+
+const TURNSTILE_SITE_KEY = process.env.REACT_APP_TURNSTILE_SITE_KEY || "1x00000000000000000000AA";
 
 const Navbar = () => {
+  const { user, login: authLogin, logout: authLogout } = useAuth();
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [user, setUser] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [formData, setFormData] = useState({
     userName: '',
@@ -20,6 +26,9 @@ const Navbar = () => {
     confirmPassword: ''
   });
 
+  const turnstileRef = useRef(null);
+  const [turnstileToken, setTurnstileToken] = useState('');
+
   const navigate = useNavigate();
 
   // Use the access restriction hook
@@ -27,15 +36,6 @@ const Navbar = () => {
     user,
     () => setIsLoginModalOpen(true)
   );
-
-  // Check for existing user session on component mount
-  React.useEffect(() => {
-    const token = sessionStorage.getItem('accessToken');
-    const userData = sessionStorage.getItem('user');
-    if (token && userData) {
-      setUser(JSON.parse(userData));
-    }
-  }, []);
 
   // Close user menu when clicking outside
   React.useEffect(() => {
@@ -79,11 +79,8 @@ const Navbar = () => {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem('accessToken');
-    sessionStorage.removeItem('user');
-    setUser(null);
+    authLogout();
     setShowUserMenu(false);
-    window.dispatchEvent(new Event('authStateChanged'));
     navigateTo('/');
   };
 
@@ -94,59 +91,51 @@ const Navbar = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const token = turnstileRef.current?.getResponse() || turnstileToken;
+    if (!token) {
+      setError('Please complete the CAPTCHA verification.');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
 
     try {
-      const apiUrl = isRegisterMode
-        ? 'https://qmetric-2.onrender.com/auth/create-account'
-        : 'https://qmetric-2.onrender.com/auth/login';
-
-      //  const apiUrl = isRegisterMode
-      //   ?  'http://localhost:80/auth/create-account'
-      //   :  'http://localhost:80/auth/login';
-
-
-      const requestBody = isRegisterMode
-        ? { userName: formData.userName, email: formData.email, password: formData.password }
-        : { email: formData.email, password: formData.password };
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
+      const response = await apiClient.post('/auth/login', {
+        email: formData.email,
+        password: formData.password,
+        turnstileToken: token
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Authentication failed');
-      }
-
-      const data = await response.json();
-      sessionStorage.setItem('accessToken', data.accessToken);
-      sessionStorage.setItem('user', JSON.stringify(data.user));
-      setUser(data.user);
+      const data = response.data;
+      authLogin(data.accessToken, data.user);
       setIsLoginModalOpen(false);
       setFormData({ userName: '', email: '', password: '', confirmPassword: '' });
-      window.dispatchEvent(new Event('authStateChanged'));
+      turnstileRef.current?.reset();
+      setTurnstileToken('');
       navigateTo('/');
-    } catch (error) {
-      setError(error.message || 'Credentials not matched. Please try again');
+    } catch (err) {
+      turnstileRef.current?.reset();
+      setTurnstileToken('');
+      const message = err.response?.data?.message || err.message || 'Credentials not matched. Please try again';
+      setError(message);
     } finally {
       setIsLoading(false);
     }
   };
 
   const toggleMode = () => {
-    setIsRegisterMode(!isRegisterMode);
-    setFormData({ userName: '', email: '', password: '', confirmPassword: '' });
-    setError('');
+    closeModal();
+    navigateTo('/register');
   };
 
   const closeModal = () => {
     setIsLoginModalOpen(false);
     setFormData({ userName: '', email: '', password: '', confirmPassword: '' });
     setError('');
+    turnstileRef.current?.reset();
+    setTurnstileToken('');
   };
 
   return (
@@ -188,14 +177,6 @@ const Navbar = () => {
               >
                 About
               </a>
-              {/* <button
-                onClick={() => handleFeatureAccess('Dashboard', false, '/')}
-                className="relative px-5 py-2 text-lg font-semibold transition-all rounded-lg text-gray-300 hover:text-orange-500 flex items-center space-x-1"
-              >
-                <BarChart3 className="w-4 h-4" />
-                <span>Dashboard</span>
-                {!user && <Lock className="w-4 h-4" />}
-              </button> */}
 
               {/* ── Credits Link ── */}
               <button
@@ -221,7 +202,9 @@ const Navbar = () => {
                   {showUserMenu && (
                     <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-600 rounded-lg shadow-xl z-50">
                       <div className="px-4 py-3 border-b border-gray-600">
-                        <p className="text-white font-semibold">{user.userName}</p>
+                        <p className="text-white font-semibold">
+                          {user.userName} {user.role && <span className="text-gray-400 font-normal">({user.role})</span>}
+                        </p>
                         <p className="text-gray-400 text-sm">{user.email}</p>
                         <div className="flex items-center space-x-1 mt-1">
                           <span className={`text-xs px-2 py-1 rounded ${user.isPremium ? 'bg-yellow-500 text-black' : 'bg-gray-600 text-gray-300'}`}>
@@ -229,13 +212,22 @@ const Navbar = () => {
                           </span>
                         </div>
                       </div>
-                      {/* <button
-                        onClick={() => { setShowUserMenu(false); navigateTo('/'); }}
+                      <button
+                        onClick={() => { setShowUserMenu(false); navigateTo('/profile'); }}
                         className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex items-center space-x-2"
                       >
-                        <BarChart3 className="w-4 h-4" />
-                        <span>Dashboard</span>
-                      </button> */}
+                        <User className="w-4 h-4" />
+                        <span>Profile</span>
+                      </button>
+                      {user.role === 'admin' && (
+                        <button
+                          onClick={() => { setShowUserMenu(false); navigateTo('/admin'); }}
+                          className="w-full text-left px-4 py-2 text-purple-300 hover:bg-purple-500/10 hover:text-purple-200 transition-colors flex items-center space-x-2"
+                        >
+                          <Shield className="w-4 h-4" />
+                          <span>Admin Dashboard</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => { setShowUserMenu(false); navigateTo('/credits'); }}
                         className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex items-center space-x-2"
@@ -297,14 +289,6 @@ const Navbar = () => {
               >
                 About
               </a>
-              {/* <button
-                onClick={() => handleFeatureAccess('Dashboard', false, '/')}
-                className="w-full text-left relative px-5 py-2 text-lg font-semibold transition-all rounded-lg text-gray-300 hover:text-orange-500 flex items-center space-x-1"
-              >
-                <BarChart3 className="w-4 h-4" />
-                <span>Dashboard</span>
-                {!user && <Lock className="w-4 h-4" />}
-              </button> */}
 
               {/* ── Credits Link (Mobile) ── */}
               <button
@@ -318,7 +302,9 @@ const Navbar = () => {
               {user ? (
                 <div className="space-y-2">
                   <div className="px-4 py-2 border-b border-gray-600">
-                    <p className="text-white font-semibold">{user.userName}</p>
+                    <p className="text-white font-semibold">
+                      {user.userName} {user.role && <span className="text-gray-400 font-normal">({user.role})</span>}
+                    </p>
                     <p className="text-gray-400 text-sm">{user.email}</p>
                     <div className="flex items-center space-x-1 mt-1">
                       <span className={`text-xs px-2 py-1 rounded ${user.isPremium ? 'bg-yellow-500 text-black' : 'bg-gray-600 text-gray-300'}`}>
@@ -326,6 +312,22 @@ const Navbar = () => {
                       </span>
                     </div>
                   </div>
+                  <button
+                    onClick={() => { setIsMenuOpen(false); navigateTo('/profile'); }}
+                    className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors rounded-lg flex items-center space-x-2"
+                  >
+                    <User className="w-4 h-4" />
+                    <span>Profile</span>
+                  </button>
+                  {user.role === 'admin' && (
+                    <button
+                      onClick={() => { setIsMenuOpen(false); navigateTo('/admin'); }}
+                      className="w-full text-left px-4 py-2 text-purple-300 hover:bg-purple-500/10 hover:text-purple-200 transition-colors rounded-lg flex items-center space-x-2"
+                    >
+                      <Shield className="w-4 h-4" />
+                      <span>Admin Dashboard</span>
+                    </button>
+                  )}
                   <button
                     onClick={handleLogout}
                     className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors rounded-lg"
@@ -442,10 +444,34 @@ const Navbar = () => {
                 </div>
               )}
 
+              {/* Cloudflare Turnstile CAPTCHA */}
+              <div className="flex justify-center my-3">
+                <Turnstile
+                  id="navbar-login-turnstile"
+                  ref={turnstileRef}
+                  siteKey={TURNSTILE_SITE_KEY}
+                  onSuccess={(token) => {
+                    console.log('[Turnstile/LoginModal] verified');
+                    setTurnstileToken(token);
+                    if (error) setError('');
+                  }}
+                  onExpire={() => {
+                    console.log('[Turnstile/LoginModal] expired');
+                    setTurnstileToken('');
+                  }}
+                  onError={(err) => {
+                    console.error('[Turnstile/LoginModal] error:', err);
+                    setTurnstileToken('');
+                    setError('CAPTCHA verification failed. Please try again.');
+                  }}
+                  options={{ theme: 'dark', size: 'normal' }}
+                />
+              </div>
+
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={isLoading}
+                disabled={isLoading || !turnstileToken}
                 className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-semibold rounded-lg shadow-lg hover:scale-105 hover:shadow-xl transition-transform duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 {isLoading ? 'Processing...' : (isRegisterMode ? 'Create Account' : 'Sign In')}

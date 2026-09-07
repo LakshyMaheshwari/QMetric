@@ -10,9 +10,14 @@ import "./App.css";
 import "animate.css";
 import UserDashboard from "./components/pages/UserDashboard";
 import CreditsPage from "./components/pages/Creditspage";
+import RegisterPage from "./components/pages/RegisterPage";
+import ProfilePage from "./components/pages/ProfilePage";
+import AdminDashboard from "./components/pages/AdminDashboard";
+import { AuthProvider } from "./context/AuthContext";
 
 function App() {
   return (
+    <AuthProvider>
       <div className="bg-black min-h-screen text-white">
         <Navbar />
         <ScrollToTop />
@@ -23,9 +28,13 @@ function App() {
           <Route path="/result" element={<ResultPage />} />
           <Route path="/dashboard" element={<UserDashboard />} />
           <Route path="/credits" element={<CreditsPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/admin" element={<AdminDashboard />} />
         </Routes>
         <Footer />
       </div>
+    </AuthProvider>
   );
 }
 

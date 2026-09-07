@@ -1,5 +1,21 @@
 import React, { useState } from 'react';
 import { Trash2, Upload, FileText, Check, Target, BookOpen, Loader2, AlertCircle } from 'lucide-react';
+import apiClient from '../../api/client';
+
+// SectionCard component moved OUTSIDE to prevent re-mounting and losing focus on keystrokes
+const SectionCard = ({ badge, title, subtitle, icon, children }) => (
+  <div className="bg-gray-800/50 border border-gray-700/60 rounded-2xl p-6">
+    <div className="flex items-center gap-3 mb-4">
+      {badge && <span className="px-3 py-1 bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-bold rounded-lg">{badge}</span>}
+      {icon && icon}
+      <div>
+        <h2 className="text-white font-bold text-lg">{title}</h2>
+        {subtitle && <p className="text-gray-400 text-sm">{subtitle}</p>}
+      </div>
+    </div>
+    {children}
+  </div>
+);
 
 const UploadPage = () => {
   const [formData, setFormData] = useState({
@@ -25,20 +41,6 @@ const UploadPage = () => {
   const labelClass = "block text-gray-300 text-sm font-medium mb-2";
   const inputClass = "w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all";
 
-  // SectionCard component
-  const SectionCard = ({ badge, title, subtitle, icon, children }) => (
-    <div className="bg-gray-800/50 border border-gray-700/60 rounded-2xl p-6">
-      <div className="flex items-center gap-3 mb-4">
-        {badge && <span className="px-3 py-1 bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-bold rounded-lg">{badge}</span>}
-        {icon && icon}
-        <div>
-          <h2 className="text-white font-bold text-lg">{title}</h2>
-          {subtitle && <p className="text-gray-400 text-sm">{subtitle}</p>}
-        </div>
-      </div>
-      {children}
-    </div>
-  );
 
   // Helper function
   const getCurrentWeightSum = () => courseOutcomes.reduce((sum, co) => sum + (parseFloat(co.weight) || 0), 0);
@@ -128,8 +130,16 @@ const UploadPage = () => {
     setError('');
   };
 
-  const isValidFileType = (f) =>
-    ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'].includes(f.type);
+  const isValidFileType = (f) => {
+    const validMimeTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
+    const validExtensions = ['.xlsx', '.xls'];
+    const ext = f.name ? '.' + f.name.split('.').pop().toLowerCase() : '';
+    // Check MIME type OR file extension (drag-and-drop often has empty/wrong MIME type)
+    return validMimeTypes.includes(f.type) || validExtensions.includes(ext);
+  };
 
   const handleDragOver = (e) => { e.preventDefault(); setDragOver(true); };
   const handleDragLeave = (e) => { e.preventDefault(); setDragOver(false); };
@@ -167,73 +177,25 @@ const UploadPage = () => {
     formDataToSend.append("Sequence", JSON.stringify(transformedSequence));
 
     try {
-      const token = sessionStorage.getItem('accessToken') || localStorage.getItem('accessToken');
-      if (!token) throw new Error('No authentication token found. Please login first.');
-
-      // const response = await fetch('http://localhost:80/upload/totext', {
-      const response = await fetch(`https://qmetric-2.onrender.com/upload/totext`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: formDataToSend
+      const response = await apiClient.post('/upload/totext', formDataToSend, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      // Check if response is ok first
-      if (response.ok) {
-        try {
-          const responseData = await response.json();
-          // Extract the ID from response - adjust based on your backend's response structure
-          let resultId;
-          if (typeof responseData === 'string') {
-            // If response is directly the ID as string
-            resultId = responseData._id;
-          } else if (responseData.id) {
-            // If response has an id field
-            resultId = responseData._id;
-          } else if (responseData.result_id) {
-            // If response has a result_id field
-            resultId = responseData.result_id;
-          } else if (responseData.data && responseData.data.id) {
-            // If response has nested id
-            resultId = responseData.data.id;
-          } else {
-            // If response is an object, you might need to extract differently
-            resultId = responseData;
-          }
-
-          if (resultId) {
-            // Success message
-            alert('File uploaded and processed successfully!');
-            // Redirect to result page using native browser navigation
-            window.location.href = '/result';
-            // Reset form on success
-            setFile(null); setCourseOutcomes([]); setModules([]);
-            setFormData({ "College Name": "", "Branch": "", "Year Of Study": "", "Semester": "", "Course Name": "", "Course Code": "", "Course Teacher": "" });
-          } else throw new Error('No result ID received from server');
-        } catch { setError('Invalid response from server. Please try again.'); }
-      } else {
-        // Handle error responses
-        try {
-          const text = await response.text();
-          let msg;
-          try {
-            // Try to parse as JSON first
-            const d = JSON.parse(text);
-            msg = d.message || d.error || text;
-          } catch {
-            // If not JSON, use the text directly
-            msg = text;
-          }
-          if (response.status === 403) setError('Access denied. Please check your authentication or login again.');
-          else if (response.status === 401) setError('Authentication required. Please login again.');
-          else if (response.status === 413) setError('File too large. Please upload a smaller file.');
-          else setError(`Upload failed: ${msg}`);
-        } catch { setError(`Server error: ${response.status} ${response.statusText}`); }
-      }
+      alert('File uploaded and processed successfully!');
+      window.location.href = '/result';
+      setFile(null);
+      setCourseOutcomes([]);
+      setModules([]);
+      setFormData({ "College Name": "", "Branch": "", "Year Of Study": "", "Semester": "", "Course Name": "", "Course Code": "", "Course Teacher": "" });
     } catch (err) {
-      if (err.name === 'TypeError' && err.message.includes('fetch')) setError('Network error. Please check your connection.');
-      else if (!navigator.onLine) setError('No internet connection. Please check your connection.');
-      else setError(`Upload failed: ${err.message || 'Unknown error occurred'}`);
-    } finally { setIsUploading(false); }
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'Unknown error occurred';
+      if (err.response?.status === 403) setError('Access denied. Please check your authentication or login again.');
+      else if (err.response?.status === 401) setError('Authentication required. Please login again.');
+      else if (err.response?.status === 413) setError('File too large. Please upload a smaller file.');
+      else setError(`Upload failed: ${msg}`);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const downloadSample = () => {

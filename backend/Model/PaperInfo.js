@@ -10,9 +10,20 @@ const PaperSchema = new mongoose.Schema({
   "Course Teacher": { type: String, required: true },
   "Sequence": [],
   "Collected Data":[],
-  "blommLevelMap": { type: Object, required: true },
+  "blommLevelMap": { type: Object },
+  "bloomLevelMap": { type: Object },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
-},{timestamps:true}); 
+}, { timestamps: true });
+
+// Ensure both bloomLevelMap and legacy typo field blommLevelMap stay in sync
+PaperSchema.pre('save', function(next) {
+  if (this.bloomLevelMap && !this.blommLevelMap) {
+    this.blommLevelMap = this.bloomLevelMap;
+  } else if (this.blommLevelMap && !this.bloomLevelMap) {
+    this.bloomLevelMap = this.blommLevelMap;
+  }
+  next();
+});
 
 const PaperInfo = mongoose.model('PaperInfo', PaperSchema);
 

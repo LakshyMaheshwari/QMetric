@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../Model/user');
 const OCRLog = require('../Model/OCRLog');
 const cloudinary = require('../config/cloudinary');
+// Node 22 has a built-in global `fetch` — no import needed.
 
 // ============================================================
 // OCR HELPER FUNCTIONS
@@ -278,8 +279,36 @@ function uploadToCloudinaryWithOcr(fileBuffer) {
 // LOGIN CONTROLLER (unchanged)
 // ============================================================
 const login = async (req, res) => {
-    console.log(" Login request received:", req.body);
-    const { email, password } = req.body;
+    const { email, password, turnstileToken } = req.body;
+    console.log(" Login request received for email:", email);
+
+    // --- Cloudflare Turnstile verification ---
+    if (!turnstileToken) {
+        return res.status(400).json({ error: true, message: "CAPTCHA token is missing. Please complete the verification." });
+    }
+
+    const turnstileResponse = await fetch(
+        'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                secret:   process.env.TURNSTILE_SECRET_KEY,
+                response: turnstileToken,
+            }).toString(),
+        }
+    );
+    const turnstileResult = await turnstileResponse.json();
+    console.log(' Turnstile verification result (login):', turnstileResult);
+
+    if (!turnstileResult.success) {
+        return res.status(403).json({
+            error:   true,
+            message: 'CAPTCHA verification failed. Please refresh the page and try again.',
+            codes:   turnstileResult['error-codes'],
+        });
+    }
+    // ------------------------------------------
 
     // Check if both email and password are provided
     if (!email || !password) {
@@ -293,22 +322,18 @@ const login = async (req, res) => {
     // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
-        console.log(" User not found:", email);
-        return res.status(404).json({
+        return res.status(401).json({
             error: true,
-            message: "User does not exist.",
+            message: "Invalid email or password.",
         });
     }
-
-    console.log("User found:", email);
 
     // Compare passwords
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-        console.log("Invalid password for:", email);
         return res.status(401).json({
             error: true,
-            message: "Invalid credentials",
+            message: "Invalid email or password.",
         });
     }
 
@@ -323,7 +348,7 @@ const login = async (req, res) => {
         return res.json({
             error: false,
             message: "Login successful",
-            user: { userName: user.userName, email: user.email },
+            user: { userName: user.userName, email: user.email, role: user.role || 'teacher' },
             accessToken,
         });
     } catch (error) {
@@ -337,10 +362,38 @@ const login = async (req, res) => {
 // REGISTER CONTROLLER (with OCR verification)
 // ============================================================
 const register = async (req, res) => {
-    console.log(" Register request received:", req.body);
     try {
-        const { userName, email, password, fullName, phone, collegeName, position, employeeId, department, stream } = req.body;
+        const { userName, email, password, fullName, phone, collegeName, position, employeeId, department, stream, turnstileToken } = req.body;
+        console.log(" Register request received for email:", email);
         const file = req.file; // Provided by multer (memoryStorage → file.buffer)
+
+        // --- Cloudflare Turnstile verification (BEFORE any DB work) ---
+        if (!turnstileToken) {
+            return res.status(400).json({ error: true, message: "CAPTCHA token is missing. Please complete the verification." });
+        }
+
+        const turnstileResponse = await fetch(
+            'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    secret:   process.env.TURNSTILE_SECRET_KEY,
+                    response: turnstileToken,
+                }).toString(),
+            }
+        );
+        const turnstileResult = await turnstileResponse.json();
+        console.log(' Turnstile verification result:', turnstileResult);
+
+        if (!turnstileResult.success) {
+            return res.status(403).json({
+                error:   true,
+                message: 'CAPTCHA verification failed. Please refresh the page and try again.',
+                codes:   turnstileResult['error-codes'],
+            });
+        }
+        // ---------------------------------------------------------------
 
         // --- Step 1: Validate all incoming fields ---
         if (!userName || !email || !password || !fullName || !phone || !collegeName || !position || !employeeId || !department || !stream) {
@@ -494,7 +547,335 @@ const register = async (req, res) => {
     }
 };
 
+// ============================================================
+// BULK REGISTER CONTROLLER  (CSV Onboarding endpoint)
+// POST /auth/bulk-register
+//
+// Accepts: JSON body  { users: [ { userName, email, password,
+//            fullName, phone, collegeName, position,
+//            employeeId, department, stream }, ... ] }
+//
+// Rules:
+//  • No file upload — collegeIdPhoto defaults to '' and
+//    idVerification defaults to 'unverified' for every row.
+//  • Each row is validated independently; invalid/duplicate
+//    rows are skipped and reported, not rolled back.
+//  • Passwords MUST be supplied per-row OR a shared default
+//    password can be provided as `defaultPassword` in the body.
+// ============================================================
+const bulkRegister = async (req, res) => {
+    console.log(' Bulk register request received');
+
+    const { users, defaultPassword, turnstileToken } = req.body;
+
+    // --- Cloudflare Turnstile verification (BEFORE any DB work) ---
+    if (!turnstileToken) {
+        return res.status(400).json({ error: true, message: 'CAPTCHA token is missing. Please complete the verification.' });
+    }
+
+    const turnstileResponse = await fetch(
+        'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                secret:   process.env.TURNSTILE_SECRET_KEY,
+                response: turnstileToken,
+            }).toString(),
+        }
+    );
+    const turnstileResult = await turnstileResponse.json();
+    console.log(' Turnstile verification result (bulk):', turnstileResult);
+
+    if (!turnstileResult.success) {
+        return res.status(403).json({
+            error:   true,
+            message: 'CAPTCHA verification failed. Please refresh the page and try again.',
+            codes:   turnstileResult['error-codes'],
+        });
+    }
+    // ---------------------------------------------------------------
+
+    // ── Basic shape check ────────────────────────────────────
+    if (!Array.isArray(users) || users.length === 0) {
+        return res.status(400).json({
+            error: true,
+            message: '`users` must be a non-empty array.'
+        });
+    }
+
+    if (users.length > 500) {
+        return res.status(400).json({
+            error: true,
+            message: 'Bulk limit is 500 users per request.'
+        });
+    }
+
+    // ── Required fields for every row ────────────────────────
+    const REQUIRED = [
+        'userName', 'email', 'fullName', 'phone',
+        'collegeName', 'position', 'employeeId', 'department', 'stream'
+    ];
+
+    // Valid enum values (mirrors Mongoose schema)
+    const VALID_POSITIONS = ['Professor', 'Associate Professor', 'Assistant Professor', 'Lecturer', 'HoD', 'Other'];
+    const VALID_STREAMS   = ['Engineering', 'Management', 'Science', 'Commerce', 'Arts', 'Law', 'Medicine', 'Other'];
+
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const PHONE_RE = /^[0-9]{10}$/;
+
+    // ── Per-row validation pass ───────────────────────────────
+    const validRows    = [];   // { index, data, password }
+    const skippedRows  = [];   // { index, row, reason }
+
+    for (let i = 0; i < users.length; i++) {
+        const row = users[i];
+
+        // 1. Missing required fields
+        const missing = REQUIRED.filter((f) => !row[f] || String(row[f]).trim() === '');
+        if (missing.length > 0) {
+            skippedRows.push({ index: i, row, reason: `Missing fields: ${missing.join(', ')}` });
+            continue;
+        }
+
+        // 2. Email format
+        if (!EMAIL_RE.test(row.email.trim())) {
+            skippedRows.push({ index: i, row, reason: 'Invalid email format.' });
+            continue;
+        }
+
+        // 3. Phone format
+        if (!PHONE_RE.test(String(row.phone).trim())) {
+            skippedRows.push({ index: i, row, reason: 'Phone must be exactly 10 digits.' });
+            continue;
+        }
+
+        // 4. Enum validation — position
+        if (!VALID_POSITIONS.includes(row.position)) {
+            skippedRows.push({ index: i, row, reason: `Invalid position "${row.position}". Allowed: ${VALID_POSITIONS.join(', ')}.` });
+            continue;
+        }
+
+        // 5. Enum validation — stream
+        if (!VALID_STREAMS.includes(row.stream)) {
+            skippedRows.push({ index: i, row, reason: `Invalid stream "${row.stream}". Allowed: ${VALID_STREAMS.join(', ')}.` });
+            continue;
+        }
+
+        // 6. Resolve password (row-level takes priority over shared default)
+        const rawPassword = row.password || defaultPassword;
+        if (!rawPassword || String(rawPassword).trim().length < 6) {
+            skippedRows.push({ index: i, row, reason: 'Password missing or too short (min 6 chars). Provide row-level `password` or a `defaultPassword` in the request body.' });
+            continue;
+        }
+
+        validRows.push({ index: i, data: row, password: rawPassword.trim() });
+    }
+
+    // ── Duplicate-check against DB ────────────────────────────
+    // Pull all emails, phones, employeeIds from valid rows in one query.
+    const emails      = validRows.map((r) => r.data.email.toLowerCase().trim());
+    const phones      = validRows.map((r) => String(r.data.phone).trim());
+    const employeeIds = validRows.map((r) => String(r.data.employeeId).trim());
+
+    let existingUsers = [];
+    try {
+        existingUsers = await User.find({
+            $or: [
+                { email:      { $in: emails      } },
+                { phone:      { $in: phones      } },
+                { employeeId: { $in: employeeIds } }
+            ]
+        }).select('email phone employeeId').lean();
+    } catch (dbErr) {
+        console.error(' DB duplicate-check error:', dbErr.message);
+        return res.status(500).json({ error: true, message: 'Database error during duplicate check.' });
+    }
+
+    // Build fast lookup sets
+    const existingEmails      = new Set(existingUsers.map((u) => u.email));
+    const existingPhones      = new Set(existingUsers.map((u) => u.phone));
+    const existingEmployeeIds = new Set(existingUsers.map((u) => u.employeeId));
+
+    const toInsert   = [];   // bcrypt-hashed User documents ready for DB
+    const duplicates = [];   // { index, row, reason }
+
+    for (const { index, data, password } of validRows) {
+        const emailLower = data.email.toLowerCase().trim();
+        const phoneStr   = String(data.phone).trim();
+        const empIdStr   = String(data.employeeId).trim();
+
+        // Also check for in-batch duplicates (same email in two CSV rows)
+        const isDupEmail  = existingEmails.has(emailLower);
+        const isDupPhone  = existingPhones.has(phoneStr);
+        const isDupEmpId  = existingEmployeeIds.has(empIdStr);
+
+        if (isDupEmail || isDupPhone || isDupEmpId) {
+            const field = isDupEmail ? 'email' : isDupPhone ? 'phone' : 'employeeId';
+            duplicates.push({ index, row: data, reason: `${field} already exists in the database.` });
+            continue;
+        }
+
+        // Hash password
+        let hashedPassword;
+        try {
+            const salt = await bcrypt.genSalt(10);
+            hashedPassword = await bcrypt.hash(password, salt);
+        } catch (hashErr) {
+            duplicates.push({ index, row: data, reason: `Password hashing failed: ${hashErr.message}` });
+            continue;
+        }
+
+        toInsert.push({
+            userName:     data.userName.trim(),
+            email:        emailLower,
+            password:     hashedPassword,
+            fullName:     data.fullName.trim(),
+            phone:        phoneStr,
+            collegeName:  data.collegeName.trim(),
+            position:     data.position,
+            employeeId:   empIdStr,
+            department:   data.department.trim(),
+            stream:       data.stream,
+            collegeIdPhoto: '',          // No file upload in bulk flow
+            idVerification: {            // Default — unverified until manual OCR review
+                status: 'unverified',
+                extractedData: { fullName: '', employeeId: '', collegeName: '', department: '' },
+                matchedFields: [],
+                confidence: 0,
+                updatedAt: new Date()
+            }
+        });
+
+        // Register the newly queued identifiers so in-batch duplicates are caught
+        existingEmails.add(emailLower);
+        existingPhones.add(phoneStr);
+        existingEmployeeIds.add(empIdStr);
+    }
+
+    // ── Bulk insert ───────────────────────────────────────────
+    let inserted = [];
+    let dbErrors = [];
+
+    if (toInsert.length > 0) {
+        try {
+            // ordered:false  → continue inserting remaining docs even if one fails
+            const result = await User.insertMany(toInsert, { ordered: false });
+            inserted = result;
+            console.log(` Bulk insert: ${result.length} users created.`);
+        } catch (bulkErr) {
+            // insertMany with ordered:false throws a BulkWriteError but still
+            // commits the successful documents. Extract them.
+            if (bulkErr.insertedDocs) {
+                inserted = bulkErr.insertedDocs;
+            }
+            // Collect any write errors
+            const writeErrors = bulkErr.writeErrors || [];
+            for (const we of writeErrors) {
+                const failedDoc = toInsert[we.index];
+                dbErrors.push({
+                    row: failedDoc,
+                    reason: `DB write error: ${we.errmsg || we.err?.errmsg || 'unknown'}`
+                });
+            }
+            console.error(' Bulk write partial error:', bulkErr.message);
+        }
+    }
+
+    // ── Build response summary ────────────────────────────────
+    const totalReceived = users.length;
+    const totalCreated  = inserted.length;
+    const totalSkipped  = skippedRows.length + duplicates.length + dbErrors.length;
+
+    const createdUsers = inserted.map((u) => ({
+        _id:        u._id,
+        userName:   u.userName,
+        email:      u.email,
+        fullName:   u.fullName,
+        employeeId: u.employeeId
+    }));
+
+    console.log(` Bulk register complete — created: ${totalCreated}, skipped: ${totalSkipped}`);
+
+    return res.status(207).json({   // 207 Multi-Status: partial success is normal
+        error: false,
+        summary: {
+            totalReceived,
+            totalCreated,
+            totalSkipped,
+        },
+        created:  createdUsers,
+        failed: [
+            ...skippedRows.map(({ index, row, reason }) => ({ index, email: row.email, reason })),
+            ...duplicates.map(({ index, row, reason }) => ({ index, email: row.email, reason })),
+            ...dbErrors.map(({ row, reason }) => ({ email: row?.email, reason })),
+        ]
+    });
+};
+
+// ============================================================
+// CREATE ADMIN CONTROLLER
+// POST /auth/create-admin  (protected by X-Admin-Secret header)
+//
+// Creates a minimal admin account — no OCR, no college ID photo,
+// no teacher-specific fields. Just name, email, password.
+// ============================================================
+const createAdmin = async (req, res) => {
+    try {
+        const { name, email, password } = req.body;
+
+        if (!name || !email || !password) {
+            return res.status(400).json({ error: true, message: 'Name, email, and password are required.' });
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ error: true, message: 'Invalid email format.' });
+        }
+
+        if (password.length < 8) {
+            return res.status(400).json({ error: true, message: 'Admin password must be at least 8 characters.' });
+        }
+
+        const existing = await User.findOne({ email: email.toLowerCase() });
+        if (existing) {
+            return res.status(400).json({ error: true, message: 'Email is already registered.' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 12);
+
+        const admin = new User({
+            userName: name.trim(),
+            fullName: name.trim(),
+            email: email.toLowerCase().trim(),
+            password: hashedPassword,
+            role: 'admin',
+            // Teacher-specific fields left as defaults (empty strings / null)
+            // idVerification defaults to 'unverified' but is not applicable for admins
+            idVerification: { status: 'not_applicable' }
+        });
+
+        await admin.save();
+
+        const adminResponse = admin.toObject();
+        delete adminResponse.password;
+
+        console.log(` Admin account created: ${email}`);
+
+        return res.status(201).json({
+            error: false,
+            message: 'Admin account created successfully.',
+            user: adminResponse
+        });
+    } catch (err) {
+        console.error(' Create admin error:', err.message);
+        return res.status(500).json({ error: true, message: 'Error creating admin account.', details: err.message });
+    }
+};
+
 module.exports = {
     login,
-    register
+    register,
+    bulkRegister,
+    createAdmin
 };
