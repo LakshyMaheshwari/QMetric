@@ -56,7 +56,7 @@ const FeedbackCard = ({ onSubmit, isLoading = false }) => {
             value={rating}
             onChange={(e) => setRating(Number(e.target.value))}
             className="fb-slider"
-            style={{ '--thumb-color': getRatingColor(rating), '--fill-color': getRatingColor(rating) }}
+            style={{ '--thumb-color': getRatingColor(rating), '--fill-color': getRatingColor(rating), '--val': rating }}
           />
           <div className="fb-slider-labels">
             <span>Not satisfied</span>
