@@ -1,0 +1,231 @@
+/* ============================================================
+   FeedbackCard.css  –  styles for the FeedbackCard component
+   Dark theme matching QMetric's existing palette
+   ============================================================ */
+
+/* ─── Card Shell ─────────────────────────────────────────── */
+.fb-card {
+  background: linear-gradient(135deg, #111827 0%, #1a1f2e 100%);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 1.25rem;
+  padding: 2rem;
+  width: 100%;
+  max-width: 540px;
+  margin: 0 auto;
+  box-shadow:
+    0 0 0 1px rgba(99, 102, 241, 0.1),
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    0 0 80px rgba(99, 102, 241, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  animation: fb-fade-in 0.4s ease;
+}
+
+@keyframes fb-fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Header ─────────────────────────────────────────────── */
+.fb-card__header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.fb-card__icon-wrapper {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+}
+
+.fb-card__title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, #818cf8, #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0 0 0.2rem;
+}
+
+.fb-card__description {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  margin: 0;
+}
+
+/* ─── Section ────────────────────────────────────────────── */
+.fb-card__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.fb-card__label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  letter-spacing: 0.01em;
+}
+
+/* ─── Slider ─────────────────────────────────────────────── */
+.fb-slider-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.fb-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+  /* dynamic gradient filled via inline style fallback */
+  background: linear-gradient(
+    to right,
+    var(--fill-color, #6366f1) 0%,
+    var(--fill-color, #6366f1) calc(var(--val, 50) * 1%),
+    #374151 calc(var(--val, 50) * 1%),
+    #374151 100%
+  );
+  transition: background 0.1s;
+}
+
+/* Recalculate fill using JS-set CSS variable workaround */
+.fb-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--thumb-color, #6366f1);
+  border: 3px solid #1a1f2e;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3), 0 2px 8px rgba(0,0,0,0.4);
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.1s;
+}
+
+.fb-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 0 5px rgba(99, 102, 241, 0.25), 0 2px 8px rgba(0,0,0,0.4);
+}
+
+.fb-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--thumb-color, #6366f1);
+  border: 3px solid #1a1f2e;
+  cursor: pointer;
+}
+
+.fb-slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.fb-rating-badge {
+  align-self: center;
+  padding: 0.3rem 1.1rem;
+  border-radius: 999px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* ─── Textarea ───────────────────────────────────────────── */
+.fb-textarea {
+  width: 100%;
+  min-height: 120px;
+  background: #0f172a;
+  border: 1px solid #374151;
+  border-radius: 0.75rem;
+  padding: 0.85rem 1rem;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.fb-textarea::placeholder {
+  color: #4b5563;
+}
+
+.fb-textarea:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.fb-char-count {
+  font-size: 0.75rem;
+  color: #4b5563;
+  text-align: right;
+}
+
+/* ─── Submit Button ──────────────────────────────────────── */
+.fb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.9rem 1.5rem;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+}
+
+.fb-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(99, 102, 241, 0.55);
+}
+
+.fb-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.fb-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Spinner inside button */
+.fb-btn__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: fb-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes fb-spin {
+  to { transform: rotate(360deg); }
+}

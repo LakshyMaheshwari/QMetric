@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Menu, X, User, Mail, Lock, Eye, EyeOff, Home, BarChart3, Users } from 'lucide-react';
+import { FileText, Menu, X, User, Mail, Lock, Eye, EyeOff, Home, BarChart3, Users, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AccessRestrictionModal from './AccessRestrictionModal';
 import useAccessRestriction from './hooks/useAccessRestriction';
@@ -205,6 +205,17 @@ const Navbar = () => {
                 <Users className="w-4 h-4" />
                 <span>Credits</span>
               </button>
+
+              {/* ── Feedback Link (only for logged-in users) ── */}
+              {user && (
+                <button
+                  onClick={() => navigateTo('/feedback')}
+                  className="relative px-5 py-2 text-lg font-semibold transition-all rounded-lg text-gray-300 hover:text-orange-500 flex items-center space-x-1"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Feedback</span>
+                </button>
+              )}
             </div>
 
             {/* Login / Avatar - Desktop */}
@@ -242,6 +253,13 @@ const Navbar = () => {
                       >
                         <Users className="w-4 h-4" />
                         <span>Credits</span>
+                      </button>
+                      <button
+                        onClick={() => { setShowUserMenu(false); navigateTo('/feedback'); }}
+                        className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex items-center space-x-2"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        <span>Feedback</span>
                       </button>
                       <button
                         onClick={handleLogout}
@@ -314,6 +332,17 @@ const Navbar = () => {
                 <Users className="w-4 h-4" />
                 <span>Credits</span>
               </button>
+
+              {/* ── Feedback Link (Mobile, logged-in only) ── */}
+              {user && (
+                <button
+                  onClick={() => { setIsMenuOpen(false); navigateTo('/feedback'); }}
+                  className="w-full text-left relative px-5 py-2 text-lg font-semibold transition-all rounded-lg text-gray-300 hover:text-orange-500 flex items-center space-x-2"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Feedback</span>
+                </button>
+              )}
 
               {user ? (
                 <div className="space-y-2">

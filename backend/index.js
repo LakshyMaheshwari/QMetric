@@ -10,6 +10,7 @@ const mongoose = require('mongoose');
 
 const fileRouter = require('./routes/file');
 const usersRouter = require('./routes/auth');
+const feedbackRouter = require('./routes/feedback');
 
 const app = express();
 
@@ -42,6 +43,7 @@ app.use(logger('dev'));
   // Routes
   app.use('/upload', fileRouter);
   app.use('/auth', usersRouter);
+  app.use('/feedback', feedbackRouter);
 
   // 404 handler
   app.use((req, res, next) => {

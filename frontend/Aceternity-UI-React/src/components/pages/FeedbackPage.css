@@ -1,0 +1,179 @@
+/* ============================================================
+   FeedbackPage.css  –  page-level layout styles
+   ============================================================ */
+
+/* ─── Full-page wrapper ──────────────────────────────────── */
+.fp-page {
+  min-height: 100vh;
+  background: #030712;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6rem 1.5rem 4rem;
+}
+
+/* ─── Decorative background blobs ────────────────────────── */
+.fp-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+.fp-blob--1 {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, #6366f1, transparent 70%);
+  top: -100px;
+  left: -200px;
+}
+
+.fp-blob--2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, #8b5cf6, transparent 70%);
+  bottom: -80px;
+  right: -150px;
+}
+
+/* ─── Content container ──────────────────────────────────── */
+.fp-container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* ─── Page header ────────────────────────────────────────── */
+.fp-header {
+  text-align: center;
+}
+
+.fp-header__title {
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-weight: 800;
+  color: #f1f5f9;
+  margin: 0 0 0.5rem;
+  line-height: 1.2;
+}
+
+.fp-header__highlight {
+  background: linear-gradient(90deg, #818cf8, #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.fp-header__subtitle {
+  font-size: 0.95rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.fp-header__subtitle strong {
+  color: #a5b4fc;
+}
+
+/* ─── Error banner ───────────────────────────────────────── */
+.fp-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.88rem;
+}
+
+/* ─── Success card ───────────────────────────────────────── */
+.fp-success {
+  background: linear-gradient(135deg, #111827 0%, #1a1f2e 100%);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: 1.25rem;
+  padding: 3rem 2rem;
+  text-align: center;
+  box-shadow: 0 0 60px rgba(34, 197, 94, 0.08), 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: fb-fade-in 0.4s ease;
+}
+
+@keyframes fb-fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fp-success__icon {
+  width: 72px;
+  height: 72px;
+  background: rgba(34, 197, 94, 0.15);
+  border: 2px solid rgba(34, 197, 94, 0.4);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.25rem;
+  color: #22c55e;
+}
+
+.fp-success__title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0 0 0.5rem;
+}
+
+.fp-success__body {
+  color: #6b7280;
+  margin: 0 0 1.75rem;
+  font-size: 0.95rem;
+}
+
+.fp-success__btn {
+  background: transparent;
+  border: 1px solid rgba(99, 102, 241, 0.5);
+  color: #818cf8;
+  padding: 0.65rem 1.5rem;
+  border-radius: 0.65rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.fp-success__btn:hover {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.8);
+}
+
+/* ─── Loading screen ─────────────────────────────────────── */
+.fp-loading {
+  min-height: 100vh;
+  background: #030712;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.fp-loading__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(99, 102, 241, 0.2);
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: fb-spin 0.7s linear infinite;
+}
+
+@keyframes fb-spin {
+  to { transform: rotate(360deg); }
+}
