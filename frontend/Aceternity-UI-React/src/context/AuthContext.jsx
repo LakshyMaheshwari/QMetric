@@ -1,103 +1,99 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-
 /**
- * AuthContext — provides authentication state across the entire app.
- * Reads from sessionStorage to match the pattern in Navbar.jsx.
+ * context/AuthContext.jsx
+ * ------------------------
+ * Centralised authentication state for the entire app.
  *
- * Exposed values:
- *   user     — { userName, email } | null
- *   token    — JWT string | null
- *   loading  — true while initial session check is running
- *   login()  — saves token/user to sessionStorage and updates state
- *   logout() — clears sessionStorage and resets state
+ * - Single source of truth: localStorage
+ * - All components read/write auth via this context — no direct localStorage access elsewhere
+ * - Listens to a custom 'authStateChanged' window event so unrelated components (e.g. Navbar)
+ *   can react when other components (e.g. RegisterPage) complete a login.
  */
+
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const AuthContext = createContext(null);
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+// ─── Storage helpers (always localStorage) ─────────────────────────────────────
+const STORAGE_KEY_TOKEN = 'accessToken';
+const STORAGE_KEY_USER  = 'user';
+
+function readStoredAuth() {
+  try {
+    const token = localStorage.getItem(STORAGE_KEY_TOKEN);
+    const raw   = localStorage.getItem(STORAGE_KEY_USER);
+    const user  = raw ? JSON.parse(raw) : null;
+    return { token, user };
+  } catch {
+    return { token: null, user: null };
+  }
+}
+
+function writeStoredAuth(token, user) {
+  localStorage.setItem(STORAGE_KEY_TOKEN, token);
+  localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+}
+
+function clearStoredAuth() {
+  // Clear from local storage
+  localStorage.removeItem(STORAGE_KEY_TOKEN);
+  localStorage.removeItem(STORAGE_KEY_USER);
+}
+
+// ─── Provider ──────────────────────────────────────────────────────────────────
+export function AuthProvider({ children }) {
+  const [user,  setUser]  = useState(null);
   const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
 
-  // On mount, restore session from sessionStorage
+  // Initialise from storage on mount
   useEffect(() => {
-    const storedToken = sessionStorage.getItem('accessToken');
-    const storedUser = sessionStorage.getItem('user');
-    if (storedToken && storedUser) {
-      try {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      } catch {
-        // Corrupted data — clear it
-        sessionStorage.removeItem('accessToken');
-        sessionStorage.removeItem('user');
-      }
+    const { token: t, user: u } = readStoredAuth();
+    if (t && u) {
+      setToken(t);
+      setUser(u);
     }
-    setLoading(false);
   }, []);
 
-  /**
-   * Listen for external auth state changes dispatched by Navbar.jsx
-   * (Navbar dispatches a custom 'authStateChanged' event on login/logout)
-   */
+  // React to auth changes triggered by other components or the axios interceptor
   useEffect(() => {
-    const syncAuth = () => {
-      const storedToken = sessionStorage.getItem('accessToken');
-      const storedUser = sessionStorage.getItem('user');
-      if (storedToken && storedUser) {
-        try {
-          setToken(storedToken);
-          setUser(JSON.parse(storedUser));
-        } catch {
-          setToken(null);
-          setUser(null);
-        }
-      } else {
-        setToken(null);
-        setUser(null);
-      }
+    const handleChange = () => {
+      const { token: t, user: u } = readStoredAuth();
+      setToken(t || null);
+      setUser(u || null);
     };
-
-    window.addEventListener('authStateChanged', syncAuth);
-    return () => window.removeEventListener('authStateChanged', syncAuth);
+    window.addEventListener('authStateChanged', handleChange);
+    return () => window.removeEventListener('authStateChanged', handleChange);
   }, []);
 
-  /**
-   * login — call this after a successful API response
-   * @param {string} accessToken
-   * @param {{ userName: string, email: string }} userData
-   */
+  /** Call this after a successful login / registration */
   const login = useCallback((accessToken, userData) => {
-    sessionStorage.setItem('accessToken', accessToken);
-    sessionStorage.setItem('user', JSON.stringify(userData));
+    writeStoredAuth(accessToken, userData);
     setToken(accessToken);
     setUser(userData);
     window.dispatchEvent(new Event('authStateChanged'));
   }, []);
 
-  /** logout — clears session and redirects consumers */
+  /** Call this on logout from any component */
   const logout = useCallback(() => {
-    sessionStorage.removeItem('accessToken');
-    sessionStorage.removeItem('user');
+    clearStoredAuth();
     setToken(null);
     setUser(null);
     window.dispatchEvent(new Event('authStateChanged'));
   }, []);
 
+  const isAuthenticated = Boolean(token && user);
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-/** useAuth — hook to consume auth context in any component */
-export const useAuth = () => {
+// ─── Hook ──────────────────────────────────────────────────────────────────────
+export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error('useAuth must be used inside <AuthProvider>');
-  }
+  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
   return ctx;
-};
+}
 
 export default AuthContext;

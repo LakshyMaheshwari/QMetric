@@ -148,6 +148,7 @@ console.log("Dynamic Bloom Level Map:", bloomLevelMap);
                 ModuleHours: moduleHours
             },
             blommLevelMap: bloomLevelMap,
+            bloomLevelMap: bloomLevelMap,
             "Collected Data": evaluationResult,
             "userId": userId
         });
@@ -244,25 +245,46 @@ exports.getResultsById = async (req, res) => {
   }
 };
 
-exports.searchPapers = async(req, res) => {
-    try{
+/**
+ * escapeRegex — escapes all special regex metacharacters in a string.
+ * Prevents ReDoS attacks from user-supplied search queries.
+ */
+function escapeRegex(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+exports.searchPapers = async (req, res) => {
+    try {
         const { userId } = req.user;
-        const {query} = req.body;
+        const { query } = req.body;
 
-        const searchRegex = new RegExp(query, 'i');
+        // Validate: query must be a non-empty string, max 200 chars
+        if (!query || typeof query !== 'string') {
+            return res.status(400).json({ error: 'Search query is required.' });
+        }
+        if (query.trim().length === 0) {
+            return res.status(400).json({ error: 'Search query cannot be empty.' });
+        }
+        if (query.length > 200) {
+            return res.status(400).json({ error: 'Search query is too long (max 200 characters).' });
+        }
 
-        const papers = await PaperInfo.find ({
+        // Escape special regex characters before building the pattern
+        const safeQuery = escapeRegex(query.trim());
+        const searchRegex = new RegExp(safeQuery, 'i');
+
+        const papers = await PaperInfo.find({
             userId: userId,
             $or: [
-            {"College Name":searchRegex},
-            {"Branch":searchRegex},
-            {"Course Name":searchRegex},
-            {"Course Code":searchRegex}
-        ]
-    });
+                { 'College Name': searchRegex },
+                { 'Branch':       searchRegex },
+                { 'Course Name':  searchRegex },
+                { 'Course Code':  searchRegex },
+            ]
+        }).lean();
 
-    res.json(papers);
-}catch(error){
-    res.status(500).json({error: error.message })
-}
+        res.json(papers);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 };

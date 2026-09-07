@@ -11,6 +11,9 @@ import "animate.css";
 import UserDashboard from "./components/pages/UserDashboard";
 import CreditsPage from "./components/pages/Creditspage";
 import FeedbackPage from "./components/pages/FeedbackPage";
+import RegisterPage from "./components/pages/RegisterPage";
+import ProfilePage from "./components/pages/ProfilePage";
+import AdminDashboard from "./components/pages/AdminDashboard";
 import { AuthProvider } from "./context/AuthContext";
 
 function App() {
@@ -29,6 +32,9 @@ function App() {
           <Route path="/credits" element={<CreditsPage />} />
           {/* Feedback — auth-guarded page */}
           <Route path="/feedback" element={<FeedbackPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/admin" element={<AdminDashboard />} />
         </Routes>
         <Footer />
       </div>

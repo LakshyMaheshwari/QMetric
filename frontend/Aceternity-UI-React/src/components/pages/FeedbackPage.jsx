@@ -13,7 +13,7 @@ const API_BASE = 'https://qmetric-2.onrender.com';
  * not authenticated. Submits feedback to POST /feedback.
  */
 const FeedbackPage = () => {
-  const { user, token, loading } = useAuth();
+  const { user, token } = useAuth();
   const navigate = useNavigate();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -22,10 +22,10 @@ const FeedbackPage = () => {
 
   // Redirect unauthenticated users back to home
   useEffect(() => {
-    if (!loading && !user) {
+    if (!user) {
       navigate('/');
     }
-  }, [user, loading, navigate]);
+  }, [user, navigate]);
 
   // ── Submit handler ────────────────────────────────────────
   const handleFeedbackSubmit = async ({ rating, feedback }) => {
@@ -58,16 +58,6 @@ const FeedbackPage = () => {
       setIsSubmitting(false);
     }
   };
-
-  // ── Loading / auth guard ──────────────────────────────────
-  if (loading) {
-    return (
-      <div className="fp-loading">
-        <div className="fp-loading__spinner" />
-        <p>Checking session…</p>
-      </div>
-    );
-  }
 
   // If not logged in, useEffect will redirect — render nothing meanwhile
   if (!user) return null;

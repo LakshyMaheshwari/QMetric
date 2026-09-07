@@ -3,9 +3,11 @@ import {
   User, BookOpen, BarChart3, Upload, LogOut,
   FileText, Brain, ArrowRight, RefreshCw, Home
 } from 'lucide-react';
+import apiClient from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
 
 export default function UserDashboard() {
-  const [user, setUser] = useState(null);
+  const { user, logout: authLogout, isAuthenticated } = useAuth();
   const [recentPapers, setRecentPapers] = useState([]);
   const [stats, setStats] = useState({ totalPapers: 0 });
   const [loading, setLoading] = useState(true);
@@ -15,46 +17,27 @@ export default function UserDashboard() {
   };
 
   useEffect(() => {
-    // Check user authentication
-    const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
-    const userData = localStorage.getItem('user') || sessionStorage.getItem('user');
-    // Check for authentication token - replace with your auth logic
-    if (!token || !userData) {
-      setUser({ name: 'Dr. Sarah Johnson', email: 'sarah.johnson@university.edu', role: 'Faculty' });
-      fetchMockData();
+    if (isAuthenticated) {
+      fetchDashboardData();
     } else {
-      try {
-        setUser(JSON.parse(userData));
-        fetchDashboardData();
-      } catch {
-        setUser({ name: 'Dr. Sarah Johnson', email: 'sarah.johnson@university.edu', role: 'Faculty' });
-        fetchMockData();
-      }
+      fetchMockData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAuthenticated]);
 
   // Fetch actual dashboard data from API
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const token = sessionStorage.getItem('accessToken') || localStorage.getItem('accessToken');
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/upload/totext`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          setRecentPapers(result.data.slice(0, 5));
-          setStats({ totalPapers: result.data.length });
-        }
+      const response = await apiClient.get('/upload/totext');
+      const result = response.data;
+      if (result.success && Array.isArray(result.data)) {
+        setRecentPapers(result.data.slice(0, 5));
+        setStats({ totalPapers: result.data.length });
       } else {
-        // Fallback to mock data if API fails
         fetchMockData();
       }
     } catch {
-      // Fallback to mock data if API fails
       fetchMockData();
     } finally {
       setLoading(false);
@@ -64,7 +47,6 @@ export default function UserDashboard() {
   // Mock data for demo purposes
   const fetchMockData = () => {
     setLoading(true);
-    // Simulate API delay
     setTimeout(() => {
       const mockPapers = [
         { _id: '1', 'Course Name': 'Advanced Data Structures', 'Course Code': 'CS301', 'Branch': 'Computer Science', 'Year Of Study': '3rd Year', 'Semester': '5', 'College Name': 'Tech University', createdAt: new Date().toISOString() },
@@ -78,8 +60,7 @@ export default function UserDashboard() {
   };
 
   const handleLogout = () => {
-    ['accessToken', 'user'].forEach(k => { localStorage.removeItem(k); sessionStorage.removeItem(k); });
-    window.dispatchEvent(new Event('authStateChanged'));
+    authLogout();
     navigate('/');
   };
 

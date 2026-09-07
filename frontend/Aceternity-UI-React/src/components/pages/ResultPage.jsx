@@ -4,6 +4,7 @@ import BloomsAnalysisChart from './report/BloomAnalysisChart';
 import ModuleAnalysisChart from './report/ModuleAnalysisChart';
 import QuestionDistributionChart from './report/QuestionDistributionChart';
 import COCoverageChart from './report/COCoverageChart';
+import apiClient from '../../api/client';
 
 // Small SVG gauge component for final score
 function polarToCartesian(cx, cy, r, angleDeg) {
@@ -142,40 +143,16 @@ const ResultPage = () => {
   const chartsRef = useRef(null);
 
   useEffect(() => {
-    const authToken = sessionStorage.getItem('accessToken');
-    if (authToken) {
-      fetchData(authToken);
-    } else {
-      setError('Authorization token is required');
-      setLoading(false);
-    }
+    fetchData();
   }, []);
 
-  const fetchData = async (authToken) => {
+  const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // const response = await fetch('http://localhost:80/upload/totext', {
-      const response = await fetch('https://qmetric-2.onrender.com/upload/totext', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Unauthorized: Invalid or expired token');
-        } else if (response.status === 403) {
-          throw new Error('Forbidden: Insufficient permissions');
-        } else {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-      }
-
-      const result = await response.json();
+      const response = await apiClient.get('/upload/totext');
+      const result = response.data;
 
       if (result.success && result.data) {
         setData(result.data);
@@ -183,7 +160,8 @@ const ResultPage = () => {
         throw new Error('Invalid response format or unsuccessful request');
       }
     } catch (err) {
-      setError(err.message);
+      const msg = err.response?.data?.message || err.message || 'Failed to load results';
+      setError(msg);
     } finally {
       setLoading(false);
     }
