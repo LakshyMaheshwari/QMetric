@@ -4,8 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import FeedbackCard from '../FeedbackCard';
 import './FeedbackPage.css';
 
-// API base URL — matches the URL used in Navbar.jsx
-const API_BASE = 'https://qmetric-2.onrender.com';
+// API base URL — use env var if available, fall back to localhost for dev
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 /**
  * FeedbackPage — accessible at /feedback.

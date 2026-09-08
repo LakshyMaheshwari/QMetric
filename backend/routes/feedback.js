@@ -54,13 +54,13 @@ router.post('/', authenticateToken, async (req, res) => {
 /**
  * GET /feedback
  * Retrieve all feedback — admin only.
- * Admin check: looks for isAdmin flag on User document.
+ * Admin check: user.role must be 'admin'.
  * Sorted by newest first.
  */
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const adminUser = await User.findById(req.user.userId);
-    if (!adminUser || !adminUser.isAdmin) {
+    if (!adminUser || adminUser.role !== 'admin') {
       return res.status(403).json({ error: true, message: 'Access denied. Admins only.' });
     }
 
@@ -79,7 +79,7 @@ router.get('/', authenticateToken, async (req, res) => {
 router.put('/:id/resolve', authenticateToken, async (req, res) => {
   try {
     const adminUser = await User.findById(req.user.userId);
-    if (!adminUser || !adminUser.isAdmin) {
+    if (!adminUser || adminUser.role !== 'admin') {
       return res.status(403).json({ error: true, message: 'Access denied. Admins only.' });
     }
 

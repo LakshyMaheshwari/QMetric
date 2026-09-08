@@ -11,6 +11,7 @@ import "animate.css";
 import UserDashboard from "./components/pages/UserDashboard";
 import CreditsPage from "./components/pages/Creditspage";
 import FeedbackPage from "./components/pages/FeedbackPage";
+import Testimonials from "./components/Testimonials";
 import RegisterPage from "./components/pages/RegisterPage";
 import ProfilePage from "./components/pages/ProfilePage";
 import AdminDashboard from "./components/pages/AdminDashboard";
@@ -36,6 +37,7 @@ function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/admin" element={<AdminDashboard />} />
         </Routes>
+        <Testimonials />
         <Footer />
       </div>
     </AuthProvider>
