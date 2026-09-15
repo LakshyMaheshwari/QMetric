@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -19,6 +19,8 @@ export default function RegisterPage() {
     password: "",
     fullName: "",
     phone: "",
+    collegeId: "",
+    collegeCode: "",
     collegeName: "",
     position: "Professor",   // default enum value
     employeeId: "",
@@ -27,9 +29,30 @@ export default function RegisterPage() {
     collegeIdPhoto: null,
   });
 
+  const [collegesList, setCollegesList] = useState([]);
+  const [loadingColleges, setLoadingColleges] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
   const [success, setSuccess] = useState("");
+
+  // Fetch active colleges on mount for selection
+  useEffect(() => {
+    const fetchActiveColleges = async () => {
+      try {
+        setLoadingColleges(true);
+        const res = await apiClient.get('/auth/colleges');
+        if (res.data && res.data.colleges) {
+          setCollegesList(res.data.colleges);
+        }
+      } catch (err) {
+        console.error('Failed to load active colleges:', err);
+      } finally {
+        setLoadingColleges(false);
+      }
+    };
+    fetchActiveColleges();
+  }, []);
 
   // Turnstile
   const turnstileRef   = useRef(null);
@@ -377,18 +400,42 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* College Name */}
+            {/* College Selection & Code */}
             <div className="space-y-2">
-              <Label htmlFor="collegeName">College Name</Label>
-              <Input
-                id="collegeName"
-                name="collegeName"
-                type="text"
+              <Label htmlFor="collegeId">
+                Select Registered College <span className="text-red-400">*</span>
+              </Label>
+              <select
+                id="collegeId"
+                name="collegeId"
                 required
-                placeholder="University of Technology"
-                value={formData.collegeName}
-                onChange={handleChange}
-              />
+                value={formData.collegeId}
+                onChange={(e) => {
+                  const selectedId = e.target.value;
+                  const selectedCollege = collegesList.find((c) => c._id === selectedId);
+                  setFormData((prev) => ({
+                    ...prev,
+                    collegeId: selectedId,
+                    collegeCode: selectedCollege ? selectedCollege.code : "",
+                    collegeName: selectedCollege ? selectedCollege.name : "",
+                  }));
+                }}
+                className="flex h-10 w-full border-none bg-zinc-800 text-white shadow-input rounded-md px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-[2px] focus-visible:ring-neutral-600 shadow-[0px_0px_1px_1px_var(--neutral-700)]"
+              >
+                <option value="">
+                  {loadingColleges ? "Loading colleges..." : "-- Select your institution --"}
+                </option>
+                {collegesList.map((college) => (
+                  <option key={college._id} value={college._id}>
+                    {college.name} ({college.code}) {college.city ? `- ${college.city}` : ""}
+                  </option>
+                ))}
+              </select>
+              {formData.collegeCode && (
+                <p className="text-xs text-blue-400">
+                  College Code: <span className="font-mono font-bold uppercase">{formData.collegeCode}</span>
+                </p>
+              )}
             </div>
 
             {/* Position */}

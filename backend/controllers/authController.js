@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../Model/user');
+const College = require('../Model/College');
 const OCRLog = require('../Model/OCRLog');
 const cloudinary = require('../config/cloudinary');
 // Node 22 has a built-in global `fetch` — no import needed.
@@ -348,7 +349,14 @@ const login = async (req, res) => {
         return res.json({
             error: false,
             message: "Login successful",
-            user: { userName: user.userName, email: user.email, role: user.role || 'teacher' },
+            user: {
+                userName: user.userName,
+                email: user.email,
+                fullName: user.fullName || user.userName,
+                role: user.role || 'teacher',
+                collegeId: user.collegeId || null,
+                collegeName: user.collegeName || ''
+            },
             accessToken,
         });
     } catch (error) {
@@ -363,7 +371,11 @@ const login = async (req, res) => {
 // ============================================================
 const register = async (req, res) => {
     try {
-        const { userName, email, password, fullName, phone, collegeName, position, employeeId, department, stream, turnstileToken } = req.body;
+        const {
+            userName, email, password, fullName, phone,
+            collegeId, collegeCode, collegeName,
+            position, employeeId, department, stream, turnstileToken
+        } = req.body;
         console.log(" Register request received for email:", email);
         const file = req.file; // Provided by multer (memoryStorage → file.buffer)
 
@@ -396,9 +408,36 @@ const register = async (req, res) => {
         // ---------------------------------------------------------------
 
         // --- Step 1: Validate all incoming fields ---
-        if (!userName || !email || !password || !fullName || !phone || !collegeName || !position || !employeeId || !department || !stream) {
+        if (!userName || !email || !password || !fullName || !phone || (!collegeId && !collegeCode && !collegeName) || !position || !employeeId || !department || !stream) {
             return res.status(400).json({ error: true, message: "All fields are required." });
         }
+
+        // Validate College exists and is active
+        let matchedCollege = null;
+        if (collegeId) {
+            matchedCollege = await College.findById(collegeId);
+        } else if (collegeCode) {
+            matchedCollege = await College.findOne({ code: collegeCode.trim().toUpperCase() });
+        } else if (collegeName) {
+            matchedCollege = await College.findOne({ name: { $regex: `^${collegeName.trim()}$`, $options: 'i' } });
+        }
+
+        if (!matchedCollege) {
+            return res.status(400).json({
+                error: true,
+                message: "Selected college is not recognized. Please choose a valid registered college."
+            });
+        }
+
+        if (!matchedCollege.isActive) {
+            return res.status(403).json({
+                error: true,
+                message: "This college is currently inactive. Please contact the college administrator."
+            });
+        }
+
+        const effectiveCollegeName = matchedCollege.name;
+        const effectiveCollegeId = matchedCollege._id;
 
         if (!file) {
             return res.status(400).json({ error: true, message: "College ID photo is required." });
@@ -484,7 +523,8 @@ const register = async (req, res) => {
             password: hashedPassword,
             fullName,
             phone,
-            collegeName,
+            collegeId: effectiveCollegeId,
+            collegeName: effectiveCollegeName,
             position,
             employeeId,
             department,
@@ -496,12 +536,19 @@ const register = async (req, res) => {
         await newUser.save();
         console.log(' User created:', email, '| Verification:', idVerification.status);
 
+        // Increment totalTeachers on the College document
+        try {
+            await College.findByIdAndUpdate(effectiveCollegeId, { $inc: { totalTeachers: 1 } });
+        } catch (colErr) {
+            console.error('Failed to increment college totalTeachers:', colErr.message);
+        }
+
         // --- Save OCR Log (non-blocking) ---
         // Full ocrRawText lives here; failure must NOT affect registration.
         try {
             await OCRLog.create({
                 userId:        newUser._id,
-                userInput:     { fullName, employeeId, collegeName, department },
+                userInput:     { fullName, employeeId, collegeName: effectiveCollegeName, department },
                 extractedData: idVerification.extractedData,
                 matchedFields: idVerification.matchedFields,
                 status:        idVerification.status,

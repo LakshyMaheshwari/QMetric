@@ -79,7 +79,7 @@ const createUser = async (req, res) => {
 const updateRole = async (req, res) => {
     try {
         const { role } = req.body;
-        if (!['teacher', 'reviewer', 'admin'].includes(role)) {
+        if (!['teacher', 'reviewer', 'admin', 'super_admin'].includes(role)) {
             return res.status(400).json({ error: true, message: 'Invalid role' });
         }
         const user = await User.findByIdAndUpdate(

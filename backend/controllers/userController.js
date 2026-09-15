@@ -3,7 +3,9 @@ const User = require('../Model/user');
 const getProfile = async (req, res) => {
     try {
         // req.user is set by the authenticateToken middleware
-        const user = await User.findById(req.user.userId).select('-password');
+        const user = await User.findById(req.user.userId)
+            .select('-password')
+            .populate('collegeId', 'name code city state');
         if (!user) {
             return res.status(404).json({ error: true, message: 'User not found' });
         }

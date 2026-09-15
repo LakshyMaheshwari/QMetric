@@ -12,6 +12,10 @@ const rateLimit   = require('express-rate-limit');
 const fileRouter  = require('./routes/file');
 const usersRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
+const superAdminCollegesRouter = require('./routes/superAdminColleges');
+const superAdminRouter = require('./routes/superAdmin');
+const collegeAdminRouter = require('./routes/collegeAdmin');
+const reviewerRouter = require('./routes/reviewer');
 
 const app = express();
 
@@ -76,7 +80,14 @@ const bulkLimiter = rateLimit({
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/upload', uploadLimiter, fileRouter);
 app.use('/auth',   authLimiter,   usersRouter);
+app.use('/college-admin',          collegeAdminRouter);
+app.use('/admin/colleges',         superAdminCollegesRouter);
+const teacherRouter = require('./routes/teacher');
+
 app.use('/admin',                 adminRouter);
+app.use('/super-admin',           superAdminRouter);
+app.use('/reviewer',              reviewerRouter);
+app.use('/teacher',               teacherRouter);
 
 // ─── Health check (responds even if DB is not yet connected) ──────────────────
 app.get('/health', (req, res) => {

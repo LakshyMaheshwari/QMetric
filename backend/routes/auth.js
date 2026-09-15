@@ -29,9 +29,15 @@ router.post('/bulk-register', adminAuth, (req, res, next) => {
   next();
 }, authController.bulkRegister);
 
+const collegeController = require('../controllers/collegeController');
+
+// ─── Active Colleges (for registration dropdown) ─────────────────────────────
+router.get('/colleges', collegeController.getActiveColleges);
+
 // ─── Admin account creation — protected by admin secret header ───────────────
 // Caller must send:  X-Admin-Secret: <ADMIN_SECRET_KEY>
 // Body: { name, email, password }
 router.post('/create-admin', adminAuth, authController.createAdmin);
 
 module.exports = router;
+

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Turnstile } from '@marsidev/react-turnstile';
-import { FileText, Menu, X, User, Mail, Lock, Eye, EyeOff, Home, BarChart3, Users, Shield } from 'lucide-react';
+import { FileText, Menu, X, User, Mail, Lock, Eye, EyeOff, Home, BarChart3, Users, Shield, Building2, Building, ClipboardCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AccessRestrictionModal from './AccessRestrictionModal';
 import useAccessRestriction from './hooks/useAccessRestriction';
@@ -219,13 +219,40 @@ const Navbar = () => {
                         <User className="w-4 h-4" />
                         <span>Profile</span>
                       </button>
+                      {user.role === 'super_admin' && (
+                        <button
+                          onClick={() => { setShowUserMenu(false); navigateTo('/super-admin'); }}
+                          className="w-full text-left px-4 py-2 text-blue-300 hover:bg-blue-500/10 hover:text-blue-200 transition-colors flex items-center space-x-2"
+                        >
+                          <Building2 className="w-4 h-4" />
+                          <span>Super Admin Dashboard</span>
+                        </button>
+                      )}
                       {user.role === 'admin' && (
                         <button
-                          onClick={() => { setShowUserMenu(false); navigateTo('/admin'); }}
-                          className="w-full text-left px-4 py-2 text-purple-300 hover:bg-purple-500/10 hover:text-purple-200 transition-colors flex items-center space-x-2"
+                          onClick={() => { setShowUserMenu(false); navigateTo('/college-admin'); }}
+                          className="w-full text-left px-4 py-2 text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200 transition-colors flex items-center space-x-2"
                         >
-                          <Shield className="w-4 h-4" />
-                          <span>Admin Dashboard</span>
+                          <Building className="w-4 h-4" />
+                          <span>College Dashboard</span>
+                        </button>
+                      )}
+                      {(user.role === 'reviewer' || user.role === 'admin') && (
+                        <button
+                          onClick={() => { setShowUserMenu(false); navigateTo('/reviewer'); }}
+                          className="w-full text-left px-4 py-2 text-teal-300 hover:bg-teal-500/10 hover:text-teal-200 transition-colors flex items-center space-x-2"
+                        >
+                          <ClipboardCheck className="w-4 h-4" />
+                          <span>Review Papers</span>
+                        </button>
+                      )}
+                      {(user.role === 'teacher' || user.role === 'reviewer' || user.role === 'admin') && (
+                        <button
+                          onClick={() => { setShowUserMenu(false); navigateTo('/teacher'); }}
+                          className="w-full text-left px-4 py-2 text-indigo-300 hover:bg-indigo-500/10 hover:text-indigo-200 transition-colors flex items-center space-x-2"
+                        >
+                          <FileText className="w-4 h-4" />
+                          <span>My Papers</span>
                         </button>
                       )}
                       <button
@@ -319,13 +346,40 @@ const Navbar = () => {
                     <User className="w-4 h-4" />
                     <span>Profile</span>
                   </button>
+                  {user.role === 'super_admin' && (
+                    <button
+                      onClick={() => { setIsMenuOpen(false); navigateTo('/super-admin'); }}
+                      className="w-full text-left px-4 py-2 text-blue-300 hover:bg-blue-500/10 hover:text-blue-200 transition-colors rounded-lg flex items-center space-x-2"
+                    >
+                      <Building2 className="w-4 h-4" />
+                      <span>Super Admin Dashboard</span>
+                    </button>
+                  )}
                   {user.role === 'admin' && (
                     <button
-                      onClick={() => { setIsMenuOpen(false); navigateTo('/admin'); }}
-                      className="w-full text-left px-4 py-2 text-purple-300 hover:bg-purple-500/10 hover:text-purple-200 transition-colors rounded-lg flex items-center space-x-2"
+                      onClick={() => { setIsMenuOpen(false); navigateTo('/college-admin'); }}
+                      className="w-full text-left px-4 py-2 text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200 transition-colors rounded-lg flex items-center space-x-2"
                     >
-                      <Shield className="w-4 h-4" />
-                      <span>Admin Dashboard</span>
+                      <Building className="w-4 h-4" />
+                      <span>College Dashboard</span>
+                    </button>
+                  )}
+                  {(user.role === 'reviewer' || user.role === 'admin') && (
+                    <button
+                      onClick={() => { setIsMenuOpen(false); navigateTo('/reviewer'); }}
+                      className="w-full text-left px-4 py-2 text-teal-300 hover:bg-teal-500/10 hover:text-teal-200 transition-colors rounded-lg flex items-center space-x-2"
+                    >
+                      <ClipboardCheck className="w-4 h-4" />
+                      <span>Review Papers</span>
+                    </button>
+                  )}
+                  {(user.role === 'teacher' || user.role === 'reviewer' || user.role === 'admin') && (
+                    <button
+                      onClick={() => { setIsMenuOpen(false); navigateTo('/teacher'); }}
+                      className="w-full text-left px-4 py-2 text-indigo-300 hover:bg-indigo-500/10 hover:text-indigo-200 transition-colors rounded-lg flex items-center space-x-2"
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>My Papers</span>
                     </button>
                   )}
                   <button

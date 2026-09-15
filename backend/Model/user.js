@@ -25,12 +25,18 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['teacher', 'reviewer', 'admin'],
+        enum: ['teacher', 'reviewer', 'admin', 'super_admin'],
         default: 'teacher'
     },
     isBlocked: {
         type: Boolean,
         default: false
+    },
+    collegeId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'College',
+        required: false,
+        default: null
     },
 
     // --- Teacher-specific profile fields (NOT required for admin/reviewer) ---
@@ -100,11 +106,7 @@ const userSchema = new mongoose.Schema({
         ],
         default: ''
     },
-    collegeIdPhoto: {
-        type: String,         // Cloudinary secure_url
-        required: teacherOnly,
-        default: ''
-    },
+    collegeIdPhoto: { type: String, required: false, default: '' },
 
     // --- OCR ID Verification (teachers only — admins skip this) ---
     idVerification: {
@@ -137,9 +139,18 @@ const userSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-// Indexes for faster lookups
-userSchema.index({ employeeId: 1, collegeName: 1 });
-userSchema.index({ email: 1 });
-userSchema.index({ phone: 1 });
+// Pre-save hook: Enforce collegeId requirements by role
+userSchema.pre('save', function (next) {
+    if (this.role === 'super_admin') {
+        this.collegeId = null;
+        this.collegeName = '';
+    } else if (!this.collegeId && ['teacher', 'reviewer', 'admin'].includes(this.role)) {
+        return next(new Error('College is required for teachers, reviewers, and admins'));
+    }
+    next();
+});
 
+// Indexes for faster lookups
+userSchema.index({ collegeId: 1 });
+userSchema.index({ employeeId: 1, collegeName: 1 });
 module.exports = mongoose.model('User', userSchema);

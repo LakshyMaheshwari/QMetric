@@ -13,6 +13,12 @@ import CreditsPage from "./components/pages/Creditspage";
 import RegisterPage from "./components/pages/RegisterPage";
 import ProfilePage from "./components/pages/ProfilePage";
 import AdminDashboard from "./components/pages/AdminDashboard";
+import CollegeAdminDashboard from "./components/pages/CollegeAdminDashboard";
+import Colleges from "./components/SuperAdmin/Colleges";
+import SuperAdminDashboard from "./components/pages/SuperAdminDashboard";
+import CollegeDetailPage from "./components/pages/CollegeDetailPage";
+import ReviewerDashboard from "./components/pages/ReviewerDashboard";
+import TeacherDashboard from "./components/pages/TeacherDashboard";
 import { AuthProvider } from "./context/AuthContext";
 
 function App() {
@@ -31,6 +37,12 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/college-admin" element={<CollegeAdminDashboard />} />
+          <Route path="/super-admin/colleges" element={<Colleges />} />
+          <Route path="/super-admin" element={<SuperAdminDashboard />} />
+          <Route path="/super-admin/colleges/:id" element={<CollegeDetailPage />} />
+          <Route path="/reviewer" element={<ReviewerDashboard />} />
+          <Route path="/teacher" element={<TeacherDashboard />} />
         </Routes>
         <Footer />
       </div>
