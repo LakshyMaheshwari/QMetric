@@ -1,0 +1,9 @@
+# Python virtualenv — never commit this
+bin/
+lib/
+include/
+pyvenv.cfg
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
