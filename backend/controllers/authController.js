@@ -1,9 +1,18 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const validator = require('validator');
 const User = require('../Model/user');
+const { logAudit } = require('../utils/auditLog');
+const { getUserId } = require('../utils/currentUser');
 const College = require('../Model/College');
 const OCRLog = require('../Model/OCRLog');
 const cloudinary = require('../config/cloudinary');
+const { withTransaction } = require('../utils/withTransaction');
+const { BCRYPT_ROUNDS, isStrongPassword, PASSWORD_ERROR_MESSAGE } = require('../config/security');
+const { createNotification } = require('./notificationController');
+const crypto = require('node:crypto');
+const emailService = require('../utils/emailService');
+
 // Node 22 has a built-in global `fetch` — no import needed.
 
 // ============================================================
@@ -19,25 +28,52 @@ function normalize(str) {
     return str
         .toLowerCase()
         .trim()
-        .replace(/[^a-z0-9\s]/gi, '')  // remove special chars
-        .replace(/\s+/g, ' ');          // collapse spaces
+        .replace(/[^a-z0-9\s]/gi, '')
+        .replace(/\s+/g, ' ');
+}
+
+/**
+ * Escape regex metacharacters in a string. Uses String.raw for the
+ * replacement so no escaped-backslash literal appears in source.
+ */
+function escapeRegexLiteral(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+}
+
+/**
+ * Build a regex-source string from a label, converting internal spaces
+ * to flexible horizontal-whitespace matches. E.g. "employee name"
+ * becomes "employee[ \t]+name".
+ */
+function labelWithFlexibleWhitespace(label) {
+    return label
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(escapeRegexLiteral)
+        .join(String.raw`[ \t]+`);
+}
+
+/**
+ * Given a regex that matches a "label + delimiter" prefix, return the text
+ * that follows the match on the same line. This replaces greedy `(.+)`
+ * capture groups (which trigger S8786).
+ */
+function textAfterMatch(text, pattern) {
+    const match = text.match(pattern);
+    if (!match) return '';
+    const after = text.slice(match.index + match[0].length);
+    return after.split('\n')[0].trim();
 }
 
 /**
  * Extract the full OCR text block from the Cloudinary response.
- * Path: result.info.ocr.adv_ocr.data[0].textAnnotations[0].description
  */
 function extractOcrText(uploadResult) {
     try {
         const ocrData = uploadResult.info?.ocr?.adv_ocr?.data;
-        if (!ocrData || !Array.isArray(ocrData) || ocrData.length === 0) {
-            return '';
-        }
+        if (!Array.isArray(ocrData) || ocrData.length === 0) return '';
         const textAnnotations = ocrData[0]?.textAnnotations;
-        if (!textAnnotations || !Array.isArray(textAnnotations) || textAnnotations.length === 0) {
-            return '';
-        }
-        // First annotation is the full text block
+        if (!Array.isArray(textAnnotations) || textAnnotations.length === 0) return '';
         return textAnnotations[0]?.description || '';
     } catch (err) {
         console.error('  OCR text extraction error:', err.message);
@@ -45,64 +81,69 @@ function extractOcrText(uploadResult) {
     }
 }
 
+const NAME_LABELS = [
+    'employee name', 'staff name', 'name of employee', 'name of staff',
+    'faculty name', 'teacher name', 'name',
+];
+
+// Trailing cleanup — matches a label keyword + delimiter at the end
+// of an extracted string. Uses [ \t] instead of \s to keep the pattern linear.
+const TRAILING_LABEL_RE = /\b(?:dept|department|id|emp|employee|designation|branch|college|university)[ \t]*[:\-–].*$/i;
+
 /**
  * Extract Full Name from OCR text.
- * Looks for patterns like "Name:", "Employee Name:", "Name of Employee:", "Staff Name:"
  */
 function extractFullName(ocrText) {
-    const patterns = [
-        /(?:employee\s+name|staff\s+name|name\s+of\s+employee|name\s+of\s+staff|faculty\s+name|teacher\s+name|name)\s*[:\-–]\s*(.+)/i,
-    ];
-    for (const pattern of patterns) {
-        const match = ocrText.match(pattern);
-        if (match && match[1]) {
-            // Take text up to end of line or next label
-            const value = match[1].split(/\n/)[0].trim();
-            // Remove trailing labels (e.g., "Dr. John Smith Dept:")
-            return value.replace(/\b(dept|department|id|emp|employee|designation|branch|college|university)\s*[:\-–]/i, '').trim();
+    const text = String(ocrText);
+    for (const label of NAME_LABELS) {
+        const source = labelWithFlexibleWhitespace(label) + String.raw`[ \t]*[:\-–][ \t]*`;
+        const re = new RegExp(source, 'i');
+        const value = textAfterMatch(text, re);
+        if (value) {
+            return value.replace(TRAILING_LABEL_RE, '').trim();
         }
     }
     return '';
 }
 
+const EMPLOYEE_ID_LABELS = [
+    'employee id', 'employee no', 'employee code', 'employee number',
+    'emp id', 'emp no', 'emp code',
+    'staff id', 'staff no', 'staff code',
+    'registration id', 'registration no',
+    'id no', 'id number', 'roll no', 'faculty id',
+];
+
 /**
  * Extract Employee ID from OCR text.
- * Looks for: "ID:", "Emp ID:", "Employee ID:", "EMP NO:", "Employee No:",
- * "Staff ID:", "Registration No:", "Roll No:", "ID No:", "Emp Code:"
+ * The capture uses a bounded character class — no backtracking risk.
  */
 function extractEmployeeId(ocrText) {
-    const patterns = [
-        /(?:emp(?:loyee)?\s*(?:id|no|code|number)|staff\s*(?:id|no|code)|registration\s*(?:id|no)|id\s*(?:no|number)|roll\s*no|faculty\s*id)\s*[:\-–]\s*([A-Z0-9\-\/]+)/i,
-    ];
-    for (const pattern of patterns) {
-        const match = ocrText.match(pattern);
-        if (match && match[1]) {
-            return match[1].trim();
-        }
+    const text = String(ocrText);
+    for (const label of EMPLOYEE_ID_LABELS) {
+        const source = labelWithFlexibleWhitespace(label)
+            + String.raw`[ \t]*[:\-–][ \t]*([A-Z0-9\-/]+)`;
+        const re = new RegExp(source, 'i');
+        const match = text.match(re);
+        if (match?.[1]) return match[1].trim();
     }
     return '';
 }
 
 /**
  * Extract College Name from OCR text.
- * Looks for: "College:", "University:", "Institute:", "Institution:",
- * or common patterns like "XYZ College of Engineering"
+ * Uses slice-based extraction to avoid `(.+)` greedy capture.
  */
 function extractCollegeName(ocrText) {
-    const patterns = [
-        /(?:college|university|institute|institution)\s*(?:name)?\s*[:\-–]\s*(.+)/i,
-    ];
-    for (const pattern of patterns) {
-        const match = ocrText.match(pattern);
-        if (match && match[1]) {
-            return match[1].split(/\n/)[0].trim();
-        }
-    }
+    const text = String(ocrText);
+    const source = String.raw`(?:college|university|institute|institution)(?:[ \t]+name)?[ \t]*[:\-–][ \t]*`;
+    const value = textAfterMatch(text, new RegExp(source, 'i'));
+    if (value) return value;
 
-    // Fallback: look for lines containing "college", "university", "institute"
-    const lines = ocrText.split('\n');
+    // Fallback: any line containing institution keywords
+    const lines = text.split('\n');
     for (const line of lines) {
-        if (/\b(college|university|institute|institution)\b/i.test(line) && line.trim().length > 5) {
+        if (/\b(?:college|university|institute|institution)\b/i.test(line) && line.trim().length > 5) {
             return line.trim();
         }
     }
@@ -111,47 +152,31 @@ function extractCollegeName(ocrText) {
 
 /**
  * Extract Department from OCR text.
- * Looks for: "Dept:", "Department:", "Branch:", "Faculty:"
  */
 function extractDepartment(ocrText) {
-    const patterns = [
-        /(?:dept|department|branch|faculty\s*of|division)\s*[:\-–]\s*(.+)/i,
-    ];
-    for (const pattern of patterns) {
-        const match = ocrText.match(pattern);
-        if (match && match[1]) {
-            return match[1].split(/\n/)[0].trim();
-        }
-    }
-    return '';
+    const source = String.raw`(?:dept|department|branch|faculty[ \t]+of|division)[ \t]*[:\-–][ \t]*`;
+    return textAfterMatch(String(ocrText), new RegExp(source, 'i'));
 }
 
 /**
  * Compare two strings with fuzzy matching.
- * Returns true if one string contains the other (case-insensitive, normalized).
- * Suitable for names, college names, departments — NOT for IDs.
  */
 function fuzzyMatch(inputValue, extractedValue) {
     if (!inputValue || !extractedValue) return false;
     const a = normalize(inputValue);
     const b = normalize(extractedValue);
     if (!a || !b) return false;
-    // Check if either string contains the other
     return a.includes(b) || b.includes(a);
 }
 
 /**
  * Exact token match for identifiers (Employee ID).
- * Splits text into tokens (by whitespace, slashes, dashes, commas, pipes)
- * and checks if the normalized user value exists as a whole token.
- * This prevents partial matches like '24610900' matching '246109009'.
  */
 function exactTokenMatch(userValue, text) {
     if (!userValue || !text) return false;
     const normalizedUser = normalize(userValue);
     if (!normalizedUser) return false;
-    // Split on common delimiters: whitespace, slash, dash, comma, pipe, colon, semicolon
-    const tokens = normalize(text).split(/[\s\/\-,|;:]+/).filter(Boolean);
+    const tokens = normalize(text).split(/[\s/,|;:]+/).filter(Boolean);
     return tokens.includes(normalizedUser);
 }
 
@@ -171,38 +196,31 @@ function runOcrVerification(ocrText, userInputs) {
     const matchedFields = [];
     let strictMatchCount = 0;
     let fallbackMatchCount = 0;
-    
+
     const normalizedOcrText = normalize(ocrText);
 
-    for (const field of fieldsToCheck) {
+    for(const field of fieldsToCheck) {
         const extracted = extractedData[field];
         const userValue = userInputs[field];
-        
-        let isMatch = false;
-
-        // Employee ID requires exact matching; other fields use fuzzy (substring) matching
         const isIdField = (field === 'employeeId');
 
-        // Step 1: Strict match (regex-extracted value vs user input)
+        let isMatch = false;
+
         if (extracted && userValue) {
             const strictMatch = isIdField
-                ? normalize(userValue) === normalize(extracted)  // exact equality for IDs
-                : fuzzyMatch(userValue, extracted);              // substring ok for names
+                ? normalize(userValue) === normalize(extracted)
+                : fuzzyMatch(userValue, extracted);
             if (strictMatch) {
                 isMatch = true;
                 strictMatchCount++;
             }
         }
 
-        // Step 2: Fallback — search the full OCR text (only if strict didn't match)
         if (!isMatch && userValue) {
-            let fallbackHit = false;
-
+            let fallbackHit;
             if (isIdField) {
-                // Token-level exact match: split OCR text into tokens and look for a whole match
                 fallbackHit = exactTokenMatch(userValue, ocrText);
             } else {
-                // Substring match for names / college / department
                 const normalizedUserValue = normalize(userValue);
                 fallbackHit = normalizedUserValue && normalizedOcrText.includes(normalizedUserValue);
             }
@@ -210,19 +228,13 @@ function runOcrVerification(ocrText, userInputs) {
             if (fallbackHit) {
                 isMatch = true;
                 fallbackMatchCount++;
-                // Capture the matched user value to store in extractedData
                 extractedData[field] = userValue;
-            } else {
-                // If not found at all, reset the extractedData for this field to avoid confusion
-                if (!extracted) {
-                    extractedData[field] = '';
-                }
+            } else if (!extracted) {
+                extractedData[field] = '';
             }
         }
 
-        if (isMatch) {
-            matchedFields.push(field);
-        }
+        if (isMatch) matchedFields.push(field);
     }
 
     const totalMatches = strictMatchCount + fallbackMatchCount;
@@ -248,14 +260,13 @@ function runOcrVerification(ocrText, userInputs) {
         extractedData,
         matchedFields,
         confidence,
-        ocrRawText: ocrText || '',   // full text — caller decides what to store where
-        updatedAt: new Date()
+        ocrRawText: ocrText || '',
+        updatedAt: new Date(),
     };
 }
 
 /**
  * Upload a buffer to Cloudinary with OCR enabled.
- * Returns a Promise that resolves with the upload result.
  */
 function uploadToCloudinaryWithOcr(fileBuffer) {
     return new Promise((resolve, reject) => {
@@ -264,7 +275,7 @@ function uploadToCloudinaryWithOcr(fileBuffer) {
                 folder: 'qmetric_id_photos',
                 ocr: 'adv_ocr',
                 resource_type: 'image',
-                transformation: [{ width: 800, height: 800, crop: 'limit' }]
+                transformation: [{ width: 800, height: 800, crop: 'limit' }],
             },
             (error, result) => {
                 if (error) reject(error);
@@ -275,613 +286,809 @@ function uploadToCloudinaryWithOcr(fileBuffer) {
     });
 }
 
-
-// ============================================================
-// LOGIN CONTROLLER (unchanged)
-// ============================================================
-const login = async (req, res) => {
-    const { email, password, turnstileToken } = req.body;
-    console.log(" Login request received for email:", email);
-
-    // --- Cloudflare Turnstile verification ---
-    if (!turnstileToken) {
-        return res.status(400).json({ error: true, message: "CAPTCHA token is missing. Please complete the verification." });
-    }
-
-    const turnstileResponse = await fetch(
+/**
+ * Verify a Cloudflare Turnstile token. Returns true if valid.
+ */
+async function verifyTurnstile(turnstileToken) {
+    const response = await fetch(
         'https://challenges.cloudflare.com/turnstile/v0/siteverify',
         {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({
-                secret:   process.env.TURNSTILE_SECRET_KEY,
+                secret: process.env.TURNSTILE_SECRET_KEY,
                 response: turnstileToken,
             }).toString(),
         }
     );
-    const turnstileResult = await turnstileResponse.json();
-    console.log(' Turnstile verification result (login):', turnstileResult);
+    return response.json();
+}
 
+// ============================================================
+// LOGIN CONTROLLER
+// ============================================================
+const login = async (req, res) => {
+    const { email, password, turnstileToken } = req.body;
+
+    if (!turnstileToken) {
+        return res.status(400).json({ error: true, message: 'CAPTCHA token is missing. Please complete the verification.' });
+    }
+
+    const turnstileResult = await verifyTurnstile(turnstileToken);
     if (!turnstileResult.success) {
         return res.status(403).json({
-            error:   true,
-            message: 'CAPTCHA verification failed. Please refresh the page and try again.',
-            codes:   turnstileResult['error-codes'],
-        });
-    }
-    // ------------------------------------------
-
-    // Check if both email and password are provided
-    if (!email || !password) {
-        console.log(" Missing email or password");
-        return res.status(400).json({
             error: true,
-            message: "Credentials required.",
+            message: 'CAPTCHA verification failed. Please refresh the page and try again.',
+            codes: turnstileResult['error-codes'],
         });
     }
 
-    // Find user by email
+    if (!email || !password) {
+        return res.status(400).json({ error: true, message: 'Credentials required.' });
+    }
+
     const user = await User.findOne({ email });
     if (!user) {
-        return res.status(401).json({
+        return res.status(401).json({ error: true, message: 'Invalid email or password.' });
+    }
+
+    if (user.isBlocked) {
+        await logAudit({
+            userId: user._id,
+            action: 'LOGIN_BLOCKED',
+            resource: `User:${user._id}`,
+            request: req,
+            error: new Error('Blocked user attempted to login'),
+        });
+        return res.status(403).json({
             error: true,
-            message: "Invalid email or password.",
+            message: 'Your account has been blocked. Please contact your administrator.',
         });
     }
 
-    // Compare passwords
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-        return res.status(401).json({
-            error: true,
-            message: "Invalid email or password.",
+        await logAudit({
+            userId: user._id,
+            action: 'LOGIN',
+            resource: `User:${user._id}`,
+            request: req,
+            error: new Error('Invalid credentials'),
         });
+        return res.status(401).json({ error: true, message: 'Invalid email or password.' });
     }
 
     try {
-        // Generate JWT Token
         const accessToken = jwt.sign(
             { userId: user._id },
             process.env.ACCESS_TOKEN_SECRET,
-            { expiresIn: "72h" }
+            { expiresIn: '72h' }
         );
+
+        res.cookie('accessToken', accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 72 * 60 * 60 * 1000,
+        });
+
+        const accountState = user.collegeApprovalStatus === 'pending'
+            ? 'pending_approval'
+            : 'active';
+
+        await logAudit({
+            userId: user._id,
+            action: 'LOGIN',
+            resource: `User:${user._id}`,
+            request: req,
+        });
 
         return res.json({
             error: false,
-            message: "Login successful",
+            message: accountState === 'pending_approval'
+                ? 'Login successful. Your account is awaiting approval from your college admin.'
+                : 'Login successful',
             user: {
+                _id: user._id,
                 userName: user.userName,
                 email: user.email,
                 fullName: user.fullName || user.userName,
                 role: user.role || 'teacher',
                 collegeId: user.collegeId || null,
-                collegeName: user.collegeName || ''
+                collegeName: user.collegeName || '',
+                collegeApprovalStatus: user.collegeApprovalStatus || 'not_applicable',
             },
-            accessToken,
+            accountState,
+            canUseFeatures: accountState === 'active',
         });
     } catch (error) {
-        console.log(" Token creation error:", error.message);
-        return res.status(500).json({ error: true, message: "Error creating token" });
+        console.log(' Token creation error:', error.message);
+        return res.status(500).json({ error: true, message: 'Error creating token' });
     }
 };
 
-
 // ============================================================
-// REGISTER CONTROLLER (with OCR verification)
+// REGISTER CONTROLLER — 3 flows (affiliated / independent / student)
 // ============================================================
 const register = async (req, res) => {
     try {
         const {
             userName, email, password, fullName, phone,
             collegeId, collegeCode, collegeName,
-            position, employeeId, department, stream, turnstileToken
+            position, employeeId, department, stream,
+            turnstileToken,
+            role = 'teacher',
+            signupIntent,
         } = req.body;
-        console.log(" Register request received for email:", email);
-        const file = req.file; // Provided by multer (memoryStorage → file.buffer)
 
-        // --- Cloudflare Turnstile verification (BEFORE any DB work) ---
+        // ── Turnstile gate ──────────────────────────────
         if (!turnstileToken) {
-            return res.status(400).json({ error: true, message: "CAPTCHA token is missing. Please complete the verification." });
+            return res.status(400).json({ error: true, message: 'CAPTCHA token is missing. Please complete the verification.' });
         }
-
-        const turnstileResponse = await fetch(
-            'https://challenges.cloudflare.com/turnstile/v0/siteverify',
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    secret:   process.env.TURNSTILE_SECRET_KEY,
-                    response: turnstileToken,
-                }).toString(),
-            }
-        );
-        const turnstileResult = await turnstileResponse.json();
-        console.log(' Turnstile verification result:', turnstileResult);
-
+        const turnstileResult = await verifyTurnstile(turnstileToken);
         if (!turnstileResult.success) {
             return res.status(403).json({
-                error:   true,
+                error: true,
                 message: 'CAPTCHA verification failed. Please refresh the page and try again.',
-                codes:   turnstileResult['error-codes'],
+                codes: turnstileResult['error-codes'],
             });
         }
-        // ---------------------------------------------------------------
 
-        // --- Step 1: Validate all incoming fields ---
-        if (!userName || !email || !password || !fullName || !phone || (!collegeId && !collegeCode && !collegeName) || !position || !employeeId || !department || !stream) {
-            return res.status(400).json({ error: true, message: "All fields are required." });
+        // ── Base validation ─────────────────────────────
+        if (!['teacher', 'student'].includes(role)) {
+            return res.status(400).json({ error: true, message: 'Invalid role for signup.' });
         }
-
-        // Validate College exists and is active
-        let matchedCollege = null;
-        if (collegeId) {
-            matchedCollege = await College.findById(collegeId);
-        } else if (collegeCode) {
-            matchedCollege = await College.findOne({ code: collegeCode.trim().toUpperCase() });
-        } else if (collegeName) {
-            matchedCollege = await College.findOne({ name: { $regex: `^${collegeName.trim()}$`, $options: 'i' } });
-        }
-
-        if (!matchedCollege) {
+        if (role === 'teacher' && !['affiliated', 'independent'].includes(signupIntent)) {
             return res.status(400).json({
                 error: true,
-                message: "Selected college is not recognized. Please choose a valid registered college."
+                message: 'signupIntent must be "affiliated" or "independent" for teachers.',
             });
         }
-
-        if (!matchedCollege.isActive) {
-            return res.status(403).json({
-                error: true,
-                message: "This college is currently inactive. Please contact the college administrator."
-            });
+        if (!isStrongPassword(password)) {
+            return res.status(400).json({ error: true, message: PASSWORD_ERROR_MESSAGE });
+        }
+        if (typeof email !== 'string' || email.length > 254 || !validator.isEmail(email)) {
+            return res.status(400).json({ error: true, message: 'Invalid email format.' });
+        }
+        if (!/^\d{10}$/.test(phone)) {
+            return res.status(400).json({ error: true, message: 'Phone number must be exactly 10 digits.' });
         }
 
-        const effectiveCollegeName = matchedCollege.name;
-        const effectiveCollegeId = matchedCollege._id;
+        // ── Uniqueness ──────────────────────────────────
+        const emailLower = email.toLowerCase().trim();
+        const uniqueness = [{ email: emailLower }, { phone }];
+        if (employeeId) uniqueness.push({ employeeId });
 
-        if (!file) {
-            return res.status(400).json({ error: true, message: "College ID photo is required." });
-        }
-
-        // Phone format validation (Indian 10-digit)
-        if (!/^[0-9]{10}$/.test(phone)) {
-            return res.status(400).json({ error: true, message: "Phone number must be exactly 10 digits." });
-        }
-
-        // Email format validation
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            return res.status(400).json({ error: true, message: "Invalid email format." });
-        }
-
-        // Check for existing user by email, phone, or employeeId
-        const existingUser = await User.findOne({ $or: [{ email }, { phone }, { employeeId }] });
+        const existingUser = await User.findOne({ $or: uniqueness });
         if (existingUser) {
-            let conflictField = "User";
-            if (existingUser.email === email.toLowerCase()) conflictField = "Email";
-            else if (existingUser.phone === phone) conflictField = "Phone number";
-            else if (existingUser.employeeId === employeeId) conflictField = "Employee ID";
+            let conflictField = 'User';
+            if (existingUser.email === emailLower) conflictField = 'Email';
+            else if (existingUser.phone === phone) conflictField = 'Phone number';
+            else if (employeeId && existingUser.employeeId === employeeId) conflictField = 'Employee ID';
             return res.status(409).json({ error: true, message: `${conflictField} already exists in the system.` });
         }
 
-        // --- Step 2 & 3 & 4: Upload image and perform OCR Verification ---
-        let uploadResult = null;
-        let ocrRawText = '';          // full OCR text — goes to OCRLog, NOT to User
-        let idVerification = {
-            status: 'unverified',
-            extractedData: { fullName: '', employeeId: '', collegeName: '', department: '' },
-            matchedFields: [],
-            confidence: 0,
-            updatedAt: new Date()
-        };
-
-        try {
-            // Upload to Cloudinary
-            uploadResult = await uploadToCloudinaryWithOcr(file.buffer);
-            console.log(' Cloudinary upload successful:', uploadResult.secure_url);
-
-            // Extract OCR Text
-            const ocrText = extractOcrText(uploadResult);
-            console.log(' OCR raw text:', ocrText ? ocrText.substring(0, 200) + '...' : '(empty)');
-
-            if (ocrText && ocrText.trim().length > 0) {
-                // Compare extracted values and determine status
-                const verificationResult = runOcrVerification(ocrText, { fullName, employeeId, collegeName, department });
-
-                // Separate the raw text (goes to OCRLog) from the summary (goes to User)
-                ocrRawText = verificationResult.ocrRawText;
-
-                // Build User-safe idVerification (no ocrRawText)
-                idVerification = {
-                    status:        verificationResult.status,
-                    extractedData: verificationResult.extractedData,
-                    matchedFields: verificationResult.matchedFields,
-                    confidence:    verificationResult.confidence,
-                    updatedAt:     verificationResult.updatedAt
-                };
-
-                console.log(' OCR verification result:', {
-                    status: idVerification.status,
-                    confidence: idVerification.confidence,
-                    matchedFields: idVerification.matchedFields,
-                    extractedData: idVerification.extractedData
-                });
-            } else {
-                console.log(' No text detected by OCR — marking as unverified');
+        // ═══════════════ FLOW A: Affiliated teacher ═══════════════
+        if (role === 'teacher' && signupIntent === 'affiliated') {
+            // Resolve college
+            let matchedCollege = null;
+            if (collegeId) {
+                matchedCollege = await College.findById(collegeId);
+            } else if (collegeCode) {
+                matchedCollege = await College.findOne({ code: collegeCode.trim().toUpperCase() });
+            } else if (collegeName) {
+                matchedCollege = await College.findOne({ name: { $regex: `^${collegeName.trim()}$`, $options: 'i' } });
             }
-        } catch (err) {
-            // On ANY error (upload or OCR), default to unverified but do NOT block registration
-            console.error(' Cloudinary/OCR processing error (non-blocking):', err.message);
-        }
+            if (!matchedCollege) {
+                return res.status(400).json({
+                    error: true,
+                    message: 'Selected college is not recognized. Please choose a valid registered college.',
+                });
+            }
+            if (!matchedCollege.isActive) {
+                return res.status(403).json({
+                    error: true,
+                    message: 'This college is currently inactive. Please contact the college administrator.',
+                });
+            }
+            if (!position) {
+                return res.status(400).json({ error: true, message: 'Position is required for affiliated teachers.' });
+            }
 
-        // --- Step 8: Hash password and create user document ---
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
+            // OCR (best-effort)
+            let uploadResult = null;
+            let ocrRawText = '';
+            let idVerification = {
+                status: 'unverified',
+                extractedData: { fullName: '', employeeId: '', collegeName: '', department: '' },
+                matchedFields: [],
+                confidence: 0,
+                updatedAt: new Date(),
+            };
 
-        const newUser = new User({
-            userName,
-            email,
-            password: hashedPassword,
-            fullName,
-            phone,
-            collegeId: effectiveCollegeId,
-            collegeName: effectiveCollegeName,
-            position,
-            employeeId,
-            department,
-            stream,
-            collegeIdPhoto: uploadResult ? uploadResult.secure_url : '', // empty string if upload failed
-            idVerification
-        });
+            if (req.file) {
+                try {
+                    uploadResult = await uploadToCloudinaryWithOcr(req.file.buffer);
+                    const ocrText = extractOcrText(uploadResult);
+                    if (ocrText && ocrText.trim().length > 0) {
+                        const verificationResult = runOcrVerification(ocrText, {
+                            fullName,
+                            employeeId,
+                            collegeName: matchedCollege.name,
+                            department,
+                        });
+                        ocrRawText = verificationResult.ocrRawText;
+                        idVerification = {
+                            status: verificationResult.status,
+                            extractedData: verificationResult.extractedData,
+                            matchedFields: verificationResult.matchedFields,
+                            confidence: verificationResult.confidence,
+                            updatedAt: verificationResult.updatedAt,
+                        };
+                    }
+                } catch (ocrErr) {
+                    console.error('Cloudinary/OCR processing error (non-blocking):', ocrErr.message);
+                }
+            }
 
-        await newUser.save();
-        console.log(' User created:', email, '| Verification:', idVerification.status);
+            const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
+            let newUser;
 
-        // Increment totalTeachers on the College document
-        try {
-            await College.findByIdAndUpdate(effectiveCollegeId, { $inc: { totalTeachers: 1 } });
-        } catch (colErr) {
-            console.error('Failed to increment college totalTeachers:', colErr.message);
-        }
-
-        // --- Save OCR Log (non-blocking) ---
-        // Full ocrRawText lives here; failure must NOT affect registration.
-        try {
-            await OCRLog.create({
-                userId:        newUser._id,
-                userInput:     { fullName, employeeId, collegeName: effectiveCollegeName, department },
-                extractedData: idVerification.extractedData,
-                matchedFields: idVerification.matchedFields,
-                status:        idVerification.status,
-                confidence:    idVerification.confidence,
-                ocrRawText,
-                imageUrl:      uploadResult ? uploadResult.secure_url : ''
+            await withTransaction(async (session) => {
+                const opts = session ? { session } : {};
+                const [created] = await User.create([{
+                    userName,
+                    email: emailLower,
+                    password: hashedPassword,
+                    fullName,
+                    phone,
+                    role: 'teacher',
+                    collegeId: matchedCollege._id,
+                    collegeName: matchedCollege.name,
+                    position,
+                    employeeId,
+                    department,
+                    stream,
+                    collegeIdPhoto: uploadResult ? uploadResult.secure_url : '',
+                    idVerification,
+                    collegeApprovalStatus: 'pending',
+                }], opts);
+                newUser = created;
             });
-            console.log(' OCR log saved for user:', newUser._id);
-        } catch (logErr) {
-            // Log the error but do NOT fail the registration
-            console.error(' OCR log save failed (non-blocking):', logErr.message);
-        }
 
-        // --- Step 9: Generate JWT Token ---
-        const accessToken = jwt.sign(
-            { userId: newUser._id, role: 'teacher' },
-            process.env.ACCESS_TOKEN_SECRET,
-            { expiresIn: "72h" }
-        );
+            // Audit
+            try {
+                await logAudit({
+                    userId: newUser._id,
+                    action: 'REGISTER_TEACHER_AFFILIATED',
+                    resource: `User:${newUser._id}`,
+                    request: req,
+                });
+            } catch (auditErr) {
+                console.error('Audit log failed (non-blocking):', auditErr.message);
+            }
 
-        return res.status(201).json({
-            error: false,
-            message: "Account created successfully.",
-            user: {
-                userName: newUser.userName,
-                email: newUser.email,
-                fullName: newUser.fullName,
-                idVerification: {
+            // OCRLog record
+            try {
+                await OCRLog.create({
+                    userId: newUser._id,
+                    userInput: { fullName, employeeId, collegeName: matchedCollege.name, department },
+                    extractedData: idVerification.extractedData,
+                    matchedFields: idVerification.matchedFields,
                     status: idVerification.status,
                     confidence: idVerification.confidence,
-                    matchedFields: idVerification.matchedFields
+                    ocrRawText,
+                    imageUrl: uploadResult ? uploadResult.secure_url : '',
+                });
+            } catch (logErr) {
+                console.error('OCR log save failed (non-blocking):', logErr.message);
+            }
+
+            // Notify all college admins
+            try {
+                const admins = await User.find({
+                    collegeId: matchedCollege._id,
+                    role: 'admin',
+                }).select('_id').lean();
+
+                for (const admin of admins) {
+                    createNotification({
+                        userId: admin._id,
+                        type: 'pending_teacher_approval',
+                        title: 'New teacher awaiting approval',
+                        message: `${fullName} (${emailLower}) from ${matchedCollege.name} is awaiting approval.`,
+                        relatedDocId: newUser._id,
+                        actionUrl: `/college-admin/pending-teachers/${newUser._id}`,
+                    }).catch(() => {});
                 }
-            },
-            accessToken,
-        });
+            } catch (notifErr) {
+                console.error('Admin notification dispatch failed (non-blocking):', notifErr.message);
+            }
+
+            // Welcome notification for the user
+            createNotification({
+                userId: newUser._id,
+                type: 'welcome_pending_approval',
+                title: 'Welcome to QMetric',
+                message: `Your affiliation with ${matchedCollege.name} is awaiting admin approval.`,
+                actionUrl: '/profile',
+            }).catch(() => {});
+
+            // Welcome email (fire-and-forget)
+            emailService
+                .sendWelcomeAffiliatedTeacherEmail(newUser.email, newUser.fullName, matchedCollege.name)
+                .catch(() => {});
+
+            // NO COOKIE — pending approval
+            return res.status(201).json({
+                error: false,
+                message: `Welcome, ${fullName}! Your account is awaiting approval from ${matchedCollege.name}.`,
+                requiresApproval: true,
+                accountState: 'pending_approval',
+                user: {
+                    _id: newUser._id,
+                    userName: newUser.userName,
+                    email: newUser.email,
+                    fullName: newUser.fullName,
+                    role: 'teacher',
+                    collegeId: matchedCollege._id,
+                    collegeName: matchedCollege.name,
+                },
+            });
+        }
+
+        // ═══════════════ FLOW B: Independent teacher ═══════════════
+        if (role === 'teacher' && signupIntent === 'independent') {
+            if (!position) {
+                return res.status(400).json({ error: true, message: 'Position is required.' });
+            }
+
+            const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
+            const newUser = await User.create({
+                userName,
+                email: emailLower,
+                password: hashedPassword,
+                fullName,
+                phone,
+                role: 'teacher',
+                collegeId: null,
+                collegeName: '',
+                position,
+                employeeId: employeeId || undefined,
+                department: department || '',
+                stream: stream || '',
+                idVerification: { status: 'not_applicable', updatedAt: new Date() },
+            });
+
+            try {
+                await logAudit({
+                    userId: newUser._id,
+                    action: 'REGISTER_TEACHER_INDEPENDENT',
+                    resource: `User:${newUser._id}`,
+                    request: req,
+                });
+            } catch (auditErr) {
+                console.error('Audit log failed (non-blocking):', auditErr.message);
+            }
+
+            createNotification({
+                userId: newUser._id,
+                type: 'welcome',
+                title: 'Welcome to QMetric',
+                message: 'Your independent teacher account is active. Upload a paper to get started.',
+                actionUrl: '/teacher/upload',
+            }).catch(() => {});
+
+            const accessToken = jwt.sign(
+                { userId: newUser._id, role: 'teacher' },
+                process.env.ACCESS_TOKEN_SECRET,
+                { expiresIn: '72h' }
+            );
+            res.cookie('accessToken', accessToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 72 * 60 * 60 * 1000,
+            });
+
+            return res.status(201).json({
+                error: false,
+                message: 'Welcome to QMetric!',
+                canUseFeatures: true,
+                accountState: 'active',
+                user: {
+                    _id: newUser._id,
+                    userName: newUser.userName,
+                    email: newUser.email,
+                    fullName: newUser.fullName,
+                    role: 'teacher',
+                    collegeId: null,
+                    collegeName: '',
+                },
+            });
+        }
+
+        // ═══════════════ FLOW C: Student ═══════════════
+        if (role === 'student') {
+            const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
+            const newUser = await User.create({
+                userName,
+                email: emailLower,
+                password: hashedPassword,
+                fullName,
+                phone,
+                role: 'student',
+                collegeId: null,
+                collegeName: '',
+                position: '',
+                department: '',
+                stream: '',
+                idVerification: { status: 'not_applicable', updatedAt: new Date() },
+            });
+
+            try {
+                await logAudit({
+                    userId: newUser._id,
+                    action: 'REGISTER_STUDENT',
+                    resource: `User:${newUser._id}`,
+                    request: req,
+                });
+            } catch (auditErr) {
+                console.error('Audit log failed (non-blocking):', auditErr.message);
+            }
+
+            createNotification({
+                userId: newUser._id,
+                type: 'welcome',
+                title: 'Welcome to QMetric',
+                message: 'Your student account is active. Upload a paper to check its quality.',
+                actionUrl: '/teacher/upload',
+            }).catch(() => {});
+
+            const accessToken = jwt.sign(
+                { userId: newUser._id, role: 'student' },
+                process.env.ACCESS_TOKEN_SECRET,
+                { expiresIn: '72h' }
+            );
+            res.cookie('accessToken', accessToken, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 72 * 60 * 60 * 1000,
+            });
+
+            return res.status(201).json({
+                error: false,
+                message: 'Welcome to QMetric!',
+                canUseFeatures: true,
+                accountState: 'active',
+                user: {
+                    _id: newUser._id,
+                    userName: newUser.userName,
+                    email: newUser.email,
+                    fullName: newUser.fullName,
+                    role: 'student',
+                    collegeId: null,
+                    collegeName: '',
+                },
+            });
+        }
+
+        return res.status(400).json({ error: true, message: 'Unhandled signup flow.' });
     } catch (error) {
-        console.error(" Registration error:", error);
+        console.error('Registration error:', error);
         return res.status(500).json({
             error: true,
-            message: "Error creating account.",
-            details: error.message
+            message: 'Error creating account.',
+            details: error.message,
         });
     }
 };
 
 // ============================================================
-// BULK REGISTER CONTROLLER  (CSV Onboarding endpoint)
-// POST /auth/bulk-register
-//
-// Accepts: JSON body  { users: [ { userName, email, password,
-//            fullName, phone, collegeName, position,
-//            employeeId, department, stream }, ... ] }
-//
-// Rules:
-//  • No file upload — collegeIdPhoto defaults to '' and
-//    idVerification defaults to 'unverified' for every row.
-//  • Each row is validated independently; invalid/duplicate
-//    rows are skipped and reported, not rolled back.
-//  • Passwords MUST be supplied per-row OR a shared default
-//    password can be provided as `defaultPassword` in the body.
+// BULK REGISTER CONTROLLER — helper extraction (S3776)
+// ============================================================
+
+const REQUIRED_FIELDS = [
+    'userName', 'email', 'fullName', 'phone',
+    'collegeName', 'position', 'employeeId', 'department', 'stream',
+];
+
+const VALID_POSITIONS = ['Professor', 'Associate Professor', 'Assistant Professor', 'Lecturer', 'HoD', 'Other'];
+const VALID_STREAMS = ['Engineering', 'Management', 'Science', 'Commerce', 'Arts', 'Law', 'Medicine', 'Other'];
+const PHONE_RE = /^\d{10}$/;
+
+/**
+ * Validate a single bulk row. Returns either
+ *   { ok: true, data, password }
+ * or
+ *   { ok: false, reason }
+ */
+function validateBulkRow(row, defaultPassword) {
+    const missing = REQUIRED_FIELDS.filter((f) => !row[f] || String(row[f]).trim() === '');
+    if (missing.length > 0) {
+        return { ok: false, reason: `Missing fields: ${missing.join(', ')}` };
+    }
+
+    const trimmedEmail = String(row.email).trim();
+    if (trimmedEmail.length > 254 || !validator.isEmail(trimmedEmail)) {
+        return { ok: false, reason: 'Invalid email format.' };
+    }
+
+    if (!PHONE_RE.test(String(row.phone).trim())) {
+        return { ok: false, reason: 'Phone must be exactly 10 digits.' };
+    }
+
+    if (!VALID_POSITIONS.includes(row.position)) {
+        return { ok: false, reason: `Invalid position "${row.position}". Allowed: ${VALID_POSITIONS.join(', ')}.` };
+    }
+
+    if (!VALID_STREAMS.includes(row.stream)) {
+        return { ok: false, reason: `Invalid stream "${row.stream}". Allowed: ${VALID_STREAMS.join(', ')}.` };
+    }
+
+    const rawPassword = row.password || defaultPassword;
+    if (!rawPassword || !isStrongPassword(String(rawPassword).trim())) {
+        return {
+            ok: false,
+            reason: `Password does not meet policy. ${PASSWORD_ERROR_MESSAGE} Provide row-level \`password\` or a strong \`defaultPassword\`.`,
+        };
+    }
+
+    return { ok: true, data: row, password: rawPassword.trim() };
+}
+
+/**
+ * Build a lookup map from college names, codes, and ids.
+ */
+function buildCollegeMap(colleges) {
+    const map = new Map();
+    for (const col of colleges) {
+        if (col.name) map.set(col.name.toLowerCase().trim(), col);
+        if (col.code) map.set(col.code.toLowerCase().trim(), col);
+        map.set(String(col._id), col);
+    }
+    return map;
+}
+
+/**
+ * Detect which field triggered a duplicate, without nested ternaries (S3358).
+ */
+function duplicateFieldName({ email, phone, employeeId }) {
+    if (email) return 'email';
+    if (phone) return 'phone';
+    if (employeeId) return 'employeeId';
+    return 'unknown';
+}
+
+// ============================================================
+// BULK REGISTER CONTROLLER
 // ============================================================
 const bulkRegister = async (req, res) => {
-    console.log(' Bulk register request received');
-
     const { users, defaultPassword, turnstileToken } = req.body;
+    const hasAdminSecret = Boolean(req.headers['x-admin-secret']);
 
-    // --- Cloudflare Turnstile verification (BEFORE any DB work) ---
-    if (!turnstileToken) {
+    // ── Turnstile gate ─────────────────────────────────
+    if (turnstileToken && !hasAdminSecret) {
+        const turnstileResult = await verifyTurnstile(turnstileToken);
+        if (!turnstileResult.success) {
+            return res.status(403).json({
+                error: true,
+                message: 'CAPTCHA verification failed. Please refresh the page and try again.',
+                codes: turnstileResult['error-codes'],
+            });
+        }
+    } else if (!hasAdminSecret && !turnstileToken) {
         return res.status(400).json({ error: true, message: 'CAPTCHA token is missing. Please complete the verification.' });
     }
 
-    const turnstileResponse = await fetch(
-        'https://challenges.cloudflare.com/turnstile/v0/siteverify',
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                secret:   process.env.TURNSTILE_SECRET_KEY,
-                response: turnstileToken,
-            }).toString(),
-        }
-    );
-    const turnstileResult = await turnstileResponse.json();
-    console.log(' Turnstile verification result (bulk):', turnstileResult);
-
-    if (!turnstileResult.success) {
-        return res.status(403).json({
-            error:   true,
-            message: 'CAPTCHA verification failed. Please refresh the page and try again.',
-            codes:   turnstileResult['error-codes'],
-        });
-    }
-    // ---------------------------------------------------------------
-
-    // ── Basic shape check ────────────────────────────────────
+    // ── Shape check ────────────────────────────────────
     if (!Array.isArray(users) || users.length === 0) {
-        return res.status(400).json({
-            error: true,
-            message: '`users` must be a non-empty array.'
-        });
+        return res.status(400).json({ error: true, message: '`users` must be a non-empty array.' });
     }
-
     if (users.length > 500) {
-        return res.status(400).json({
-            error: true,
-            message: 'Bulk limit is 500 users per request.'
-        });
+        return res.status(400).json({ error: true, message: 'Bulk limit is 500 users per request.' });
     }
 
-    // ── Required fields for every row ────────────────────────
-    const REQUIRED = [
-        'userName', 'email', 'fullName', 'phone',
-        'collegeName', 'position', 'employeeId', 'department', 'stream'
-    ];
-
-    // Valid enum values (mirrors Mongoose schema)
-    const VALID_POSITIONS = ['Professor', 'Associate Professor', 'Assistant Professor', 'Lecturer', 'HoD', 'Other'];
-    const VALID_STREAMS   = ['Engineering', 'Management', 'Science', 'Commerce', 'Arts', 'Law', 'Medicine', 'Other'];
-
-    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const PHONE_RE = /^[0-9]{10}$/;
-
-    // ── Per-row validation pass ───────────────────────────────
-    const validRows    = [];   // { index, data, password }
-    const skippedRows  = [];   // { index, row, reason }
+    // ── Validate rows (per-row) ────────────────────────
+    const validRows = [];
+    const skippedRows = [];
 
     for (let i = 0; i < users.length; i++) {
-        const row = users[i];
-
-        // 1. Missing required fields
-        const missing = REQUIRED.filter((f) => !row[f] || String(row[f]).trim() === '');
-        if (missing.length > 0) {
-            skippedRows.push({ index: i, row, reason: `Missing fields: ${missing.join(', ')}` });
-            continue;
+        const result = validateBulkRow(users[i], defaultPassword);
+        if (!result.ok) {
+            skippedRows.push({ index: i, row: users[i], reason: result.reason });
+        } else {
+            validRows.push({ index: i, data: result.data, password: result.password });
         }
-
-        // 2. Email format
-        if (!EMAIL_RE.test(row.email.trim())) {
-            skippedRows.push({ index: i, row, reason: 'Invalid email format.' });
-            continue;
-        }
-
-        // 3. Phone format
-        if (!PHONE_RE.test(String(row.phone).trim())) {
-            skippedRows.push({ index: i, row, reason: 'Phone must be exactly 10 digits.' });
-            continue;
-        }
-
-        // 4. Enum validation — position
-        if (!VALID_POSITIONS.includes(row.position)) {
-            skippedRows.push({ index: i, row, reason: `Invalid position "${row.position}". Allowed: ${VALID_POSITIONS.join(', ')}.` });
-            continue;
-        }
-
-        // 5. Enum validation — stream
-        if (!VALID_STREAMS.includes(row.stream)) {
-            skippedRows.push({ index: i, row, reason: `Invalid stream "${row.stream}". Allowed: ${VALID_STREAMS.join(', ')}.` });
-            continue;
-        }
-
-        // 6. Resolve password (row-level takes priority over shared default)
-        const rawPassword = row.password || defaultPassword;
-        if (!rawPassword || String(rawPassword).trim().length < 6) {
-            skippedRows.push({ index: i, row, reason: 'Password missing or too short (min 6 chars). Provide row-level `password` or a `defaultPassword` in the request body.' });
-            continue;
-        }
-
-        validRows.push({ index: i, data: row, password: rawPassword.trim() });
     }
 
-    // ── Duplicate-check against DB ────────────────────────────
-    // Pull all emails, phones, employeeIds from valid rows in one query.
-    const emails      = validRows.map((r) => r.data.email.toLowerCase().trim());
-    const phones      = validRows.map((r) => String(r.data.phone).trim());
+    // ── Duplicate check against DB ─────────────────────
+    const emails = validRows.map((r) => r.data.email.toLowerCase().trim());
+    const phones = validRows.map((r) => String(r.data.phone).trim());
     const employeeIds = validRows.map((r) => String(r.data.employeeId).trim());
 
     let existingUsers = [];
     try {
         existingUsers = await User.find({
             $or: [
-                { email:      { $in: emails      } },
-                { phone:      { $in: phones      } },
-                { employeeId: { $in: employeeIds } }
-            ]
+                { email: { $in: emails } },
+                { phone: { $in: phones } },
+                { employeeId: { $in: employeeIds } },
+            ],
         }).select('email phone employeeId').lean();
     } catch (dbErr) {
         console.error(' DB duplicate-check error:', dbErr.message);
         return res.status(500).json({ error: true, message: 'Database error during duplicate check.' });
     }
 
-    // Build fast lookup sets
-    const existingEmails      = new Set(existingUsers.map((u) => u.email));
-    const existingPhones      = new Set(existingUsers.map((u) => u.phone));
+    const existingEmails = new Set(existingUsers.map((u) => u.email));
+    const existingPhones = new Set(existingUsers.map((u) => u.phone));
     const existingEmployeeIds = new Set(existingUsers.map((u) => u.employeeId));
 
-    const toInsert   = [];   // bcrypt-hashed User documents ready for DB
-    const duplicates = [];   // { index, row, reason }
+    // ── College resolution ─────────────────────────────
+    const activeColleges = await College.find({ isActive: true }).lean();
+    const collegeMap = buildCollegeMap(activeColleges);
+
+    const toInsert = [];
+    const duplicates = [];
 
     for (const { index, data, password } of validRows) {
         const emailLower = data.email.toLowerCase().trim();
-        const phoneStr   = String(data.phone).trim();
-        const empIdStr   = String(data.employeeId).trim();
+        const phoneStr = String(data.phone).trim();
+        const empIdStr = String(data.employeeId).trim();
 
-        // Also check for in-batch duplicates (same email in two CSV rows)
-        const isDupEmail  = existingEmails.has(emailLower);
-        const isDupPhone  = existingPhones.has(phoneStr);
-        const isDupEmpId  = existingEmployeeIds.has(empIdStr);
+        const dupFlags = {
+            email: existingEmails.has(emailLower),
+            phone: existingPhones.has(phoneStr),
+            employeeId: existingEmployeeIds.has(empIdStr),
+        };
 
-        if (isDupEmail || isDupPhone || isDupEmpId) {
-            const field = isDupEmail ? 'email' : isDupPhone ? 'phone' : 'employeeId';
-            duplicates.push({ index, row: data, reason: `${field} already exists in the database.` });
+        if (dupFlags.email || dupFlags.phone || dupFlags.employeeId) {
+            duplicates.push({
+                index,
+                row: data,
+                reason: `${duplicateFieldName(dupFlags)} already exists in the database.`,
+            });
             continue;
         }
 
-        // Hash password
+        const rawCollegeKey = String(data.collegeId || data.collegeName || '').toLowerCase().trim();
+        const matchedCol = collegeMap.get(rawCollegeKey) || activeColleges[0];
+
+        if (!matchedCol) {
+            skippedRows.push({ index, row: data, reason: `College "${data.collegeName || data.collegeId}" not recognized or inactive.` });
+            continue;
+        }
+
         let hashedPassword;
         try {
-            const salt = await bcrypt.genSalt(10);
-            hashedPassword = await bcrypt.hash(password, salt);
+            hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
         } catch (hashErr) {
             duplicates.push({ index, row: data, reason: `Password hashing failed: ${hashErr.message}` });
             continue;
         }
 
         toInsert.push({
-            userName:     data.userName.trim(),
-            email:        emailLower,
-            password:     hashedPassword,
-            fullName:     data.fullName.trim(),
-            phone:        phoneStr,
-            collegeName:  data.collegeName.trim(),
-            position:     data.position,
-            employeeId:   empIdStr,
-            department:   data.department.trim(),
-            stream:       data.stream,
-            collegeIdPhoto: '',          // No file upload in bulk flow
-            idVerification: {            // Default — unverified until manual OCR review
+            userName: data.userName.trim(),
+            email: emailLower,
+            password: hashedPassword,
+            fullName: data.fullName.trim(),
+            phone: phoneStr,
+            collegeId: matchedCol._id,
+            collegeName: matchedCol.name,
+            position: data.position,
+            employeeId: empIdStr,
+            department: data.department.trim(),
+            stream: data.stream,
+            collegeIdPhoto: '',
+            idVerification: {
                 status: 'unverified',
                 extractedData: { fullName: '', employeeId: '', collegeName: '', department: '' },
                 matchedFields: [],
                 confidence: 0,
-                updatedAt: new Date()
-            }
+                updatedAt: new Date(),
+            },
         });
 
-        // Register the newly queued identifiers so in-batch duplicates are caught
         existingEmails.add(emailLower);
         existingPhones.add(phoneStr);
         existingEmployeeIds.add(empIdStr);
     }
 
-    // ── Bulk insert ───────────────────────────────────────────
+    // ── Atomic bulk insert ─────────────────────────────
     let inserted = [];
-    let dbErrors = [];
+    const dbErrors = [];
 
     if (toInsert.length > 0) {
         try {
-            // ordered:false  → continue inserting remaining docs even if one fails
-            const result = await User.insertMany(toInsert, { ordered: false });
-            inserted = result;
-            console.log(` Bulk insert: ${result.length} users created.`);
+            await withTransaction(async (session) => {
+                const opts = session ? { session } : {};
+
+                inserted = await User.insertMany(toInsert, { ordered: true, ...opts });
+
+                const incMap = new Map();
+                for (const doc of toInsert) {
+                    const role = doc.role || 'teacher';
+                    if (role !== 'teacher') continue;
+                    const key = String(doc.collegeId);
+                    incMap.set(key, (incMap.get(key) || 0) + 1);
+                }
+
+                for (const [collegeId, count] of incMap.entries()) {
+                    await College.findByIdAndUpdate(collegeId, { $inc: { totalTeachers: count } }, opts);
+                }
+            });
         } catch (bulkErr) {
-            // insertMany with ordered:false throws a BulkWriteError but still
-            // commits the successful documents. Extract them.
-            if (bulkErr.insertedDocs) {
-                inserted = bulkErr.insertedDocs;
-            }
-            // Collect any write errors
-            const writeErrors = bulkErr.writeErrors || [];
-            for (const we of writeErrors) {
-                const failedDoc = toInsert[we.index];
-                dbErrors.push({
-                    row: failedDoc,
-                    reason: `DB write error: ${we.errmsg || we.err?.errmsg || 'unknown'}`
-                });
-            }
-            console.error(' Bulk write partial error:', bulkErr.message);
+            dbErrors.push({
+                row: null,
+                reason: `Bulk insert failed: ${bulkErr.message || 'unknown error'}. No users were created.`,
+            });
+            inserted = [];
+            console.error(' Bulk write rolled back:', bulkErr.message);
         }
     }
 
-    // ── Build response summary ────────────────────────────────
+    // ── Response ───────────────────────────────────────
     const totalReceived = users.length;
-    const totalCreated  = inserted.length;
-    const totalSkipped  = skippedRows.length + duplicates.length + dbErrors.length;
+    const totalCreated = inserted.length;
+    const totalSkipped = skippedRows.length + duplicates.length + dbErrors.length;
 
     const createdUsers = inserted.map((u) => ({
-        _id:        u._id,
-        userName:   u.userName,
-        email:      u.email,
-        fullName:   u.fullName,
-        employeeId: u.employeeId
+        _id: u._id,
+        userName: u.userName,
+        email: u.email,
+        fullName: u.fullName,
+        employeeId: u.employeeId,
     }));
 
-    console.log(` Bulk register complete — created: ${totalCreated}, skipped: ${totalSkipped}`);
+    // ── Fire summary email to requesting admin (non-blocking) ──
+    try {
+        const requester = await User.findById(getUserId(req) || req.adminId).select('email fullName').lean();
+        if (requester?.email) {
+            emailService.sendBulkRegistrationSummary({
+                to: requester.email,
+                adminName: requester.fullName,
+                totalCreated,
+                totalFailed: skippedRows.length + duplicates.length + dbErrors.length,
+                totalSkipped: skippedRows.length,
+                failedList: [
+                    ...skippedRows.map(({ row, reason }) => ({ email: row.email, reason })),
+                    ...duplicates.map(({ row, reason }) => ({ email: row.email, reason })),
+                ],
+            }).catch(() => {});
+        }
+    } catch (e) {
+        console.error(' Bulk summary email failed (non-blocking):', e.message);
+    }
 
-    return res.status(207).json({   // 207 Multi-Status: partial success is normal
+    return res.status(207).json({
         error: false,
-        summary: {
-            totalReceived,
-            totalCreated,
-            totalSkipped,
-        },
-        created:  createdUsers,
+        summary: { totalReceived, totalCreated, totalSkipped },
+        created: createdUsers,
         failed: [
             ...skippedRows.map(({ index, row, reason }) => ({ index, email: row.email, reason })),
             ...duplicates.map(({ index, row, reason }) => ({ index, email: row.email, reason })),
             ...dbErrors.map(({ row, reason }) => ({ email: row?.email, reason })),
-        ]
+        ],
     });
 };
 
 // ============================================================
 // CREATE ADMIN CONTROLLER
-// POST /auth/create-admin  (protected by X-Admin-Secret header)
-//
-// Creates a minimal admin account — no OCR, no college ID photo,
-// no teacher-specific fields. Just name, email, password.
 // ============================================================
 const createAdmin = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
+        const { name, email, password, collegeId } = req.body;
 
         if (!name || !email || !password) {
             return res.status(400).json({ error: true, message: 'Name, email, and password are required.' });
         }
-
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
+        if (typeof email !== 'string' || email.length > 254 || !validator.isEmail(email)) {
             return res.status(400).json({ error: true, message: 'Invalid email format.' });
         }
-
-        if (password.length < 8) {
-            return res.status(400).json({ error: true, message: 'Admin password must be at least 8 characters.' });
+        if (!isStrongPassword(password)) {
+            return res.status(400).json({ error: true, message: PASSWORD_ERROR_MESSAGE });
         }
 
         const existing = await User.findOne({ email: email.toLowerCase() });
@@ -889,7 +1096,25 @@ const createAdmin = async (req, res) => {
             return res.status(400).json({ error: true, message: 'Email is already registered.' });
         }
 
-        const hashedPassword = await bcrypt.hash(password, 12);
+        let effectiveCollegeId = null;
+        let effectiveCollegeName = 'N/A';
+
+        if (collegeId) {
+            const foundCollege = await College.findById(collegeId);
+            if (foundCollege) {
+                effectiveCollegeId = foundCollege._id;
+                effectiveCollegeName = foundCollege.name;
+            }
+        }
+        if (!effectiveCollegeId) {
+            const fallback = await College.findOne({ isActive: true }).sort({ createdAt: 1 });
+            if (fallback) {
+                effectiveCollegeId = fallback._id;
+                effectiveCollegeName = fallback.name;
+            }
+        }
+
+        const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
         const admin = new User({
             userName: name.trim(),
@@ -897,22 +1122,36 @@ const createAdmin = async (req, res) => {
             email: email.toLowerCase().trim(),
             password: hashedPassword,
             role: 'admin',
-            // Teacher-specific fields left as defaults (empty strings / null)
-            // idVerification defaults to 'unverified' but is not applicable for admins
-            idVerification: { status: 'not_applicable' }
+            collegeId: effectiveCollegeId,
+            collegeName: effectiveCollegeName,
+            idVerification: { status: 'not_applicable' },
         });
 
         await admin.save();
 
+        createNotification({
+          userId: admin._id,
+          type: 'welcome',
+          title: 'Welcome to QMetric',
+          message: 'Your admin account is ready. Explore the dashboard to get started.',
+          actionUrl: '/dashboard',
+        }).catch(() => {});
+
+        emailService.sendNewUserEmail(admin, password).catch(() => {});
+        await logAudit({
+            userId: getUserId(req),
+            action: 'CREATE_ADMIN',
+            resource: `User:${admin._id}`,
+            request: req,
+        });
+
         const adminResponse = admin.toObject();
         delete adminResponse.password;
-
-        console.log(` Admin account created: ${email}`);
 
         return res.status(201).json({
             error: false,
             message: 'Admin account created successfully.',
-            user: adminResponse
+            user: adminResponse,
         });
     } catch (err) {
         console.error(' Create admin error:', err.message);
@@ -920,9 +1159,506 @@ const createAdmin = async (req, res) => {
     }
 };
 
+// ============================================================
+// EMAIL VERIFICATION
+// ============================================================
+const verifyEmail = async (req, res) => {
+    try {
+        const { token } = req.params;
+        if (!token || typeof token !== 'string') {
+            return res.status(400).json({ error: true, message: 'Verification token required.' });
+        }
+
+        const hashed = crypto.createHash('sha256').update(token).digest('hex');
+
+        const user = await User.findOne({
+            emailVerificationToken: hashed,
+            emailVerificationExpires: { $gt: new Date() },
+        }).select('+emailVerificationToken +emailVerificationExpires');
+
+        if (!user) {
+            return res.status(400).json({ error: true, message: 'Invalid or expired verification token.' });
+        }
+
+        user.emailVerified = true;
+        user.emailVerificationToken = null;
+        user.emailVerificationExpires = null;
+        await user.save({ validateBeforeSave: false });
+
+        await logAudit({
+            userId: user._id,
+            action: 'EMAIL_VERIFIED',
+            resource: `User:${user._id}`,
+            request: req,
+        });
+
+        return res.json({ error: false, message: 'Email verified successfully.' });
+    } catch (err) {
+        console.error(' verifyEmail error:', err);
+        return res.status(500).json({ error: true, message: 'Server error.' });
+    }
+};
+
+const resendVerificationEmail = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email || typeof email !== 'string') {
+            return res.status(400).json({ error: true, message: 'Email is required.' });
+        }
+
+        const user = await User.findOne({ email: email.toLowerCase().trim() });
+        // Don't leak whether the account exists
+        if (!user) {
+            return res.json({ error: false, message: 'If that email exists, a verification link has been sent.' });
+        }
+        if (user.emailVerified) {
+            return res.json({ error: false, message: 'Email is already verified.' });
+        }
+
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        const hashed = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+        user.emailVerificationToken = hashed;
+        user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await user.save({ validateBeforeSave: false });
+
+        emailService.sendVerificationEmail(user.email, rawToken, user.fullName).catch(() => {});
+
+        return res.json({ error: false, message: 'If that email exists, a verification link has been sent.' });
+    } catch (err) {
+        console.error(' resendVerificationEmail error:', err);
+        return res.status(500).json({ error: true, message: 'Server error.' });
+    }
+};
+
+// ============================================================
+// POST /auth/profile/request-affiliation
+// Independent teacher → requests affiliation with a college (pending approval)
+// ============================================================
+const requestAffiliation = async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            return res.status(401).json({ error: true, message: 'Unauthenticated.' });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: true, message: 'User not found.' });
+        }
+
+        if (user.role !== 'teacher') {
+            return res.status(400).json({
+                error: true,
+                message: 'Only teachers can request college affiliation.',
+            });
+        }
+
+        if (user.collegeId || user.collegeApprovalStatus === 'pending') {
+            return res.status(400).json({
+                error: true,
+                message: user.collegeApprovalStatus === 'pending'
+                    ? 'You already have a pending affiliation request.'
+                    : 'You are already affiliated with a college.',
+            });
+        }
+
+        const { collegeId } = req.body;
+        if (!collegeId) {
+            return res.status(400).json({ error: true, message: 'collegeId is required.' });
+        }
+
+        const matchedCollege = await College.findById(collegeId);
+        if (!matchedCollege) {
+            return res.status(400).json({ error: true, message: 'College not found.' });
+        }
+        if (!matchedCollege.isActive) {
+            return res.status(403).json({
+                error: true,
+                message: 'This college is currently inactive.',
+            });
+        }
+
+        // OCR (best-effort)
+        let uploadResult = null;
+        let ocrRawText = '';
+        let idVerification = {
+            status: 'unverified',
+            extractedData: { fullName: '', employeeId: '', collegeName: '', department: '' },
+            matchedFields: [],
+            confidence: 0,
+            updatedAt: new Date(),
+        };
+
+        if (req.file) {
+            try {
+                uploadResult = await uploadToCloudinaryWithOcr(req.file.buffer);
+                const ocrText = extractOcrText(uploadResult);
+                if (ocrText && ocrText.trim().length > 0) {
+                    const verificationResult = runOcrVerification(ocrText, {
+                        fullName: user.fullName,
+                        employeeId: user.employeeId,
+                        collegeName: matchedCollege.name,
+                        department: user.department,
+                    });
+                    ocrRawText = verificationResult.ocrRawText;
+                    idVerification = {
+                        status: verificationResult.status,
+                        extractedData: verificationResult.extractedData,
+                        matchedFields: verificationResult.matchedFields,
+                        confidence: verificationResult.confidence,
+                        updatedAt: verificationResult.updatedAt,
+                    };
+                }
+            } catch (ocrErr) {
+                console.error('OCR processing error (non-blocking):', ocrErr.message);
+            }
+        }
+
+        // Store the pending request; do NOT touch collegeId yet
+        user.pendingAffiliationRequest = {
+            collegeId: matchedCollege._id,
+            requestedAt: new Date(),
+            idVerification,
+        };
+        user.collegeApprovalStatus = 'pending';
+        await user.save();
+
+        // Audit
+        try {
+            await logAudit({
+                userId: user._id,
+                action: 'REQUEST_AFFILIATION',
+                resource: `User:${user._id}`,
+                changes: {
+                    newValue: { collegeId: matchedCollege._id, collegeName: matchedCollege.name },
+                    fields: ['pendingAffiliationRequest'],
+                },
+                request: req,
+            });
+        } catch (auditErr) {
+            console.error('Audit log failed (non-blocking):', auditErr.message);
+        }
+
+        // OCRLog record (if OCR ran)
+        if (uploadResult) {
+            try {
+                await OCRLog.create({
+                    userId: user._id,
+                    userInput: {
+                        fullName: user.fullName,
+                        employeeId: user.employeeId,
+                        collegeName: matchedCollege.name,
+                        department: user.department,
+                    },
+                    extractedData: idVerification.extractedData,
+                    matchedFields: idVerification.matchedFields,
+                    status: idVerification.status,
+                    confidence: idVerification.confidence,
+                    ocrRawText,
+                    imageUrl: uploadResult.secure_url,
+                });
+            } catch (logErr) {
+                console.error('OCR log save failed (non-blocking):', logErr.message);
+            }
+        }
+
+        // Notify college admins
+        try {
+            const admins = await User.find({
+                collegeId: matchedCollege._id,
+                role: 'admin',
+            }).select('_id').lean();
+
+            for (const admin of admins) {
+                createNotification({
+                    userId: admin._id,
+                    type: 'pending_teacher_approval',
+                    title: 'Affiliation request',
+                    message: `${user.fullName} (${user.email}) has requested affiliation with ${matchedCollege.name}.`,
+                    relatedDocId: user._id,
+                    actionUrl: `/college-admin/pending-teachers/${user._id}`,
+                }).catch(() => {});
+            }
+        } catch (notifErr) {
+            console.error('Admin notification dispatch failed (non-blocking):', notifErr.message);
+        }
+
+        return res.json({
+            error: false,
+            message: `Your affiliation request with ${matchedCollege.name} has been submitted for approval.`,
+            requiresApproval: true,
+            accountState: 'pending_approval',
+        });
+    } catch (err) {
+        console.error('requestAffiliation error:', err);
+        return res.status(500).json({ error: true, message: 'Server error.', details: err.message });
+    }
+};
+
+// ============================================================
+// POST /auth/profile/upgrade-to-teacher
+// Student → teacher (independent: instant; affiliated: pending)
+// ============================================================
+const upgradeToTeacher = async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            return res.status(401).json({ error: true, message: 'Unauthenticated.' });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: true, message: 'User not found.' });
+        }
+
+        if (user.role !== 'student') {
+            return res.status(400).json({
+                error: true,
+                message: 'Only student accounts can be upgraded to teacher.',
+            });
+        }
+
+        const { signupIntent, collegeId } = req.body;
+
+        if (!['affiliated', 'independent'].includes(signupIntent)) {
+            return res.status(400).json({
+                error: true,
+                message: 'signupIntent must be "affiliated" or "independent".',
+            });
+        }
+
+        // ── Independent teacher (instant) ────────────────────
+        if (signupIntent === 'independent') {
+            user.role = 'teacher';
+            user.collegeId = null;
+            user.collegeName = '';
+            user.collegeApprovalStatus = 'approved';
+            // Populate teacher-required fields from existing student data
+            if (!user.position) user.position = 'Other';
+            await user.save();
+
+            try {
+                await logAudit({
+                    userId: user._id,
+                    action: 'UPGRADE_TO_TEACHER',
+                    resource: `User:${user._id}`,
+                    changes: {
+                        oldValue: { role: 'student' },
+                        newValue: { role: 'teacher', affiliation: 'independent' },
+                        fields: ['role'],
+                    },
+                    request: req,
+                });
+            } catch (auditErr) {
+                console.error('Audit log failed (non-blocking):', auditErr.message);
+            }
+
+            createNotification({
+                userId: user._id,
+                type: 'welcome',
+                title: 'Account upgraded',
+                message: 'You are now an independent teacher. Upload papers to get started.',
+                actionUrl: '/teacher/upload',
+            }).catch(() => {});
+
+            return res.json({
+                error: false,
+                message: 'Account upgraded to independent teacher.',
+                canUseFeatures: true,
+                accountState: 'active',
+            });
+        }
+
+        // ── Affiliated teacher (pending approval) ────────────
+        if (!collegeId) {
+            return res.status(400).json({ error: true, message: 'collegeId is required for affiliated upgrade.' });
+        }
+
+        const matchedCollege = await College.findById(collegeId);
+        if (!matchedCollege) {
+            return res.status(400).json({ error: true, message: 'College not found.' });
+        }
+        if (!matchedCollege.isActive) {
+            return res.status(403).json({ error: true, message: 'This college is currently inactive.' });
+        }
+
+        // OCR (best-effort)
+        let uploadResult = null;
+        let ocrRawText = '';
+        let idVerification = {
+            status: 'unverified',
+            extractedData: { fullName: '', employeeId: '', collegeName: '', department: '' },
+            matchedFields: [],
+            confidence: 0,
+            updatedAt: new Date(),
+        };
+
+        if (req.file) {
+            try {
+                uploadResult = await uploadToCloudinaryWithOcr(req.file.buffer);
+                const ocrText = extractOcrText(uploadResult);
+                if (ocrText && ocrText.trim().length > 0) {
+                    const verificationResult = runOcrVerification(ocrText, {
+                        fullName: user.fullName,
+                        employeeId: user.employeeId,
+                        collegeName: matchedCollege.name,
+                        department: user.department,
+                    });
+                    ocrRawText = verificationResult.ocrRawText;
+                    idVerification = {
+                        status: verificationResult.status,
+                        extractedData: verificationResult.extractedData,
+                        matchedFields: verificationResult.matchedFields,
+                        confidence: verificationResult.confidence,
+                        updatedAt: verificationResult.updatedAt,
+                    };
+                }
+            } catch (ocrErr) {
+                console.error('OCR processing error (non-blocking):', ocrErr.message);
+            }
+        }
+
+        user.role = 'teacher';
+        user.collegeId = matchedCollege._id;
+        user.collegeName = matchedCollege.name;
+        user.collegeApprovalStatus = 'pending';
+        user.idVerification = idVerification;
+        if (uploadResult) user.collegeIdPhoto = uploadResult.secure_url;
+        if (!user.position) user.position = 'Other';
+        if (!user.department) user.department = 'Not specified';
+        if (!user.stream) user.stream = 'Other';
+        await user.save();
+
+        try {
+            await logAudit({
+                userId: user._id,
+                action: 'UPGRADE_TO_TEACHER',
+                resource: `User:${user._id}`,
+                changes: {
+                    oldValue: { role: 'student' },
+                    newValue: { role: 'teacher', affiliation: 'affiliated', collegeId: matchedCollege._id },
+                    fields: ['role', 'collegeId', 'collegeApprovalStatus'],
+                },
+                request: req,
+            });
+        } catch (auditErr) {
+            console.error('Audit log failed (non-blocking):', auditErr.message);
+        }
+
+        if (uploadResult) {
+            try {
+                await OCRLog.create({
+                    userId: user._id,
+                    userInput: {
+                        fullName: user.fullName,
+                        employeeId: user.employeeId,
+                        collegeName: matchedCollege.name,
+                        department: user.department,
+                    },
+                    extractedData: idVerification.extractedData,
+                    matchedFields: idVerification.matchedFields,
+                    status: idVerification.status,
+                    confidence: idVerification.confidence,
+                    ocrRawText,
+                    imageUrl: uploadResult.secure_url,
+                });
+            } catch (logErr) {
+                console.error('OCR log save failed (non-blocking):', logErr.message);
+            }
+        }
+
+        try {
+            const admins = await User.find({
+                collegeId: matchedCollege._id,
+                role: 'admin',
+            }).select('_id').lean();
+
+            for (const admin of admins) {
+                createNotification({
+                    userId: admin._id,
+                    type: 'pending_teacher_approval',
+                    title: 'Student upgraded — awaiting approval',
+                    message: `${user.fullName} (${user.email}) upgraded to teacher and is awaiting approval at ${matchedCollege.name}.`,
+                    relatedDocId: user._id,
+                    actionUrl: `/college-admin/pending-teachers/${user._id}`,
+                }).catch(() => {});
+            }
+        } catch (notifErr) {
+            console.error('Admin notification dispatch failed (non-blocking):', notifErr.message);
+        }
+
+        return res.json({
+            error: false,
+            message: `Your upgrade to teacher at ${matchedCollege.name} has been submitted for approval.`,
+            requiresApproval: true,
+            accountState: 'pending_approval',
+        });
+    } catch (err) {
+        console.error('upgradeToTeacher error:', err);
+        return res.status(500).json({ error: true, message: 'Server error.', details: err.message });
+    }
+};
+
+// ============================================================
+// BULK REGISTER — TEMPLATE + FORMAT (public helpers)
+// ============================================================
+
+/**
+ * GET /auth/bulk-register/template
+ */
+const downloadBulkTemplate = (req, res) => {
+    const csv = [
+        'email,password,fullName,userName,phone,role,collegeId,position,employeeId,department,stream',
+        'john.doe@college.edu,TempPass123!,John Doe,john_doe,9876543210,teacher,,Assistant Professor,EMP001,Computer Science,Engineering',
+    ].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="qmetric-bulk-template.csv"');
+    return res.send(csv);
+};
+
+/**
+ * GET /auth/bulk-register/format
+ */
+const getBulkFormat = (req, res) => {
+    return res.json({
+        error: false,
+        format: {
+            maxRows: 500,
+            requiredHeaders: ['email', 'password', 'fullName', 'userName', 'phone'],
+            optionalHeaders: ['role', 'collegeId', 'position', 'employeeId', 'department', 'stream'],
+            supportedRoles: ['teacher', 'reviewer'],
+            columns: [
+                { name: 'email',      type: 'string', required: true,  example: 'john@college.edu',     constraints: 'valid email, max 254 chars' },
+                { name: 'password',   type: 'string', required: true,  example: 'TempPass123!',         constraints: 'min 8 chars, 1 upper, 1 number, 1 special' },
+                { name: 'fullName',   type: 'string', required: true,  example: 'John Doe',             constraints: '2-100 chars' },
+                { name: 'userName',   type: 'string', required: true,  example: 'john_doe',             constraints: '3-30 chars' },
+                { name: 'phone',      type: 'string', required: true,  example: '9876543210',           constraints: 'exactly 10 digits' },
+                { name: 'role',       type: 'string', required: false, example: 'teacher',              constraints: 'teacher | reviewer (default: teacher)' },
+                { name: 'collegeId',  type: 'string', required: false, example: '65a3...',              constraints: 'Mongo ObjectId of active college' },
+                { name: 'position',   type: 'string', required: false, example: 'Assistant Professor', constraints: 'Professor | Associate Professor | Assistant Professor | Lecturer | HoD | Other' },
+                { name: 'employeeId', type: 'string', required: false, example: 'EMP001',               constraints: 'unique per system' },
+                { name: 'department', type: 'string', required: false, example: 'Computer Science',    constraints: 'free text' },
+                { name: 'stream',     type: 'string', required: false, example: 'Engineering',          constraints: 'Engineering | Management | Science | Commerce | Arts | Law | Medicine | Other' },
+            ],
+            requestOptions: {
+                dryRun: 'boolean (default false) — validate only, no writes',
+                rollbackOnError: 'boolean (default false) — if true, any invalid row rejects the entire batch',
+            },
+        },
+    });
+};
+
 module.exports = {
     login,
     register,
     bulkRegister,
-    createAdmin
+    createAdmin,
+    verifyEmail,
+    resendVerificationEmail,
+    downloadBulkTemplate,
+    getBulkFormat,
+    requestAffiliation,
+    upgradeToTeacher,
 };

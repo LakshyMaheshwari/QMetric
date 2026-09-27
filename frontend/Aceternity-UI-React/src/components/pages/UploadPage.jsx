@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Trash2, Upload, FileText, Check, Target, BookOpen, Loader2, AlertCircle } from 'lucide-react';
 import apiClient from '../../api/client';
 
@@ -18,6 +19,7 @@ const SectionCard = ({ badge, title, subtitle, icon, children }) => (
 );
 
 const UploadPage = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     "College Name": "",
     "Branch": "",
@@ -134,8 +136,10 @@ const UploadPage = () => {
     const validMimeTypes = [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.ms-excel',
+      'text/csv',
+      'application/csv',
     ];
-    const validExtensions = ['.xlsx', '.xls'];
+    const validExtensions = ['.xlsx', '.xls', '.csv'];
     const ext = f.name ? '.' + f.name.split('.').pop().toLowerCase() : '';
     // Check MIME type OR file extension (drag-and-drop often has empty/wrong MIME type)
     return validMimeTypes.includes(f.type) || validExtensions.includes(ext);
@@ -181,12 +185,18 @@ const UploadPage = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      alert('File uploaded and processed successfully!');
-      window.location.href = '/result';
+      const paperId = response.data?.data?._id || response.data?._id || response.data?.id;
+
       setFile(null);
       setCourseOutcomes([]);
       setModules([]);
       setFormData({ "College Name": "", "Branch": "", "Year Of Study": "", "Semester": "", "Course Name": "", "Course Code": "", "Course Teacher": "" });
+
+      if (paperId) {
+        navigate(`/result/${paperId}`);
+      } else {
+        navigate('/papers'); // fallback to papers list if no ID returned
+      }
     } catch (err) {
       const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'Unknown error occurred';
       if (err.response?.status === 403) setError('Access denied. Please check your authentication or login again.');
@@ -406,7 +416,7 @@ const UploadPage = () => {
         <SectionCard
           icon={<Upload size={16} />}
           title="Upload Paper File"
-          subtitle="Upload your question paper in Excel format (.xlsx or .xls)"
+          subtitle="Upload your question paper in Excel or CSV format (.xlsx, .xls, .csv)"
         >
           <div className="flex justify-end mb-4">
             <button type="button" onClick={downloadSample}
@@ -452,9 +462,9 @@ const UploadPage = () => {
                 <div>
                   <p className="text-white font-semibold">Drop your file here</p>
                   <p className="text-gray-400 text-sm mt-1">or click the button below to browse</p>
-                  <p className="text-gray-500 text-xs mt-2">Supported: .xlsx, .xls · Max 10 MB</p>
+                  <p className="text-gray-500 text-xs mt-2">Supported: .xlsx, .xls, .csv · Max 10 MB</p>
                 </div>
-                <input type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" id="file-upload" />
+                <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileChange} className="hidden" id="file-upload" />
                 <label htmlFor="file-upload"
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-xl hover:bg-gray-600 hover:border-gray-500 cursor-pointer transition-colors">
                   <FileText size={14} />

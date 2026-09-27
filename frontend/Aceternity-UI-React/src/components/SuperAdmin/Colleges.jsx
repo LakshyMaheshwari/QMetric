@@ -8,6 +8,7 @@ import {
   Users, CheckCircle, XCircle, Trash2, Edit2, MapPin,
   Shield, Check, X, AlertCircle
 } from 'lucide-react';
+import { ListSkeleton } from '../SkeletonLoader';
 
 export default function Colleges() {
   const { user } = useAuth();
@@ -52,7 +53,7 @@ export default function Colleges() {
       if (search.trim()) params.search = search.trim();
       if (statusFilter) params.status = statusFilter;
 
-      const res = await apiClient.get('/admin/colleges', { params });
+      const res = await apiClient.get('/super-admin/colleges', { params });
       if (res.data && !res.data.error) {
         setColleges(res.data.colleges || []);
         if (res.data.summary) {
@@ -74,7 +75,7 @@ export default function Colleges() {
   const handleToggleStatus = async (college) => {
     try {
       setUpdatingId(college._id);
-      const res = await apiClient.put(`/admin/colleges/${college._id}`, {
+      const res = await apiClient.put(`/super-admin/colleges/${college._id}`, {
         isActive: !college.isActive,
       });
       if (res.data && !res.data.error) {
@@ -106,7 +107,7 @@ export default function Colleges() {
   const handleSaveEdit = async (id) => {
     try {
       setUpdatingId(id);
-      const res = await apiClient.put(`/admin/colleges/${id}`, editForm);
+      const res = await apiClient.put(`/super-admin/colleges/${id}`, editForm);
       if (res.data && !res.data.error) {
         setColleges((prev) =>
           prev.map((c) => (c._id === id ? { ...c, ...res.data.college } : c))
@@ -127,7 +128,8 @@ export default function Colleges() {
 
     try {
       setDeletingId(college._id);
-      const res = await apiClient.delete(`/admin/colleges/${college._id}`);
+      // permanent=true matches old hard-delete behavior; the UI removes the row
+      const res = await apiClient.delete(`/super-admin/colleges/${college._id}?permanent=true`);
       if (res.data && !res.data.error) {
         setColleges((prev) => prev.filter((c) => c._id !== college._id));
         setSuccess('College deleted successfully');
@@ -139,6 +141,16 @@ export default function Colleges() {
       setDeletingId(null);
     }
   };
+
+  if (loading && colleges.length === 0) {
+    return (
+      <div className="min-h-screen bg-black text-white pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <ListSkeleton items={6} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white pt-24 pb-16 px-4 sm:px-6 lg:px-8">
@@ -285,16 +297,7 @@ export default function Colleges() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/70">
-                {loading && colleges.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-zinc-400">
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <RefreshCw className="w-6 h-6 animate-spin text-blue-400" />
-                        <span>Loading colleges...</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : colleges.length === 0 ? (
+                {colleges.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-zinc-400">
                       <div className="flex flex-col items-center justify-center gap-2">
@@ -374,17 +377,17 @@ export default function Colleges() {
                           )}
                         </td>
 
-                        {/* Teachers Count */}
+                        {/* Teachers Count — reads liveTeacherCount from super-admin endpoint */}
                         <td className="py-4 px-4 text-center">
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                            {college.totalTeachers ?? 0}
+                            {college.liveTeacherCount ?? college.totalTeachers ?? 0}
                           </span>
                         </td>
 
-                        {/* Papers Count */}
+                        {/* Papers Count — reads livePaperCount from super-admin endpoint */}
                         <td className="py-4 px-4 text-center">
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-500/10 text-purple-300 border border-purple-500/20">
-                            {college.totalPapers ?? 0}
+                            {college.livePaperCount ?? college.totalPapers ?? 0}
                           </span>
                         </td>
 

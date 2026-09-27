@@ -3,61 +3,61 @@ import {
   User, BookOpen, BarChart3, Upload, LogOut,
   FileText, Brain, ArrowRight, RefreshCw, Home
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 
 export default function UserDashboard() {
   const { user, logout: authLogout, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [recentPapers, setRecentPapers] = useState([]);
   const [stats, setStats] = useState({ totalPapers: 0 });
   const [loading, setLoading] = useState(true);
 
-  const navigate = (path) => {
-    window.location.href = path;
-  };
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchDashboardData();
-    } else {
-      fetchMockData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated]);
-
-  // Fetch actual dashboard data from API
-  const fetchDashboardData = async () => {
+  const fetchPapers = async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get('/upload/totext');
-      const result = response.data;
-      if (result.success && Array.isArray(result.data)) {
-        setRecentPapers(result.data.slice(0, 5));
-        setStats({ totalPapers: result.data.length });
+      const response = await apiClient.get('/teacher/papers');
+
+      // Correct data shape: {papers: [papers]}, {data: [papers]}, or just [papers]
+      const papersList = response.data?.papers || response.data?.data || (Array.isArray(response.data) ? response.data : []);
+
+      // Now it's actually an array we can slice
+      const recentFive = Array.isArray(papersList)
+        ? papersList.slice(0, 5)
+        : [];
+
+      setRecentPapers(recentFive);
+      if (response.data?.stats?.total !== undefined) {
+        setStats({ totalPapers: response.data.stats.total });
       } else {
-        fetchMockData();
+        setStats({ totalPapers: Array.isArray(papersList) ? papersList.length : 0 });
       }
-    } catch {
-      fetchMockData();
+    } catch (error) {
+      console.error('Failed to fetch papers:', error);
+      // Empty instead of fake
+      setRecentPapers([]);
+      setStats({ totalPapers: 0 });
     } finally {
       setLoading(false);
     }
   };
 
-  // Mock data for demo purposes
-  const fetchMockData = () => {
-    setLoading(true);
-    setTimeout(() => {
-      const mockPapers = [
-        { _id: '1', 'Course Name': 'Advanced Data Structures', 'Course Code': 'CS301', 'Branch': 'Computer Science', 'Year Of Study': '3rd Year', 'Semester': '5', 'College Name': 'Tech University', createdAt: new Date().toISOString() },
-        { _id: '2', 'Course Name': 'Machine Learning Fundamentals', 'Course Code': 'CS401', 'Branch': 'Computer Science', 'Year Of Study': '4th Year', 'Semester': '7', 'College Name': 'Tech University', createdAt: new Date(Date.now() - 86400000).toISOString() },
-        { _id: '3', 'Course Name': 'Database Management Systems', 'Course Code': 'CS302', 'Branch': 'Computer Science', 'Year Of Study': '3rd Year', 'Semester': '5', 'College Name': 'Tech University', createdAt: new Date(Date.now() - 172800000).toISOString() },
-      ];
-      setRecentPapers(mockPapers);
-      setStats({ totalPapers: mockPapers.length });
-      setLoading(false);
-    }, 1000);
-  };
+  const fetchDashboardData = fetchPapers;
+
+  useEffect(() => {
+    if (user?.role === 'reviewer') {
+      navigate('/reviewer', { replace: true });
+    } else if (user?.role === 'super_admin') {
+      navigate('/super-admin', { replace: true });
+    } else if (user?.role === 'admin') {
+      navigate('/college-admin', { replace: true });
+    }
+  }, [user, navigate]);
+
+  useEffect(() => {
+    fetchPapers();
+  }, []);
 
   const handleLogout = () => {
     authLogout();
@@ -67,7 +67,7 @@ export default function UserDashboard() {
   const quickActions = [
     { icon: <Upload className="w-6 h-6" />, title: 'Upload New Paper', description: 'Analyze a new question paper', action: () => navigate('/upload'), color: 'from-blue-500 to-purple-600', glow: 'shadow-blue-500/30' },
     { icon: <BookOpen className="w-6 h-6" />, title: 'View All Papers', description: 'Browse your paper collection', action: () => navigate('/papers'), color: 'from-teal-500 to-emerald-600', glow: 'shadow-teal-500/30' },
-    { icon: <BarChart3 className="w-6 h-6" />, title: 'Analytics', description: 'View detailed analytics', action: () => { }, color: 'from-orange-500 to-red-600', glow: 'shadow-orange-500/30' },
+    { icon: <BarChart3 className="w-6 h-6" />, title: 'Analytics', description: 'View detailed analytics', action: () => { if (recentPapers.length > 0 && recentPapers[0]._id) { navigate(`/result/${recentPapers[0]._id}`); } else { navigate('/papers'); } }, color: 'from-orange-500 to-red-600', glow: 'shadow-orange-500/30' },
     { icon: <FileText className="w-6 h-6" />, title: 'Total Papers', description: `${stats.totalPapers} paper${stats.totalPapers !== 1 ? 's' : ''} uploaded`, action: () => navigate('/papers'), color: 'from-indigo-500 to-blue-600', glow: 'shadow-indigo-500/30' },
   ];
 
@@ -110,7 +110,7 @@ export default function UserDashboard() {
               <button onClick={() => navigate('/')} className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors" title="Home">
                 <Home className="w-5 h-5" />
               </button>
-              <button onClick={() => { setLoading(true); fetchDashboardData(); }} className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors" title="Refresh">
+              <button onClick={() => { setLoading(true); fetchPapers(); }} className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors" title="Refresh">
                 <RefreshCw className="w-5 h-5" />
               </button>
 
@@ -169,7 +169,7 @@ export default function UserDashboard() {
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-300 text-xs font-semibold uppercase tracking-widest">
               📄 Recent Papers
             </div>
-            <button className="text-blue-400 hover:text-blue-300 text-sm font-medium flex items-center gap-1 hover:bg-blue-500/10 px-3 py-2 rounded-lg transition-colors">
+            <button onClick={() => navigate('/papers')} className="text-blue-400 hover:text-blue-300 text-sm font-medium flex items-center gap-1 hover:bg-blue-500/10 px-3 py-2 rounded-lg transition-colors">
               View All <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -198,7 +198,7 @@ export default function UserDashboard() {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <div className="text-xs text-gray-500 mb-2">{new Date(paper.createdAt).toLocaleDateString()}</div>
-                      <button className="text-xs text-blue-400 hover:text-blue-300 font-medium bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 px-3 py-1.5 rounded-lg transition-colors">
+                      <button onClick={() => navigate(`/result/${paper._id}`)} className="text-xs text-blue-400 hover:text-blue-300 font-medium bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 px-3 py-1.5 rounded-lg transition-colors">
                         View Analysis
                       </button>
                     </div>

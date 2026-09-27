@@ -8,8 +8,8 @@ const seedSuperAdmin = async () => {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('Connected to MongoDB');
 
-    const email = 'superadmin@qmetric.com';
-    const rawPassword = 'superadmin123';
+    const email = process.env.SEED_SUPER_ADMIN_EMAIL || 'change-me-in-production';
+    const rawPassword = process.env.SEED_SUPER_ADMIN_PASSWORD || 'change-me-in-production';
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(rawPassword, salt);
 

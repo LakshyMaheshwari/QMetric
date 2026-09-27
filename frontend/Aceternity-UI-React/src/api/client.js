@@ -1,54 +1,167 @@
-/**
- * api/client.js
- * -------------
- * Single Axios instance for ALL frontend API calls.
- *
- * Rules:
- *   - Base URL comes from REACT_APP_API_URL env var; falls back to localhost:5000
- *   - The request interceptor automatically injects the JWT from localStorage
- *   - The response interceptor handles 401 (auto-logout + redirect) globally
- *   - No component ever hardcodes a URL or manually reads localStorage for the token
- */
+// import axios from 'axios';
+
+// const API_BASE_URL = process.env.REACT_APP_API_URL;
+// if (!API_BASE_URL) {
+//   console.error('🔴 REACT_APP_API_URL is not set');
+// }
+
+// const apiClient = axios.create({
+//   baseURL: API_BASE_URL || 'http://localhost:5000',
+//   withCredentials: true,
+//   timeout: 30000,
+//   headers: { 'Content-Type': 'application/json' },
+// });
+
+// // ─── Read CSRF token from cookie ─────────────────────────
+// function getCsrfToken() {
+//   const match = document.cookie.match(/(?:^|;\s*)x-csrf-token=([^;]+)/);
+//   return match ? decodeURIComponent(match[1]) : null;
+// }
+
+// // ─── Attach CSRF token to all state-changing requests ────
+// apiClient.interceptors.request.use(
+//   (config) => {
+//     const method = config.method?.toLowerCase();
+//     if (['post', 'put', 'patch', 'delete'].includes(method)) {
+//       const token = getCsrfToken();
+//       if (token) {
+//         config.headers['x-csrf-token'] = token;
+//       }
+//     }
+//     return config;
+//   },
+//   (error) => Promise.reject(error)
+// );
+
+// // ─── Response interceptor: auth + CSRF errors ────────────
+// apiClient.interceptors.response.use(
+//   (response) => response,
+//   (error) => {
+//     const status = error.response?.status;
+//     const message = error.response?.data?.message || '';
+
+//     if (status === 401) {
+//       localStorage.removeItem('user');
+//       window.dispatchEvent(new Event('authExpired'));
+//     }
+
+//     if (status === 403 && message.toLowerCase().includes('blocked')) {
+//       localStorage.removeItem('user');
+//       window.dispatchEvent(new Event('authBlocked'));
+//     }
+
+//     if (status === 403 && message.toLowerCase().includes('csrf')) {
+//       console.warn('CSRF token invalid — refreshing page may help');
+//     }
+
+//     return Promise.reject(error);
+//   }
+// );
+
+// export default apiClient;
 
 import axios from 'axios';
 
-// ─── Base URL ──────────────────────────────────────────────────────────────────
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_URL;
+if (!API_BASE_URL) {
+  console.error('REACT_APP_API_URL is not set');
+}
 
 const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 30000, // 30 s – generous for file uploads
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: API_BASE_URL || 'http://localhost:5000',
+  withCredentials: true,
+  timeout: 30000,
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// ─── Request interceptor — attach JWT automatically ──────────────────────────
+// ─── Read CSRF token from cookie ─────────────────────────────
+function getCsrfTokenFromCookie() {
+  const match = document.cookie.match(/(?:^|;\s*)x-csrf-token=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+// ─── Single in-flight CSRF bootstrap ─────────────────────────
+// Any mutating request awaits this. Deduplicated so we never fire
+// more than one /api/csrf-token call concurrently.
+let csrfBootstrapPromise = null;
+
+export function ensureCsrfToken({ force = false } = {}) {
+  if (force) csrfBootstrapPromise = null;
+  if (csrfBootstrapPromise) return csrfBootstrapPromise;
+
+  csrfBootstrapPromise = apiClient
+    .get('/api/csrf-token')
+    .then((res) => {
+      const token = res.data?.csrfToken || getCsrfTokenFromCookie();
+      if (!token) throw new Error('CSRF bootstrap returned no token');
+      return token;
+    })
+    .catch((err) => {
+      csrfBootstrapPromise = null; // allow retry on next call
+      throw err;
+    });
+
+  return csrfBootstrapPromise;
+}
+
+// ─── Request interceptor ─────────────────────────────────────
 apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+  async (config) => {
+    const method = (config.method || 'get').toLowerCase();
+    const isMutating = ['post', 'put', 'patch', 'delete'].includes(method);
+    const isCsrfEndpoint = (config.url || '').includes('/api/csrf-token');
+
+    if (isMutating && !isCsrfEndpoint) {
+      try {
+        // Guarantees cookie exists BEFORE the header is attached.
+        await ensureCsrfToken();
+      } catch (_) {
+        // Let the request through; the response interceptor will retry once.
+      }
+      const token = getCsrfTokenFromCookie();
+      if (token) config.headers['x-csrf-token'] = token;
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// ─── Response interceptor — handle 401 globally ──────────────────────────────
+// ─── Response interceptor ────────────────────────────────────
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid – clear storage and redirect to home
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('user');
-      window.dispatchEvent(new Event('authStateChanged'));
-      // Only redirect if not already on the home page
-      if (window.location.pathname !== '/') {
-        window.location.href = '/';
+  async (error) => {
+    const status = error.response?.status;
+    const message = (error.response?.data?.message || '').toLowerCase();
+    const original = error.config;
+
+    // Auto-recover from a stale/missing CSRF cookie exactly once.
+    if (
+      status === 403 &&
+      message.includes('csrf') &&
+      original &&
+      !original._csrfRetry
+    ) {
+      original._csrfRetry = true;
+      try {
+        await ensureCsrfToken({ force: true });
+        const token = getCsrfTokenFromCookie();
+        if (token) original.headers['x-csrf-token'] = token;
+        return apiClient(original);
+      } catch (_) {
+        // fall through to normal error handling
       }
     }
+
+    if (status === 401) {
+      localStorage.removeItem('user');
+      window.dispatchEvent(new Event('authExpired'));
+    }
+
+    if (status === 403 && message.includes('blocked')) {
+      localStorage.removeItem('user');
+      window.dispatchEvent(new Event('authBlocked'));
+    }
+
     return Promise.reject(error);
   }
 );

@@ -19,7 +19,13 @@ import SuperAdminDashboard from "./components/pages/SuperAdminDashboard";
 import CollegeDetailPage from "./components/pages/CollegeDetailPage";
 import ReviewerDashboard from "./components/pages/ReviewerDashboard";
 import TeacherDashboard from "./components/pages/TeacherDashboard";
+import TeamPage from "./components/pages/TeamPage";
+import AllPapersPage from './components/pages/AllPapersPage';
+import NotFound from "./components/pages/NotFound";
+import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
+import { ensureCsrfToken } from "./api/client";
+
 
 function App() {
   return (
@@ -28,21 +34,62 @@ function App() {
         <Navbar />
         <ScrollToTop />
         <Routes>
+          {/* Public Routes - NO guard */}
           <Route path="/" element={<LandingPage />} />
-          <Route path="/upload" element={<UploadPage />} />
+          <Route path="/login" element={<LandingPage />} />
           <Route path="/components" element={<Components />} />
-          <Route path="/result" element={<ResultPage />} />
-          <Route path="/dashboard" element={<UserDashboard />} />
           <Route path="/credits" element={<CreditsPage />} />
+          <Route path="/team" element={<TeamPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/college-admin" element={<CollegeAdminDashboard />} />
-          <Route path="/super-admin/colleges" element={<Colleges />} />
-          <Route path="/super-admin" element={<SuperAdminDashboard />} />
-          <Route path="/super-admin/colleges/:id" element={<CollegeDetailPage />} />
-          <Route path="/reviewer" element={<ReviewerDashboard />} />
-          <Route path="/teacher" element={<TeacherDashboard />} />
+
+          {/* Protected - Any authenticated user */}
+          <Route path="/profile" element={
+            <ProtectedRoute><ProfilePage /></ProtectedRoute>
+          } />
+          <Route path="/dashboard" element={
+            <ProtectedRoute><UserDashboard /></ProtectedRoute>
+          } />
+
+          {/* Teacher-only routes */}
+          <Route path="/upload" element={
+            <ProtectedRoute requiredRole="teacher"><UploadPage /></ProtectedRoute>
+          } />
+          <Route path="/result/:paperId" element={
+            <ProtectedRoute requiredRole={['teacher', 'reviewer', 'admin', 'super_admin']}><ResultPage /></ProtectedRoute>
+          } />
+          <Route path="/teacher" element={
+            <ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>
+          } />
+          <Route path="/papers" element={
+            <ProtectedRoute requiredRole="teacher"><AllPapersPage /></ProtectedRoute>
+          } />
+
+          {/* Reviewer-only routes */}
+          <Route path="/reviewer" element={
+            <ProtectedRoute requiredRole={['reviewer', 'admin']}><ReviewerDashboard /></ProtectedRoute>
+          } />
+
+          {/* Admin-only routes */}
+          <Route path="/admin" element={
+            <ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>
+          } />
+          <Route path="/college-admin" element={
+            <ProtectedRoute requiredRole="admin"><CollegeAdminDashboard /></ProtectedRoute>
+          } />
+
+          {/* Super Admin-only routes */}
+          <Route path="/super-admin" element={
+            <ProtectedRoute requiredRole="super_admin"><SuperAdminDashboard /></ProtectedRoute>
+          } />
+          <Route path="/super-admin/colleges" element={
+            <ProtectedRoute requiredRole="super_admin"><Colleges /></ProtectedRoute>
+          } />
+          <Route path="/super-admin/colleges/:id" element={
+            <ProtectedRoute requiredRole="super_admin"><CollegeDetailPage /></ProtectedRoute>
+          } />
+
+          {/* 404 fallback */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
         <Footer />
       </div>

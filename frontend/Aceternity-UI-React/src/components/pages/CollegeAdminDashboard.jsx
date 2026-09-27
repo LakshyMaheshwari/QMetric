@@ -7,6 +7,11 @@ import {
   Plus, Search, Filter, RefreshCw, X, AlertCircle, CheckCircle,
   Award
 } from 'lucide-react';
+import { DashboardSkeleton } from '../SkeletonLoader';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { createCollegeUserSchema } from '../../schemas/validationSchemas';
+import FormInput from '../FormInput';
 
 export default function CollegeAdminDashboard() {
   const { user } = useAuth();
@@ -19,17 +24,24 @@ export default function CollegeAdminDashboard() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [message, setMessage] = useState({ text: '', type: '' });
   const [showAddModal, setShowAddModal] = useState(false);
-  const [adding, setAdding] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
-  const [newUser, setNewUser] = useState({
-    name: '',
-    email: '',
-    password: '',
-    role: 'teacher',
-    department: '',
-    position: 'Professor',
-    phone: '',
+  const {
+    register: registerAddUser,
+    handleSubmit: handleSubmitAddUser,
+    reset: resetAddUser,
+    formState: { errors: addUserErrors, isSubmitting: isAddingUser },
+  } = useForm({
+    resolver: zodResolver(createCollegeUserSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      role: 'teacher',
+      department: '',
+      position: 'Professor',
+      phone: '',
+    },
   });
 
   // Guard: allow only admin (super_admin has own dashboard)
@@ -103,34 +115,39 @@ export default function CollegeAdminDashboard() {
     }
   };
 
-  const handleAddUser = async (e) => {
-    e.preventDefault();
-    setAdding(true);
+  const closeAddUserModal = () => {
+    setShowAddModal(false);
+    resetAddUser();
+  };
+
+  const onAddUser = async (data) => {
     try {
-      const response = await apiClient.post('/college-admin/users', newUser);
+      const response = await apiClient.post('/college-admin/users', data);
       if (response.data && !response.data.error) {
         setMessage({ text: 'User added successfully to your college!', type: 'success' });
-        setShowAddModal(false);
-        setNewUser({
-          name: '',
-          email: '',
-          password: '',
-          role: 'teacher',
-          department: '',
-          position: 'Professor',
-          phone: '',
-        });
+        closeAddUserModal();
         fetchData();
       }
     } catch (error) {
       setMessage({ text: error.response?.data?.message || 'Failed to add user', type: 'error' });
-    } finally {
-      setAdding(false);
     }
   };
 
+  if (loading && users.length === 0) {
+    return (
+      <div className="min-h-screen bg-black text-white pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <DashboardSkeleton cards={4} tableRows={8} tableCols={5} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black text-white pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+      {loading && users.length > 0 && (
+        <div className="fixed top-0 left-0 right-0 h-1 bg-blue-500 animate-pulse z-50" />
+      )}
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
@@ -288,16 +305,7 @@ export default function CollegeAdminDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/70">
-                {loading && users.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-12 text-center text-zinc-400">
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <RefreshCw className="w-6 h-6 animate-spin text-blue-400" />
-                        <span>Loading college users...</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : users.length === 0 ? (
+                {users.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-zinc-400">
                       <div className="flex flex-col items-center justify-center gap-2">
@@ -379,137 +387,61 @@ export default function CollegeAdminDashboard() {
                 <h3 className="text-xl font-bold">Add User to College</h3>
               </div>
               <button
-                onClick={() => setShowAddModal(false)}
+                type="button"
+                onClick={closeAddUserModal}
                 className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleAddUser} className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider block mb-1">
-                  Full Name <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Dr. Rajesh Sharma"
-                  value={newUser.name}
-                  onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <form onSubmit={handleSubmitAddUser(onAddUser)} className="space-y-1" noValidate>
+              <FormInput label="Full Name" name="name" register={registerAddUser} error={addUserErrors.name} placeholder="e.g. Dr. Rajesh Sharma" required />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormInput label="Email Address" name="email" type="email" register={registerAddUser} error={addUserErrors.email} placeholder="faculty@college.edu" required />
+                <FormInput label="Password" name="password" type="password" register={registerAddUser} error={addUserErrors.password} placeholder="Min 8 chars" required />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormInput
+                  label="Role"
+                  name="role"
+                  type="select"
+                  register={registerAddUser}
+                  error={addUserErrors.role}
+                  options={[
+                    { value: 'teacher', label: 'Teacher' },
+                    { value: 'reviewer', label: 'Reviewer' },
+                    { value: 'admin', label: 'College Admin' },
+                  ]}
+                />
+                <FormInput
+                  label="Position"
+                  name="position"
+                  type="select"
+                  register={registerAddUser}
+                  error={addUserErrors.position}
+                  options={['Professor', 'Associate Professor', 'Assistant Professor', 'Lecturer', 'HoD', 'Other']}
                 />
               </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider block mb-1">
-                    Email Address <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="faculty@college.edu"
-                    value={newUser.email}
-                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider block mb-1">
-                    Password <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    placeholder="Min 6 chars"
-                    value={newUser.password}
-                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider block mb-1">
-                    Role
-                  </label>
-                  <select
-                    value={newUser.role}
-                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="teacher">Teacher</option>
-                    <option value="reviewer">Reviewer</option>
-                    <option value="admin">College Admin</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider block mb-1">
-                    Position
-                  </label>
-                  <select
-                    value={newUser.position}
-                    onChange={(e) => setNewUser({ ...newUser, position: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Professor">Professor</option>
-                    <option value="Associate Professor">Associate Professor</option>
-                    <option value="Assistant Professor">Assistant Professor</option>
-                    <option value="Lecturer">Lecturer</option>
-                    <option value="HoD">HoD</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider block mb-1">
-                    Department
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Computer Science"
-                    value={newUser.department}
-                    onChange={(e) => setNewUser({ ...newUser, department: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider block mb-1">
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    placeholder="10-digit phone"
-                    pattern="[0-9]{10}"
-                    value={newUser.phone}
-                    onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+                <FormInput label="Department" name="department" register={registerAddUser} error={addUserErrors.department} placeholder="e.g. Computer Science" />
+                <FormInput label="Phone Number" name="phone" type="tel" register={registerAddUser} error={addUserErrors.phone} placeholder="10-digit phone" />
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-800">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={closeAddUserModal}
                   className="px-4 py-2 text-sm text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={adding}
+                  disabled={isAddingUser}
                   className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg shadow-lg disabled:opacity-50 flex items-center gap-2"
                 >
-                  {adding ? 'Adding User...' : 'Add User'}
+                  {isAddingUser ? 'Adding User...' : 'Add User'}
                 </button>
               </div>
             </form>

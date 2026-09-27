@@ -6,6 +6,10 @@ import {
   Users, UserPlus, Shield, Ban, Trash2, Loader2,
   ChevronUp, ChevronDown, X, RefreshCw, CheckCircle
 } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { createUserSchema } from '../../schemas/validationSchemas';
+import FormInput from '../FormInput';
 
 const ROLES = ['teacher', 'reviewer', 'admin'];
 
@@ -25,39 +29,52 @@ function RoleBadge({ role }) {
 
 // ─── Add User Modal ───────────────────────────────────────────────────────────
 function AddUserModal({ onClose, onSuccess }) {
-  const [form, setForm] = useState({
-    name: '', email: '', password: '', role: 'teacher',
-    collegeName: '', department: '', phone: ''
-  });
-  const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(createUserSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      role: 'teacher',
+      collegeName: '',
+      department: '',
+      phone: '',
+    },
+  });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleClose = () => {
+    reset();
+    onClose();
+  };
+
+  const onSubmit = async (data) => {
     setError('');
-    setCreating(true);
     try {
-      const res = await apiClient.post('/admin/users', form);
+      const res = await apiClient.post('/admin/users', data);
       if (res.data && !res.data.error) {
+        reset();
         onSuccess(res.data.user);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create user');
-    } finally {
-      setCreating(false);
     }
   };
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-xl font-bold text-white flex items-center gap-2">
             <UserPlus className="w-5 h-5 text-blue-400" /> Add New User
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+          <button type="button" onClick={handleClose} className="text-gray-400 hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -68,27 +85,29 @@ function AddUserModal({ onClose, onSuccess }) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <input name="name"     value={form.name}     onChange={handleChange} required placeholder="Full Name *" type="text"     className="w-full bg-gray-800 border border-gray-600 text-white px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          <input name="email"    value={form.email}    onChange={handleChange} required placeholder="Email *"     type="email"    className="w-full bg-gray-800 border border-gray-600 text-white px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          <input name="password" value={form.password} onChange={handleChange} required placeholder="Password * (min 6 chars)" type="password" minLength="6" className="w-full bg-gray-800 border border-gray-600 text-white px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-
-          <select name="role" value={form.role} onChange={handleChange} className="w-full bg-gray-800 border border-gray-600 text-white px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-            {ROLES.map(r => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
-          </select>
-
-          <div className="grid grid-cols-2 gap-3">
-            <input name="collegeName" value={form.collegeName} onChange={handleChange} placeholder="College (optional)" type="text" className="bg-gray-800 border border-gray-600 text-white px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            <input name="department"  value={form.department}  onChange={handleChange} placeholder="Dept. (optional)"   type="text" className="bg-gray-800 border border-gray-600 text-white px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <input name="phone" value={form.phone} onChange={handleChange} placeholder="Phone (optional)" type="text" className="w-full bg-gray-800 border border-gray-600 text-white px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-1" noValidate>
+          <FormInput label="Full Name" name="name" register={register} error={errors.name} required />
+          <FormInput label="Email" name="email" type="email" register={register} error={errors.email} required />
+          <FormInput label="Password" name="password" type="password" register={register} error={errors.password} required />
+          <FormInput
+            label="Role"
+            name="role"
+            type="select"
+            register={register}
+            error={errors.role}
+            options={ROLES.map((r) => ({ value: r, label: r.charAt(0).toUpperCase() + r.slice(1) }))}
+            required
+          />
+          <FormInput label="College (optional)" name="collegeName" register={register} error={errors.collegeName} />
+          <FormInput label="Department (optional)" name="department" register={register} error={errors.department} />
+          <FormInput label="Phone (optional)" name="phone" type="tel" register={register} error={errors.phone} />
 
           <div className="flex gap-3 pt-3 border-t border-gray-700">
-            <button type="button" onClick={onClose} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2.5 rounded-lg transition-colors">
+            <button type="button" onClick={handleClose} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2.5 rounded-lg transition-colors">
               Cancel
             </button>
-            <button type="submit" disabled={creating} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
-              {creating ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating...</> : 'Create User'}
+            <button type="submit" disabled={isSubmitting} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
+              {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Creating...</> : 'Create User'}
             </button>
           </div>
         </form>

@@ -10,7 +10,7 @@ import apiClient from '../api/client';
 const TURNSTILE_SITE_KEY = process.env.REACT_APP_TURNSTILE_SITE_KEY || "1x00000000000000000000AA";
 
 const Navbar = () => {
-  const { user, login: authLogin, logout: authLogout } = useAuth();
+  const { user, login: authLogin, logout: authLogout, blockedMessage, clearBlockedMessage } = useAuth();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -109,7 +109,7 @@ const Navbar = () => {
       });
 
       const data = response.data;
-      authLogin(data.accessToken, data.user);
+      authLogin(data.user);
       setIsLoginModalOpen(false);
       setFormData({ userName: '', email: '', password: '', confirmPassword: '' });
       turnstileRef.current?.reset();
@@ -545,6 +545,38 @@ const Navbar = () => {
               <p className="text-xs text-gray-500">
                 By continuing, you agree to our Terms of Service and Privacy Policy.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Blocked Account Modal */}
+      {blockedMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-gray-900 border border-red-500/50 rounded-2xl p-6 sm:p-8 w-full max-w-md shadow-2xl animate__animated animate__fadeIn">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-500/25">
+                <Shield className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Account Blocked</h3>
+              <p className="text-gray-300 text-sm mb-4 leading-relaxed">
+                {blockedMessage}
+              </p>
+              <div className="p-3 bg-red-950/40 border border-red-800/40 rounded-xl mb-6 text-left">
+                <p className="text-xs text-red-300">
+                  Your access has been restricted by an administrator. Please contact your institution administrator or support for assistance.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  clearBlockedMessage();
+                  navigateTo('/');
+                }}
+                className="w-full py-3 bg-gradient-to-r from-red-500 to-orange-500 text-white font-semibold rounded-lg shadow-lg hover:scale-105 transition-transform duration-200"
+              >
+                Understood
+              </button>
             </div>
           </div>
         </div>

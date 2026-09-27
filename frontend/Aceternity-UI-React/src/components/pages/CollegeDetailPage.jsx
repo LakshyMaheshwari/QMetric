@@ -6,6 +6,7 @@ import {
   ArrowLeft, Building2, Users, FileText, Shield, CheckCircle, XCircle,
   RefreshCw, AlertCircle, BookOpen, UserCheck, BarChart3, Calendar,
 } from 'lucide-react';
+import { DashboardSkeleton } from '../SkeletonLoader';
 
 // ─── Small Stat Card ─────────────────────────────────────────────────────────
 function MiniStat({ icon: Icon, label, value, color = 'blue' }) {
@@ -78,10 +79,9 @@ export default function CollegeDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black text-white pt-24 pb-16 px-4 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3 text-zinc-400">
-          <RefreshCw className="w-8 h-8 animate-spin text-blue-400" />
-          <span>Loading college details…</span>
+      <div className="min-h-screen bg-black text-white pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <DashboardSkeleton cards={6} tableRows={6} tableCols={5} />
         </div>
       </div>
     );

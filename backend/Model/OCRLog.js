@@ -66,6 +66,12 @@ const ocrLogSchema = new mongoose.Schema({
         default: ''
     },
 
+    // Rejection or manual review reason
+    reason: {
+        type: String,
+        default: ''
+    },
+
     // Auto-populated timestamp; also used by the TTL index below
     createdAt: {
         type: Date,

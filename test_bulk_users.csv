@@ -1,0 +1,4 @@
+login, mail, Name, mobile, university, rank, staff_id, division, discipline, password
+bulkuser1, bulk1@example.com, Bulk User One, 9876543211, XYZ Institute, Associate Professor, EMP2001, Information Technology, Engineering, securepass1
+bulkuser2, bulk2@example.com, Bulk User Two, 9876543212, XYZ Institute, Assistant Professor, EMP2002, Electronics, Engineering, securepass2
+bulkuser3, bulk3@example.com, Bulk User Three, 9876543213, XYZ Institute, Lecturer, EMP2003, Mechanical, Engineering, securepass3

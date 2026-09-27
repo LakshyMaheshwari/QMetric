@@ -1,0 +1,1102 @@
+{
+  "info": {
+    "_postman_id": "3d2125ad-42df-440d-9abc-341f1b93b17f",
+    "name": "QMetric API",
+    "description": "Academic Context Management System (ACMS) — Question Paper Quality Evaluation API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "JWT access token for authenticated requests"
+    },
+    {
+      "key": "adminSecret",
+      "value": "8457ccffb6a0a131fdb8d5b9ddfd031e0a0fd32998eb673a264966c062409559",
+      "type": "string",
+      "description": "Admin secret key for privileged routes (X-Admin-Secret header)"
+    }
+  ],
+  "item": [
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "List all users in the college (paginated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "role",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List all users in the college (paginated)"
+          },
+          "response": []
+        },
+        {
+          "name": "Create a new user (teacher/reviewer/admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"email\": \"user@example.com\",\n  \"password\": \"string\",\n  \"role\": \"teacher\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users"
+              ]
+            },
+            "description": "Create a new user (teacher/reviewer/admin)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update a user's role",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"teacher\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/:id/role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                ":id",
+                "role"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "123",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Update a user's role"
+          },
+          "response": []
+        },
+        {
+          "name": "Block or unblock a user",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/:id/block",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                ":id",
+                "block"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "123",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Block or unblock a user"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete a user",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/users/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "123",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Delete a user"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Get current user profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            },
+            "description": "Get current user profile"
+          },
+          "response": []
+        },
+        {
+          "name": "Update current user profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"string\",\n  \"phone\": \"string\",\n  \"department\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            },
+            "description": "Update current user profile"
+          },
+          "response": []
+        },
+        {
+          "name": "User login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@qmetric.com\",\n  \"password\": \"Password123\",\n  \"turnstileToken\": \"test-token\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "User login"
+          },
+          "response": []
+        },
+        {
+          "name": "Register a new teacher/reviewer account",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "userName",
+                  "value": "john_doe",
+                  "type": "text",
+                  "description": ""
+                },
+                {
+                  "key": "email",
+                  "value": "sample_value",
+                  "type": "text",
+                  "description": ""
+                },
+                {
+                  "key": "password",
+                  "value": "Password123",
+                  "type": "text",
+                  "description": ""
+                },
+                {
+                  "key": "fullName",
+                  "value": "sample_value",
+                  "type": "text",
+                  "description": ""
+                },
+                {
+                  "key": "phone",
+                  "value": "sample_value",
+                  "type": "text",
+                  "description": ""
+                },
+                {
+                  "key": "collegeId",
+                  "value": "sample_value",
+                  "type": "text",
+                  "description": ""
+                },
+                {
+                  "key": "position",
+                  "value": "Professor",
+                  "type": "text",
+                  "description": ""
+                },
+                {
+                  "key": "collegeIdPhoto",
+                  "type": "file",
+                  "src": "",
+                  "description": "Upload file"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/create-account",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "create-account"
+              ]
+            },
+            "description": "Register a new teacher/reviewer account"
+          },
+          "response": []
+        },
+        {
+          "name": "Verify a user's email address",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email/:token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email",
+                ":token"
+              ],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "value",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Verify a user's email address"
+          },
+          "response": []
+        },
+        {
+          "name": "Resend email verification link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/resend-verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "resend-verification"
+              ]
+            },
+            "description": "Resend email verification link"
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk register users via CSV/JSON (admin secret required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Admin-Secret",
+                "value": "{{adminSecret}}",
+                "type": "text",
+                "description": ""
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"users\": [\n    {}\n  ],\n  \"defaultPassword\": \"string\",\n  \"turnstileToken\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/bulk-register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "bulk-register"
+              ]
+            },
+            "description": "Bulk register users via CSV/JSON (admin secret required)"
+          },
+          "response": []
+        },
+        {
+          "name": "List active colleges (for registration dropdown)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/colleges",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "colleges"
+              ]
+            },
+            "description": "List active colleges (for registration dropdown)"
+          },
+          "response": []
+        },
+        {
+          "name": "Create an admin account (admin secret required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Admin-Secret",
+                "value": "{{adminSecret}}",
+                "type": "text",
+                "description": ""
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"email\": \"user@example.com\",\n  \"password\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/create-admin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "create-admin"
+              ]
+            },
+            "description": "Create an admin account (admin secret required)"
+          },
+          "response": []
+        },
+        {
+          "name": "Logout (clears accessToken cookie + revokes token)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Logout (clears accessToken cookie + revokes token)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Dev Auth",
+      "item": [
+        {
+          "name": "Development-only login (bypasses CSRF and Turnstile)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"faculty@wce.ac.in\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dev/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dev",
+                "login"
+              ]
+            },
+            "description": "Development-only login (bypasses CSRF and Turnstile)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reviewer",
+      "item": [
+        {
+          "name": "Get review statistics for the reviewer's college",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reviewer/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviewer",
+                "stats"
+              ]
+            },
+            "description": "Get review statistics for the reviewer's college"
+          },
+          "response": []
+        },
+        {
+          "name": "Get count of pending papers (for badge)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reviewer/pending-count",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviewer",
+                "pending-count"
+              ]
+            },
+            "description": "Get count of pending papers (for badge)"
+          },
+          "response": []
+        },
+        {
+          "name": "List all papers in the reviewer's college (paginated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reviewer/papers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviewer",
+                "papers"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List all papers in the reviewer's college (paginated)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get single paper details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reviewer/papers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviewer",
+                "papers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "123",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get single paper details"
+          },
+          "response": []
+        },
+        {
+          "name": "Approve, reject, or request revision for a paper",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"approved\",\n  \"comments\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/reviewer/papers/:id/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviewer",
+                "papers",
+                ":id",
+                "review"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "123",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Approve, reject, or request revision for a paper"
+          },
+          "response": []
+        },
+        {
+          "name": "Submit a correction for a question's Bloom level",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questionIndex\": 0,\n  \"correctedDomain\": \"cognitive\",\n  \"correctedLevel\": 1,\n  \"correctedLevelName\": \"string\",\n  \"reason\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/reviewer/papers/:paperId/corrections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviewer",
+                "papers",
+                ":paperId",
+                "corrections"
+              ],
+              "variable": [
+                {
+                  "key": "paperId",
+                  "value": "123",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Submit a correction for a question's Bloom level"
+          },
+          "response": []
+        },
+        {
+          "name": "List all corrections for a paper",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reviewer/papers/:paperId/corrections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviewer",
+                "papers",
+                ":paperId",
+                "corrections"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "paperId",
+                  "value": "123",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "List all corrections for a paper"
+          },
+          "response": []
+        },
+        {
+          "name": "Get a single correction",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reviewer/papers/:paperId/corrections/:questionIndex",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviewer",
+                "papers",
+                ":paperId",
+                "corrections",
+                ":questionIndex"
+              ],
+              "variable": [
+                {
+                  "key": "paperId",
+                  "value": "123",
+                  "description": ""
+                },
+                {
+                  "key": "questionIndex",
+                  "value": "value",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get a single correction"
+          },
+          "response": []
+        },
+        {
+          "name": "Update an existing correction",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correctedDomain\": \"cognitive\",\n  \"correctedLevel\": 1,\n  \"correctedLevelName\": \"string\",\n  \"reason\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/reviewer/papers/:paperId/corrections/:questionIndex",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviewer",
+                "papers",
+                ":paperId",
+                "corrections",
+                ":questionIndex"
+              ],
+              "variable": [
+                {
+                  "key": "paperId",
+                  "value": "123",
+                  "description": ""
+                },
+                {
+                  "key": "questionIndex",
+                  "value": "value",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Update an existing correction"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete a correction",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reviewer/papers/:paperId/corrections/:questionIndex",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviewer",
+                "papers",
+                ":paperId",
+                "corrections",
+                ":questionIndex"
+              ],
+              "variable": [
+                {
+                  "key": "paperId",
+                  "value": "123",
+                  "description": ""
+                },
+                {
+                  "key": "questionIndex",
+                  "value": "value",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Delete a correction"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Bloom's-taxonomy recommendations for a paper",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text",
+                "description": "Bearer authentication token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reviewer/papers/:id/recommendations/bloom",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reviewer",
+                "papers",
+                ":id",
+                "recommendations",
+                "bloom"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "123",
+                  "description": ""
+                }
+              ]
+            },
+            "description": "Get Bloom's-taxonomy recommendations for a paper"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

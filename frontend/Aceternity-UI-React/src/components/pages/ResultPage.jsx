@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AlertCircle, Download, BookOpen } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { AlertCircle, Download, BookOpen, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import BloomsAnalysisChart from './report/BloomAnalysisChart';
 import ModuleAnalysisChart from './report/ModuleAnalysisChart';
 import QuestionDistributionChart from './report/QuestionDistributionChart';
 import COCoverageChart from './report/COCoverageChart';
 import apiClient from '../../api/client';
+import DomainInsightsSection from '../result/DomainInsightsSection';
 
 // Small SVG gauge component for final score
 function polarToCartesian(cx, cy, r, angleDeg) {
@@ -30,37 +32,22 @@ const Gauge = ({ value = 0, size = 220 }) => {
   const cy = size / 2 + 35;
   const r = Math.max(10, (size / 2) - 24);
 
-  // Semicircle gauge: 0% at left (-90°), 50% at top (0°), 100% at right (90°)
   const startAngle = -90;
   const maxAngle = 90;
   const currentAngle = startAngle + (v / 100) * (maxAngle - startAngle);
 
-  // Get color for a given percentage value
   const getColorForPercentage = (percentage) => {
-    if (percentage >= 80) return '#16a34a'; // Green - Excellent
-    if (percentage >= 60) return '#2563eb'; // Blue - Good
-    if (percentage >= 40) return '#f59e0b'; // Yellow/Orange - Moderate
-    return '#ef4444'; // Red - Poor
+    if (percentage >= 80) return '#16a34a';
+    if (percentage >= 60) return '#2563eb';
+    if (percentage >= 40) return '#f59e0b';
+    return '#ef4444';
   };
 
-  // Create gradient arcs for background (0-100)
   const backgroundArcs = [
-    { start: 0, end: 40, color1: '#ef4444', color2: '#f59e0b' },    // Red to Yellow (Poor to Moderate)
-    { start: 40, end: 60, color1: '#f59e0b', color2: '#2563eb' },   // Yellow to Blue (Moderate to Good)
-    { start: 60, end: 100, color1: '#2563eb', color2: '#16a34a' }   // Blue to Green (Good to Excellent)
+    { start: 0, end: 40, color1: '#ef4444', color2: '#f59e0b' },
+    { start: 40, end: 60, color1: '#f59e0b', color2: '#2563eb' },
+    { start: 60, end: 100, color1: '#2563eb', color2: '#16a34a' }
   ];
-
-  // Create arc segments
-  // const arcSegments = backgroundArcs.map((segment, idx) => {
-  //   const segStartAngle = startAngle + (segment.start / 100) * (maxAngle - startAngle);
-  //   const segEndAngle = startAngle + (segment.end / 100) * (maxAngle - startAngle);
-  //   const path = describeArc(cx, cy, r, segStartAngle, segEndAngle);
-
-  //   // Use midpoint color for simplicity
-  //   const midColor = segment.color1; // Could blend, but solid color per segment is cleaner
-
-  //   return { path, color: midColor, idx };
-  // });
 
   const bgPath = describeArc(cx, cy, r, startAngle, maxAngle);
   const fgPath = describeArc(cx, cy, r, startAngle, currentAngle);
@@ -69,7 +56,6 @@ const Gauge = ({ value = 0, size = 220 }) => {
 
   const color = v >= 80 ? '#16a34a' : v >= 60 ? '#2563eb' : v >= 40 ? '#f59e0b' : '#ef4444';
 
-  // Generate scale labels (0, 10, 20, ... 100) at 10% intervals
   const scaleLabels = [];
   for (let i = 0; i <= 10; i++) {
     const percentage = i * 10;
@@ -88,7 +74,6 @@ const Gauge = ({ value = 0, size = 220 }) => {
   return (
     <div className="inline-block" aria-hidden="false">
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-        {/* Define gradients for smooth color transitions */}
         <defs>
           <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="#ef4444" />
@@ -98,13 +83,9 @@ const Gauge = ({ value = 0, size = 220 }) => {
           </linearGradient>
         </defs>
 
-        {/* Background arc with gradient */}
         <path d={bgPath} fill="none" stroke="url(#gaugeGradient)" strokeWidth="18" strokeLinecap="round" />
-
-        {/* Foreground arc - filled portion with gradient */}
         <path d={fgPath} fill="none" stroke={color} strokeWidth="18" strokeLinecap="round" opacity="0.7" />
 
-        {/* Scale labels at 10% intervals with range-based coloring */}
         {scaleLabels.map((label) => (
           <text
             key={label.percentage}
@@ -121,7 +102,6 @@ const Gauge = ({ value = 0, size = 220 }) => {
           </text>
         ))}
 
-        {/* needle pointing to current score */}
         <line x1={cx} y1={cy} x2={needlePt.x} y2={needlePt.y} stroke="#222" strokeWidth="3" strokeLinecap="round" />
         <circle cx={cx} cy={cy} r="6" fill="#222" />
       </svg>
@@ -135,39 +115,47 @@ const Gauge = ({ value = 0, size = 220 }) => {
 };
 
 const ResultPage = () => {
+  const { paperId } = useParams();
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [toast, setToast] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [showVisualization, setShowVisualization] = useState(false);
   const chartsRef = useRef(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await apiClient.get('/upload/totext');
-      const result = response.data;
-
-      if (result.success && result.data) {
-        setData(result.data);
-      } else {
-        throw new Error('Invalid response format or unsuccessful request');
-      }
-    } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Failed to load results';
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
+  const showToast = (message, type = 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
   };
 
-  // Normalize recommendation objects to match report schema
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!paperId) return;
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await apiClient.get(`/teacher/papers/${paperId}`);
+
+        if (!response.data.error && response.data.paper) {
+          setData(response.data.paper);
+        } else {
+          throw new Error(response.data.message || 'Invalid response format');
+        }
+      } catch (err) {
+        const msg = err.response?.data?.message || err.message || 'Failed to load results';
+        setError(msg);
+        setData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [paperId]);
+
   const normalizeCoRecommendations = (arr = []) => {
     return (arr || []).map(r => ({
       co: r.co ?? r.CO ?? r.Co ?? r.CoId ?? r.coId ?? r.co_name ?? r.coName ?? '',
@@ -188,7 +176,7 @@ const ResultPage = () => {
 
   const openAppendix = async () => {
     const link = document.createElement('a');
-    link.href = '/Appendix_QMetric.pdf'; // Path to your PDF in the public folder
+    link.href = '/Appendix_QMetric.pdf';
     link.download = `Assessment_Appendix_${new Date().toISOString().split('T')[0]}.pdf`;
     document.body.appendChild(link);
     link.click();
@@ -239,7 +227,6 @@ const ResultPage = () => {
               overflow: hidden;
             }
 
-            /* Crosshatch/diamond watermark */
             .cert-watermark {
               position: absolute;
               inset: 0;
@@ -250,7 +237,6 @@ const ResultPage = () => {
               pointer-events: none;
             }
 
-            /* Wave SVGs */
             .wave-tr {
               position: absolute;
               top: 0; right: 0;
@@ -266,14 +252,12 @@ const ResultPage = () => {
               display: block;
             }
 
-            /* Main content layer */
             .cert-body {
               position: relative;
               z-index: 3;
               padding: 52px 70px 50px 70px;
             }
 
-            /* Header row: title left, badge right */
             .header-row {
               display: flex;
               align-items: flex-start;
@@ -303,7 +287,6 @@ const ResultPage = () => {
 
             .badge-wrap { flex-shrink: 0; margin-top: 8px; }
 
-            /* Body text */
             .intro-para {
               font-family: 'Libre Baskerville', serif;
               font-size: 12.5px;
@@ -334,7 +317,6 @@ const ResultPage = () => {
               color: #1a1a2e;
             }
 
-            /* Assessment bullets */
             .assessment-block {
               font-family: 'Libre Baskerville', serif;
               font-size: 12px;
@@ -346,7 +328,6 @@ const ResultPage = () => {
             .assessment-block ul li { font-weight: 700; letter-spacing: 0.4px; line-height: 1.95; }
             .assessment-block ul li::before { content: '• '; }
 
-            /* Score box */
             .score-center-row {
               display: flex;
               justify-content: center;
@@ -381,7 +362,6 @@ const ResultPage = () => {
               vertical-align: bottom;
             }
 
-            /* Footer */
             .footer-row {
               display: flex;
               justify-content: space-between;
@@ -424,14 +404,12 @@ const ResultPage = () => {
           <div class="certificate">
             <div class="cert-watermark"></div>
 
-            <!-- TOP-RIGHT WAVE -->
             <svg class="wave-tr" viewBox="0 0 340 290" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
               <path d="M340,0 L340,290 Q200,250 170,155 Q120,40 340,0 Z" fill="#0d1b4b"/>
               <path d="M340,0 Q305,75 258,128 Q210,178 170,155 Q200,250 340,290" fill="none" stroke="#c9a84c" stroke-width="2.5"/>
               <path d="M340,0 Q295,65 248,118 Q202,168 180,150 Q208,245 340,290 L340,0 Z" fill="#1a2f6b" opacity="0.45"/>
             </svg>
 
-            <!-- BOTTOM-LEFT WAVE -->
             <svg class="wave-bl" viewBox="0 0 340 290" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
               <path d="M0,290 L0,0 Q140,40 170,135 Q220,250 0,290 Z" fill="#0d1b4b"/>
               <path d="M0,290 Q35,215 82,162 Q130,112 170,135 Q140,40 0,0" fill="none" stroke="#c9a84c" stroke-width="2.5"/>
@@ -440,14 +418,12 @@ const ResultPage = () => {
 
             <div class="cert-body">
 
-              <!-- HEADER -->
               <div class="header-row">
                 <div class="title-block">
                   <h1 class="cert-title">Question paper<br>quality certificate</h1>
                   <p class="by-qmetric">BY QMETRIC</p>
                 </div>
 
-                <!-- Gold Medal Badge -->
                 <div class="badge-wrap">
                   <svg width="92" height="104" viewBox="0 0 92 104" xmlns="http://www.w3.org/2000/svg">
                     <defs>
@@ -462,28 +438,20 @@ const ResultPage = () => {
                         <stop offset="100%" stop-color="#8a5c00"/>
                       </radialGradient>
                     </defs>
-                    <!-- Left ribbon -->
                     <polygon points="20,54 36,54 31,104 14,94" fill="#c9a84c"/>
-                    <!-- Right ribbon -->
                     <polygon points="72,54 56,54 61,104 78,94" fill="#b8932a"/>
-                    <!-- Outer gold ring -->
                     <circle cx="46" cy="44" r="39" fill="url(#outerRing)"/>
-                    <!-- Groove -->
                     <circle cx="46" cy="44" r="34" fill="none" stroke="#a07820" stroke-width="2" opacity="0.6"/>
-                    <!-- Face -->
                     <circle cx="46" cy="44" r="31" fill="url(#medalFace)"/>
-                    <!-- Radial stripe lines -->
                     <line x1="46" y1="16" x2="46" y2="72" stroke="rgba(255,255,255,0.12)" stroke-width="1.2"/>
                     <line x1="18" y1="44" x2="74" y2="44" stroke="rgba(255,255,255,0.12)" stroke-width="1.2"/>
                     <line x1="26" y1="24" x2="66" y2="64" stroke="rgba(255,255,255,0.08)" stroke-width="1.2"/>
                     <line x1="66" y1="24" x2="26" y2="64" stroke="rgba(255,255,255,0.08)" stroke-width="1.2"/>
-                    <!-- Shine highlight -->
                     <ellipse cx="38" cy="36" rx="9" ry="7" fill="rgba(255,255,255,0.22)" transform="rotate(-30 38 36)"/>
                   </svg>
                 </div>
               </div>
 
-              <!-- INTRO PARAGRAPH -->
               <p class="intro-para">
                 This is to certify that the Question Paper Quality Assessment for the<br>
                 course identified below has been conducted and validated in<br>
@@ -491,7 +459,6 @@ const ResultPage = () => {
                 academic assessment frameworks.
               </p>
 
-              <!-- DETAIL PARAGRAPH with data blanks -->
               <p class="detail-para">
                 The Question Paper Quality Assessment was conducted for the course<br>
                 titled <span class="blank">${data['Course Name'] || ''}</span>, offered under the
@@ -503,7 +470,6 @@ const ResultPage = () => {
                 <span class="blank">${data['College Name'] || ''}</span>
               </p>
 
-              <!-- ASSESSMENT LIST -->
               <div class="assessment-block">
                 <p>The assessment included systematic evaluation of:</p>
                 <ul>
@@ -514,7 +480,6 @@ const ResultPage = () => {
                 </ul>
               </div>
 
-              <!-- FINAL QUALITY SCORE BOX -->
               <div class="score-center-row">
                 <div class="score-box">
                   <div class="score-box-title">Final Quality Score:</div>
@@ -524,14 +489,12 @@ const ResultPage = () => {
                 </div>
               </div>
 
-              <!-- FOOTER -->
               <div class="footer-row">
                 <div class="date-block">
                   <div class="date-line">${dateStr}</div>
                   <div class="date-label">Date</div>
                 </div>
 
-                <!-- QMetric Logo SVG -->
                 <div class="qmetric-logo">
                   <svg width="138" height="56" viewBox="0 0 138 56" xmlns="http://www.w3.org/2000/svg">
                     <defs>
@@ -541,25 +504,22 @@ const ResultPage = () => {
                         <stop offset="100%" stop-color="#1abc9c"/>
                       </linearGradient>
                     </defs>
-                    <!-- Big italic Q -->
                     <text x="0" y="46" font-family="Georgia, 'Times New Roman', serif"
                           font-size="50" font-style="italic" font-weight="700"
                           fill="url(#qGrad)">Q</text>
-                    <!-- Stick figure above Q -->
                     <circle cx="33" cy="5" r="3.5" fill="url(#qGrad)"/>
                     <line x1="33" y1="9"  x2="33" y2="21" stroke="url(#qGrad)" stroke-width="2" stroke-linecap="round"/>
                     <line x1="26" y1="13" x2="40" y2="10" stroke="url(#qGrad)" stroke-width="1.8" stroke-linecap="round"/>
                     <line x1="33" y1="21" x2="27" y2="30" stroke="url(#qGrad)" stroke-width="1.8" stroke-linecap="round"/>
                     <line x1="33" y1="21" x2="39" y2="30" stroke="url(#qGrad)" stroke-width="1.8" stroke-linecap="round"/>
-                    <!-- "Metric" word -->
                     <text x="46" y="42" font-family="'Gill Sans', Calibri, sans-serif"
                           font-size="23" font-weight="400" fill="#1a1a2e">Metric</text>
                   </svg>
                 </div>
               </div>
 
-            </div><!-- /.cert-body -->
-          </div><!-- /.certificate -->
+            </div>
+          </div>
         </body>
         </html>
       `;
@@ -574,7 +534,7 @@ const ResultPage = () => {
       }, 800);
     } catch (err) {
       console.error('Certificate generation failed:', err);
-      alert('Failed to generate certificate. Please try again.');
+      showToast('Failed to generate certificate. Please try again.', 'error');
     } finally {
       setIsDownloading(false);
     }
@@ -601,6 +561,9 @@ const ResultPage = () => {
       const coRecommendationsRaw = collectedData?.CORecommendations || [];
       const moduleRecommendationsRaw = collectedData?.ModuleRecommendations || [];
 
+      // ✨ NEW: Extract DomainInsights
+      const domainInsights = collectedData?.DomainInsights || null;
+
       const coRecommendations = normalizeCoRecommendations(coRecommendationsRaw);
       const moduleRecommendations = normalizeModuleRecommendations(moduleRecommendationsRaw);
       const questionRecommendations = collectedData?.QuestionRecommendations || [];
@@ -611,7 +574,6 @@ const ResultPage = () => {
       const lowerQuestions = questionRecommendations.filter(q => q.remark === 'Lower than Expected Blooms Level').length;
       const matchPercentage = totalQuestions > 0 ? (matchingQuestions / totalQuestions * 100).toFixed(1) : 0;
 
-      // Generate table rows for CO configuration
       const coRows = Object.keys(sequence[0]?.COs || {}).map(co => {
         const coDataItem = sequence[0].COs[co];
         return `
@@ -623,7 +585,6 @@ const ResultPage = () => {
         `;
       }).join('');
 
-      // Generate table rows for modules
       const moduleRows = Object.keys(sequence[0]?.ModuleHours || {}).map(module => {
         const hours = sequence[0].ModuleHours[module];
         return `
@@ -634,7 +595,6 @@ const ResultPage = () => {
         `;
       }).join('');
 
-      // Generate table rows for Bloom's level map
       const bloomLevelMapRows = Object.keys(blommLevelMap).map(level => `
         <tr>
           <td>${level}</td>
@@ -642,7 +602,6 @@ const ResultPage = () => {
         </tr>
       `).join('');
 
-      // Generate table rows for Bloom's data
       const bloomDataRows = Object.keys(bloomsData).map(level => {
         const bloomData = bloomsData[level];
         const variance = (bloomData.marks || 0) - (bloomData.weights || 0);
@@ -660,7 +619,6 @@ const ResultPage = () => {
         `;
       }).join('');
 
-      // Generate table rows for module analysis
       const moduleAnalysisRows = moduleData.map((module, index) => {
         const variance = (module.actual || 0) - (module.expected || 0);
         return `
@@ -675,7 +633,6 @@ const ResultPage = () => {
         `;
       }).join('');
 
-      // Generate table rows for CO analysis
       const coAnalysisRows = Object.keys(coData).map(co => `
         <tr>
           <td class="text-center">CO${co}</td>
@@ -684,7 +641,6 @@ const ResultPage = () => {
         </tr>
       `).join('');
 
-      // Generate table rows for question recommendations
       const questionRows = questionRecommendations.map((rec, index) => `
         <tr>
           <td class="text-center">${index + 1}</td>
@@ -702,7 +658,6 @@ const ResultPage = () => {
         </tr>
       `).join('');
 
-      // Generate table rows for CO recommendations
       const coRecommendationRows = coRecommendations.map(rec => {
         const variance = (rec.actual || 0) - (rec.expected || 0);
         return `
@@ -718,7 +673,6 @@ const ResultPage = () => {
         `;
       }).join('');
 
-      // Generate table rows for module recommendations
       const moduleRecommendationRows = moduleRecommendations.map(rec => {
         const variance = (rec.actual || 0) - (rec.expected || 0);
         return `
@@ -734,6 +688,165 @@ const ResultPage = () => {
         `;
       }).join('');
 
+      // ═══════════════════════════════════════════════════════════
+      // ✨ NEW: Build Domain Insights HTML for PDF
+      // ═══════════════════════════════════════════════════════════
+      let domainInsightsHtml = '';
+
+      if (domainInsights && domainInsights.overall) {
+        const LEVEL_NAMES_PDF = {
+          cognitive: {
+            C1: 'Remember', C2: 'Understand', C3: 'Apply',
+            C4: 'Analyze', C5: 'Evaluate', C6: 'Create',
+          },
+          affective: {
+            A1: 'Receiving', A2: 'Responding', A3: 'Valuing',
+            A4: 'Organizing', A5: 'Characterizing',
+          },
+          psychomotor: {
+            P1: 'Perception', P2: 'Set', P3: 'Guided Response',
+            P4: 'Mechanism', P5: 'Complex Overt', P6: 'Adaptation', P7: 'Origination',
+          },
+        };
+
+        const buildLevelRowsPDF = (levelObj, names) =>
+          Object.entries(levelObj).map(([key, val]) => `
+            <tr>
+              <td class="text-center">${key}</td>
+              <td>${names[key] || key}</td>
+              <td class="text-center">${val.count}</td>
+              <td class="text-center">${val.percentage}%</td>
+            </tr>
+          `).join('');
+
+        const needsReviewRowsPDF = (domainInsights.needsReview || []).map(q => `
+          <tr>
+            <td class="text-center">${q.questionNumber}</td>
+            <td>${q.questionText || ''}</td>
+            <td class="text-center">${q.verb || '—'}</td>
+            <td class="text-center">${q.suggestedDomain || '—'} · ${q.suggestedLevelName || q.suggestedLevel || '—'}</td>
+            <td class="text-center">${q.score ? Math.round(q.score * 100) + '%' : '—'}</td>
+          </tr>
+        `).join('');
+
+        domainInsightsHtml = `
+          <div class="section">
+            <div class="section-title">Learning Domain Insights</div>
+            <p style="font-size: 10pt; color: #666; margin-bottom: 15px;">
+              Cognitive · Affective · Psychomotor — ${domainInsights.totalQuestions} questions analyzed
+            </p>
+
+            <!-- Overall Distribution -->
+            <table>
+              <thead>
+                <tr>
+                  <th>Domain</th>
+                  <th class="text-center">Questions</th>
+                  <th class="text-center">Percentage</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Cognitive (Bloom's)</td>
+                  <td class="text-center">${domainInsights.overall.cognitive.count}</td>
+                  <td class="text-center">${domainInsights.overall.cognitive.percentage}%</td>
+                </tr>
+                <tr>
+                  <td>Affective (Krathwohl's)</td>
+                  <td class="text-center">${domainInsights.overall.affective.count}</td>
+                  <td class="text-center">${domainInsights.overall.affective.percentage}%</td>
+                </tr>
+                <tr>
+                  <td>Psychomotor (Simpson's)</td>
+                  <td class="text-center">${domainInsights.overall.psychomotor.count}</td>
+                  <td class="text-center">${domainInsights.overall.psychomotor.percentage}%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Cognitive Breakdown -->
+          <div class="section">
+            <div class="section-title">Cognitive Domain — Bloom's Breakdown</div>
+            <table>
+              <thead>
+                <tr>
+                  <th class="text-center">Level</th>
+                  <th>Name</th>
+                  <th class="text-center">Questions</th>
+                  <th class="text-center">Percentage</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${buildLevelRowsPDF(domainInsights.cognitive, LEVEL_NAMES_PDF.cognitive)}
+              </tbody>
+            </table>
+          </div>
+
+          ${domainInsights.overall.affective.count > 0 ? `
+          <div class="section">
+            <div class="section-title">Affective Domain — Krathwohl's Breakdown</div>
+            <table>
+              <thead>
+                <tr>
+                  <th class="text-center">Level</th>
+                  <th>Name</th>
+                  <th class="text-center">Questions</th>
+                  <th class="text-center">Percentage</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${buildLevelRowsPDF(domainInsights.affective, LEVEL_NAMES_PDF.affective)}
+              </tbody>
+            </table>
+          </div>
+          ` : ''}
+
+          ${domainInsights.overall.psychomotor.count > 0 ? `
+          <div class="section">
+            <div class="section-title">Psychomotor Domain — Simpson's Breakdown</div>
+            <table>
+              <thead>
+                <tr>
+                  <th class="text-center">Level</th>
+                  <th>Name</th>
+                  <th class="text-center">Questions</th>
+                  <th class="text-center">Percentage</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${buildLevelRowsPDF(domainInsights.psychomotor, LEVEL_NAMES_PDF.psychomotor)}
+              </tbody>
+            </table>
+          </div>
+          ` : ''}
+
+          ${(domainInsights.needsReview && domainInsights.needsReview.length > 0) ? `
+          <div class="section">
+            <div class="section-title" style="color: #b45309;">⚠️ Questions Needing Manual Review (${domainInsights.needsReview.length})</div>
+            <p style="font-size: 10pt; color: #666; margin-bottom: 15px;">
+              The following questions were classified with confidence below 80%. Manual verification is recommended.
+            </p>
+            <table>
+              <thead>
+                <tr>
+                  <th class="text-center">Q#</th>
+                  <th>Question</th>
+                  <th class="text-center">Verb</th>
+                  <th class="text-center">Suggested</th>
+                  <th class="text-center">Confidence</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${needsReviewRowsPDF}
+              </tbody>
+            </table>
+          </div>
+          ` : ''}
+
+          <div class="divider"></div>
+        `;
+      }
 
       const htmlContent = `
         <!DOCTYPE html>
@@ -756,6 +869,21 @@ const ResultPage = () => {
                     background: #ffffff;
                     padding: 40px 60px;
                     font-size: 11pt;
+                    position: relative;
+                }
+                
+                body::before {
+                    content: 'QMetric';
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%) rotate(-45deg);
+                    font-size: 120pt;
+                    font-weight: 700;
+                    color: rgba(0, 0, 0, 0.03);
+                    z-index: -1;
+                    white-space: nowrap;
+                    pointer-events: none;
                 }
                 
                 .report-container {
@@ -828,29 +956,6 @@ const ResultPage = () => {
                     color: #1a1a1a;
                     font-weight: 500;
                 }
-                  body {
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-                    line-height: 1.6;
-                    color: #1a1a1a;
-                    background: #ffffff;
-                    padding: 40px 60px;
-                    font-size: 11pt;
-                    position: relative;
-                }
-                
-                body::before {
-                    content: 'QMetric';
-                    position: fixed;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%) rotate(-45deg);
-                    font-size: 120pt;
-                    font-weight: 700;
-                    color: rgba(0, 0, 0, 0.03);
-                    z-index: -1;
-                    white-space: nowrap;
-                    pointer-events: none;
-                }
                 
                 table {
                     width: 100%;
@@ -887,32 +992,12 @@ const ResultPage = () => {
                     text-align: center;
                 }
                 
-                .status-match {
-                    color: #22c55e;
-                    font-weight: 500;
-                }
-                
-                .status-higher {
-                    color: #3b82f6;
-                    font-weight: 500;
-                }
-                
-                .status-lower {
-                    color: #ef4444;
-                    font-weight: 500;
-                }
-                
-                .positive {
-                    color: #22c55e;
-                }
-                
-                .negative {
-                    color: #ef4444;
-                }
-                
-                .warning {
-                    color: #f59e0b;
-                }
+                .status-match { color: #22c55e; font-weight: 500; }
+                .status-higher { color: #3b82f6; font-weight: 500; }
+                .status-lower { color: #ef4444; font-weight: 500; }
+                .positive { color: #22c55e; }
+                .negative { color: #ef4444; }
+                .warning { color: #f59e0b; }
                 
                 .score-section {
                     text-align: center;
@@ -1009,56 +1094,17 @@ const ResultPage = () => {
                 }
                 
                 @media print {
-                    body {
-                        padding: 20px;
-                    }
-                    
-                    .header {
-                        padding-bottom: 20px;
-                        margin-bottom: 30px;
-                    }
-                    
-                    .section {
-                        margin-bottom: 30px;
-                        page-break-inside: auto;
-                    }
-                    
-                    .section-title {
-                        page-break-after: avoid;
-                    }
-                    
-                    table {
-                        page-break-inside: auto;
-                    }
-                    
-                    table tr {
-                        page-break-inside: avoid;
-                    }
-                    
-                    .score-section {
-                        padding: 30px 0;
-                        margin: 30px 0;
-                        page-break-inside: avoid;
-                    }
-                    
-                    .stats-grid {
-                        margin: 20px 0;
-                        page-break-inside: avoid;
-                    }
-                    
-                    .info-grid {
-                        page-break-inside: avoid;
-                    }
-                    
-                    .analysis-box {
-                        page-break-inside: avoid;
-                        margin: 20px 0;
-                    }
-                    
-                    .divider {
-                        margin: 20px 0;
-                        page-break-after: avoid;
-                    }
+                    body { padding: 20px; }
+                    .header { padding-bottom: 20px; margin-bottom: 30px; }
+                    .section { margin-bottom: 30px; page-break-inside: auto; }
+                    .section-title { page-break-after: avoid; }
+                    table { page-break-inside: auto; }
+                    table tr { page-break-inside: avoid; }
+                    .score-section { padding: 30px 0; margin: 30px 0; page-break-inside: avoid; }
+                    .stats-grid { margin: 20px 0; page-break-inside: avoid; }
+                    .info-grid { page-break-inside: avoid; }
+                    .analysis-box { page-break-inside: avoid; margin: 20px 0; }
+                    .divider { margin: 20px 0; page-break-after: avoid; }
                 }
             </style>
         </head>
@@ -1069,10 +1115,10 @@ const ResultPage = () => {
                     <div class="header-subtitle">Course Outcome & Cognitive Level Evaluation</div>
                     <div class="header-meta">
                         <span>Generated ${new Date().toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      })}</span>
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}</span>
                         <span>Report ID: ${data._id?.slice(-8) || 'N/A'}</span>
                     </div>
                 </div>
@@ -1108,43 +1154,42 @@ const ResultPage = () => {
                     </div>
                 </div>
 
-               <!-- Final Score -->
-<div class="score-section">
-    <div class="score-label">Overall Assessment Score</div>
-    <div class="score-value">${finalScore.toFixed(1)}%</div>
-    <div class="score-description">Based on alignment, distribution, and taxonomy analysis</div>
-    
-    <!-- Score Remark -->
-    <div style="margin-top: 30px; display: inline-block; padding: 20px 40px; border-radius: 8px; ${finalScore >= 80
-          ? 'background: #f0fdf4; border: 2px solid #86efac;'
-          : finalScore >= 60
-            ? 'background: #eff6ff; border: 2px solid #93c5fd;'
-            : finalScore >= 40
-              ? 'background: #fefce8; border: 2px solid #fde047;'
-              : 'background: #fef2f2; border: 2px solid #fca5a5;'
-        }">
-        <div style="font-size: 24pt; font-weight: 700; margin-bottom: 8px; ${finalScore >= 80
-          ? 'color: #16a34a;'
-          : finalScore >= 60
-            ? 'color: #2563eb;'
-            : finalScore >= 40
-              ? 'color: #ca8a04;'
-              : 'color: #dc2626;'
-        }">
-            ${finalScore >= 80 ? 'Excellent' : finalScore >= 60 ? 'Good' : finalScore >= 40 ? 'Moderate' : 'Poor'}
-        </div>
-        <div style="font-size: 10pt; color: #4b5563; max-width: 600px;">
-            ${finalScore >= 80
-          ? 'Strong alignment and balanced distribution. Minor refinements may enhance quality further.'
-          : finalScore >= 60
-            ? 'Reasonable alignment with some areas needing attention. Review under-represented modules/COs.'
-            : finalScore >= 40
-              ? 'Significant improvements needed. Revise question cognitive levels and balance distribution.'
-              : 'Comprehensive restructuring required. Major misalignment in cognitive levels and/or distribution.'
-        }
-        </div>
-    </div>
-</div>
+                <!-- Final Score -->
+                <div class="score-section">
+                    <div class="score-label">Overall Assessment Score</div>
+                    <div class="score-value">${finalScore.toFixed(1)}%</div>
+                    <div class="score-description">Based on alignment, distribution, and taxonomy analysis</div>
+
+                    <div style="margin-top: 30px; display: inline-block; padding: 20px 40px; border-radius: 8px; ${finalScore >= 80
+                      ? 'background: #f0fdf4; border: 2px solid #86efac;'
+                      : finalScore >= 60
+                        ? 'background: #eff6ff; border: 2px solid #93c5fd;'
+                        : finalScore >= 40
+                          ? 'background: #fefce8; border: 2px solid #fde047;'
+                          : 'background: #fef2f2; border: 2px solid #fca5a5;'
+                    }">
+                        <div style="font-size: 24pt; font-weight: 700; margin-bottom: 8px; ${finalScore >= 80
+                          ? 'color: #16a34a;'
+                          : finalScore >= 60
+                            ? 'color: #2563eb;'
+                            : finalScore >= 40
+                              ? 'color: #ca8a04;'
+                              : 'color: #dc2626;'
+                        }">
+                            ${finalScore >= 80 ? 'Excellent' : finalScore >= 60 ? 'Good' : finalScore >= 40 ? 'Moderate' : 'Poor'}
+                        </div>
+                        <div style="font-size: 10pt; color: #4b5563; max-width: 600px;">
+                            ${finalScore >= 80
+                              ? 'Strong alignment and balanced distribution. Minor refinements may enhance quality further.'
+                              : finalScore >= 60
+                                ? 'Reasonable alignment with some areas needing attention. Review under-represented modules/COs.'
+                                : finalScore >= 40
+                                  ? 'Significant improvements needed. Revise question cognitive levels and balance distribution.'
+                                  : 'Comprehensive restructuring required. Major misalignment in cognitive levels and/or distribution.'
+                            }
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Key Metrics -->
                 <div class="section">
@@ -1299,6 +1344,9 @@ const ResultPage = () => {
                     </table>
                 </div>
 
+                <!-- ✨ NEW: Learning Domain Insights -->
+                ${domainInsightsHtml}
+
                 <!-- CO Coverage -->
                 <div class="section">
                     <div class="section-title">Course Outcome Coverage</div>
@@ -1390,38 +1438,37 @@ const ResultPage = () => {
                     <div class="analysis-box">
                         <h4>Assessment Quality</h4>
                         <p>${finalScore >= 80
-          ? 'The assessment demonstrates strong alignment with learning objectives and cognitive levels.'
-          : finalScore >= 60
-            ? 'The assessment shows reasonable alignment with room for improvement in question design and distribution.'
-            : 'Significant adjustments are required to align with expected standards and cognitive level distribution.'
-        }</p>
+                          ? 'The assessment demonstrates strong alignment with learning objectives and cognitive levels.'
+                          : finalScore >= 60
+                            ? 'The assessment shows reasonable alignment with room for improvement in question design and distribution.'
+                            : 'Significant adjustments are required to align with expected standards and cognitive level distribution.'
+                        }</p>
                     </div>
                     <div class="analysis-box">
                         <h4>Alignment Status</h4>
                         <p>${matchPercentage}% of questions match their expected Bloom's taxonomy levels, with ${higherQuestions} questions at higher cognitive levels and ${lowerQuestions} below target. ${matchPercentage >= 80
-          ? 'This indicates strong cognitive level alignment across the assessment.'
-          : matchPercentage >= 60
-            ? 'Consider reviewing questions that fall below expected cognitive levels.'
-            : 'A substantial revision of question design is recommended to improve alignment.'
-        }</p>
+                          ? 'This indicates strong cognitive level alignment across the assessment.'
+                          : matchPercentage >= 60
+                            ? 'Consider reviewing questions that fall below expected cognitive levels.'
+                            : 'A substantial revision of question design is recommended to improve alignment.'
+                        }</p>
                     </div>
                 </div>
 
                 <div class="footer">
                     <p>This report provides comprehensive analysis of assessment quality based on Course Outcome alignment, Module distribution, and Bloom's Taxonomy compliance.</p>
                     <p style="margin-top: 10px;">Generated on ${new Date().toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        })}</p>
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}</p>
                 </div>
             </div>
         </body>
         </html>
       `;
-
 
       printWindow.document.write(htmlContent);
       printWindow.document.close();
@@ -1436,7 +1483,7 @@ const ResultPage = () => {
 
     } catch (err) {
       console.error('PDF generation failed:', err);
-      alert('Failed to generate PDF. Please try again.');
+      showToast('Failed to generate PDF. Please try again.', 'error');
     } finally {
       setIsDownloading(false);
     }
@@ -1474,11 +1521,10 @@ const ResultPage = () => {
       printWindow.focus();
       setTimeout(() => {
         printWindow.print();
-        // printWindow.close();
       }, 300);
     } catch (err) {
       console.error('Print charts failed', err);
-      alert('Printing charts failed');
+      showToast('Printing charts failed', 'error');
     }
   };
 
@@ -1503,10 +1549,7 @@ const ResultPage = () => {
           <h2 className="text-xl font-semibold text-gray-900 text-center mb-2">Unable to Load Report</h2>
           <p className="text-gray-900 text-center mb-4">{error}</p>
           <button
-            onClick={() => {
-              const authToken = sessionStorage.getItem('accessToken');
-              if (authToken) fetchData(authToken);
-            }}
+            onClick={() => window.location.reload()}
             className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
           >
             Try Again
@@ -1524,7 +1567,13 @@ const ResultPage = () => {
             <AlertCircle className="h-12 w-12 text-gray-500" />
           </div>
           <h2 className="text-xl font-semibold text-gray-900 text-center mb-2">No Data Available</h2>
-          <p className="text-gray-900 text-center">No analysis data found.</p>
+          <p className="text-gray-900 text-center mb-4">No analysis data found.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -1551,7 +1600,6 @@ const ResultPage = () => {
   const lowerQuestions = questionRecommendations.filter(q => q.remark === 'Lower than Expected Blooms Level').length;
   const matchPercentage = totalQuestions > 0 ? (matchingQuestions / totalQuestions * 100).toFixed(1) : 0;
 
-  // Add this RIGHT BEFORE: return (
   const getScoreRemark = (score) => {
     if (score >= 80) {
       return {
@@ -1594,9 +1642,29 @@ const ResultPage = () => {
     <div className="min-h-screen bg-slate-50 py-8 px-4">
       <div className="max-w-7xl mx-auto">
 
+        {/* ── Toast notification banner ── */}
+        {toast && (
+          <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg border flex items-center gap-3 transition-all ${
+            toast.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'
+          }`}>
+            {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5 text-green-600" /> : <AlertCircle className="w-5 h-5 text-red-600" />}
+            <span className="text-sm font-medium">{toast.message}</span>
+          </div>
+        )}
+
+        {/* ── Back Navigation ── */}
+        <div className="mb-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 font-medium transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Papers
+          </button>
+        </div>
+
         {/* ── Header ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200/80 p-6 mb-6 overflow-hidden relative">
-          {/* Subtle top gradient bar */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500" />
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-1">
             <div className="text-center md:text-left">
@@ -1673,7 +1741,6 @@ const ResultPage = () => {
           ))}
         </div>
 
-        {/* Shared card + table styles as helper components */}
         {(() => {
           const Card = ({ title, children, accent = 'blue' }) => (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200/80 p-6 mb-6 overflow-hidden relative">
@@ -1701,7 +1768,6 @@ const ResultPage = () => {
 
           return (
             <>
-              {/* ── Course Information ── */}
               <Card title="Course Information" accent="blue">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[
@@ -1720,7 +1786,6 @@ const ResultPage = () => {
                 </div>
               </Card>
 
-              {/* ── CO Config ── */}
               <Card title="Course Outcomes Configuration" accent="teal">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -1743,7 +1808,6 @@ const ResultPage = () => {
                 </div>
               </Card>
 
-              {/* ── Module Distribution ── */}
               <Card title="Module Distribution" accent="purple">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -1762,7 +1826,6 @@ const ResultPage = () => {
                 </div>
               </Card>
 
-              {/* ── Bloom's Mapping ── */}
               <Card title="Bloom's Taxonomy Mapping" accent="teal">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -1781,7 +1844,6 @@ const ResultPage = () => {
                 </div>
               </Card>
 
-              {/* ── Question Analysis ── */}
               <Card title={`Detailed Question-wise Analysis (${questionData.length} questions)`} accent="blue">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -1809,7 +1871,6 @@ const ResultPage = () => {
                 </div>
               </Card>
 
-              {/* ── Bloom's Analysis ── */}
               <Card title="Bloom's Taxonomy Analysis" accent="purple">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -1838,7 +1899,11 @@ const ResultPage = () => {
                 </div>
               </Card>
 
-              {/* ── Module Coverage ── */}
+              {/* ── Learning Domain Insights ── */}
+              {collectedData?.DomainInsights && (
+                <DomainInsightsSection insights={collectedData.DomainInsights} />
+              )}
+
               <Card title="Module Coverage Analysis" accent="teal">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -1864,7 +1929,6 @@ const ResultPage = () => {
                 </div>
               </Card>
 
-              {/* ── CO Coverage ── */}
               <Card title="Course Outcome Coverage" accent="blue">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -1886,7 +1950,6 @@ const ResultPage = () => {
                 </div>
               </Card>
 
-              {/* ── Visualization Modal ── */}
               {showVisualization && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
                   <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-auto p-6 mx-4 border border-gray-200">
@@ -1910,7 +1973,6 @@ const ResultPage = () => {
                 </div>
               )}
 
-              {/* ── Question Recommendations ── */}
               <Card title="Question Recommendations" accent="amber">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -1940,7 +2002,6 @@ const ResultPage = () => {
                 </div>
               </Card>
 
-              {/* ── CO & Module Recommendations ── */}
               {(coRecommendations.length > 0 || moduleRecommendations.length > 0) && (
                 <Card title="Recommendations" accent="amber">
                   <div className="space-y-6">
@@ -2008,7 +2069,6 @@ const ResultPage = () => {
                 </Card>
               )}
 
-              {/* ── Performance Analysis ── */}
               <Card title="Performance Analysis" accent="blue">
                 <div className="space-y-4">
                   <div className="border-l-4 border-blue-400 bg-blue-50/60 rounded-r-xl p-4">

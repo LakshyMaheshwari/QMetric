@@ -7,6 +7,7 @@ import {
   Users, CheckCircle, XCircle, Shield, AlertCircle, X,
   BarChart3, TrendingUp, BookOpen, UserCheck,
 } from 'lucide-react';
+import { DashboardSkeleton } from '../SkeletonLoader';
 
 // ─── Stat Card ───────────────────────────────────────────────────────────────
 function StatCard({ icon: Icon, label, value, sub, color = 'blue' }) {
@@ -171,8 +172,21 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  if (loading && colleges.length === 0) {
+    return (
+      <div className="min-h-screen bg-black text-white pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <DashboardSkeleton cards={6} tableRows={5} tableCols={4} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black text-white pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+      {loading && colleges.length > 0 && (
+        <div className="fixed top-0 left-0 right-0 h-1 bg-blue-500 animate-pulse z-50" />
+      )}
       <div className="max-w-7xl mx-auto space-y-8">
 
         {/* Header */}
@@ -221,14 +235,6 @@ export default function SuperAdminDashboard() {
             <StatCard icon={TrendingUp} label="New (7 days)"   value={stats.recentPapers}    sub={`${stats.recentUsers} new users`}        color="rose"   />
           </div>
         )}
-        {loading && !stats && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-28 rounded-2xl bg-zinc-900 animate-pulse" />
-            ))}
-          </div>
-        )}
-
         {/* Colleges Section */}
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800">
@@ -272,14 +278,7 @@ export default function SuperAdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/70">
-                  {loading && colleges.length === 0 ? (
-                    <tr><td colSpan={7} className="py-12 text-center text-zinc-400">
-                      <div className="flex flex-col items-center gap-2">
-                        <RefreshCw className="w-6 h-6 animate-spin text-blue-400" />
-                        <span>Loading colleges…</span>
-                      </div>
-                    </td></tr>
-                  ) : colleges.length === 0 ? (
+                  {colleges.length === 0 ? (
                     <tr><td colSpan={7} className="py-12 text-center text-zinc-400">
                       <div className="flex flex-col items-center gap-2">
                         <Building2 className="w-8 h-8 text-zinc-600" />

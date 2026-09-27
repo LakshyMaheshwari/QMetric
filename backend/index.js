@@ -1,47 +1,139 @@
 require('dotenv').config();
 
+require('./config/validateEnv')();
+
+const notificationsRouter = require('./routes/notification');
+const csrfRouter = require('./routes/csrf');
 const createError = require('http-errors');
 const express     = require('express');
-const path        = require('path');
+const path        = require('node:path');
 const cookieParser = require('cookie-parser');
-const logger      = require('morgan');
+const morgan      = require('morgan');
 const cors        = require('cors');
 const mongoose    = require('mongoose');
 const rateLimit   = require('express-rate-limit');
+const helmet      = require('helmet');
+const setupSwagger = require('./config/swagger');
+const { csrfWithBearerSkip } = require('./middleware/csrf');
 
 const fileRouter  = require('./routes/file');
 const usersRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
-const superAdminCollegesRouter = require('./routes/superAdminColleges');
 const superAdminRouter = require('./routes/superAdmin');
 const collegeAdminRouter = require('./routes/collegeAdmin');
 const reviewerRouter = require('./routes/reviewer');
+const teacherRouter = require('./routes/teacher');
+const devAuthRouter = require('./routes/devAuth');
 
 const app = express();
 
+// ─── Security Headers ──────────────────────────────────────────────────
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: [
+                "'self'",
+                "'unsafe-inline'",
+                'https://challenges.cloudflare.com',
+            ],
+            styleSrc: [
+                "'self'",
+                "'unsafe-inline'",
+            ],
+            imgSrc: [
+                "'self'",
+                'data:',
+                'https://res.cloudinary.com',
+            ],
+            connectSrc: [
+                "'self'",
+                'https://challenges.cloudflare.com',
+                ...(process.env.NODE_ENV !== 'production'
+                    ? ['http://localhost:3000', 'http://localhost:3001']
+                    : [process.env.FRONTEND_URL].filter(Boolean)),
+            ],
+            frameSrc: [
+                "'self'",
+                'https://challenges.cloudflare.com',
+            ],
+            fontSrc: ["'self'", 'data:'],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            formAction: ["'self'"],
+            frameAncestors: ["'none'"],
+            upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
+        },
+    },
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginEmbedderPolicy: false,
+    hsts: process.env.NODE_ENV === 'production'
+        ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+        : false,
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    noSniff: true,
+    frameguard: { action: 'deny' },
+    hidePoweredBy: true,
+    ieNoOpen: true,
+}));
+
 // ─── CORS ──────────────────────────────────────────────────────────────────────
+const allowedOrigins = [
+  'https://q-metric-3k72.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:3001'
+];
+if (process.env.FRONTEND_URL && !allowedOrigins.includes(process.env.FRONTEND_URL)) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
+
 app.use(cors({
-  origin: [
-    'https://q-metric-3k72.vercel.app',
-    'http://localhost:3000',
-    'http://localhost:3001'
-  ],
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true,
 }));
 
+// ─── Logging ───────────────────────────────────────────────────────────
+app.use(morgan('dev'));
+
 // ─── Body parsers & static ────────────────────────────────────────────────────
-app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// ─── Dev Auth Bypass (never mounts in production) ──────────────
+if (process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEV_AUTH === 'true') {
+    app.use('/dev', devAuthRouter);
+    console.log('⚠️  Dev auth ENABLED — POST /dev/login with { email }');
+}
+
+// ─── CSRF Protection ──────────────────────────────────────────────────────────
+// Apply to all state-changing routes (requires cookieParser)
+app.use(csrfWithBearerSkip);
+app.use('/api', csrfRouter);
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ─── Swagger docs ─────────────────────────────────────────────────────────────
+setupSwagger(app);
+
 // ─── Rate Limiters ────────────────────────────────────────────────────────────
+// ⚠️ RATE LIMITING IS IN-MEMORY (per-process)
+// These counters live inside this Node.js process. If you ever run multiple
+// backend instances behind a load balancer, each instance keeps its own
+// counter, and an attacker gets (max × instance_count) attempts.
+//
+// Before scaling horizontally:
+//   1. npm install rate-limit-redis redis
+//   2. Add REDIS_URL to .env
+//   3. Replace each limiter's store with new RedisStore({ ... })
+//   See: https://www.npmjs.com/package/rate-limit-redis
+//
+// Single-instance deployments: no action needed.
 
 // Auth: 10 attempts per 15 minutes per IP (generous for login + register)
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
@@ -51,9 +143,21 @@ const authLimiter = rateLimit({
   },
 });
 
+// General limiter for protected admin/reviewer/teacher routes
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: true,
+    message: 'Too many requests from this IP. Please slow down.',
+  },
+});
+
 // Upload: 20 uploads per hour per IP
 const uploadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
+  windowMs: 60 * 60 * 1000,
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
@@ -65,7 +169,7 @@ const uploadLimiter = rateLimit({
 
 // Bulk register: 3 attempts per hour (admin-only but still protect it)
 const bulkLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
+  windowMs: 60 * 60 * 1000,
   max: 3,
   standardHeaders: true,
   legacyHeaders: false,
@@ -73,48 +177,69 @@ const bulkLimiter = rateLimit({
     error: true,
     message: 'Bulk registration limit reached. Maximum 3 batches per hour.',
   },
-  // Apply only to the bulk route (done at route level, but guard here too)
-  skip: (req) => !req.path.includes('bulk-register'),
+    skip: (req) => {
+    // Only rate-limit the actual write endpoint: POST /auth/bulk-register.
+    // GET /bulk-register/template and GET /bulk-register/format are cheap reads.
+    if (!req.path.includes('bulk-register')) return true; // not a bulk-register route
+    if (req.method !== 'POST') return true;               // read requests are fine
+    return false;                                         // rate-limit only the POST
+  },
 });
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/upload', uploadLimiter, fileRouter);
-app.use('/auth',   authLimiter,   usersRouter);
-app.use('/college-admin',          collegeAdminRouter);
-app.use('/admin/colleges',         superAdminCollegesRouter);
-const teacherRouter = require('./routes/teacher');
-
-app.use('/admin',                 adminRouter);
-app.use('/super-admin',           superAdminRouter);
-app.use('/reviewer',              reviewerRouter);
-app.use('/teacher',               teacherRouter);
+app.use('/auth',   authLimiter, bulkLimiter, usersRouter);
+app.use('/college-admin', generalLimiter, collegeAdminRouter);
+app.use('/admin',                 generalLimiter, adminRouter);
+app.use('/super-admin',           generalLimiter, superAdminRouter);
+app.use('/reviewer',              generalLimiter, reviewerRouter);
+app.use('/teacher',               generalLimiter, teacherRouter);
+app.use('/notifications', generalLimiter, notificationsRouter);
 
 // ─── Health check (responds even if DB is not yet connected) ──────────────────
-app.get('/health', (req, res) => {
+const healthHandler = (req, res) => {
   const dbState = mongoose.connection.readyState;
-  // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
   const dbStatus = ['disconnected', 'connected', 'connecting', 'disconnecting'][dbState];
   res.json({ status: 'ok', db: dbStatus, uptime: process.uptime() });
-});
+};
+app.get('/health', healthHandler);
+app.get('/api/health', healthHandler);
 
 // ─── 404 handler ──────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
   next(createError(404));
 });
 
-// ─── Multer error handler ─────────────────────────────────────────────────────
+// ─── General error handler (also handles Multer errors) ──────────────────────
 app.use((err, req, res, next) => {
+  // Multer: file too large
   if (err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(400).json({ error: true, message: 'File too large. Maximum size is 5MB.' });
+    return res.status(400).json({
+      error: true,
+      message: 'File too large. Maximum allowed size is 25MB.',
+    });
   }
-  if (err.message && err.message.includes('Invalid file type')) {
-    return res.status(400).json({ error: true, message: err.message });
-  }
-  next(err);
-});
 
-// ─── General error handler ────────────────────────────────────────────────────
-app.use((err, req, res, next) => {
+  // Multer: file type filter rejection
+  if (err.message && (
+    err.message.includes('Invalid file type') ||
+    err.message.includes('File type not allowed')
+  )) {
+    return res.status(400).json({
+      error: true,
+      message: err.message,
+    });
+  }
+
+  // CSRF failures
+  if (err.code === 'EBADCSRFTOKEN' || (err.status === 403 && err.message && err.message.toLowerCase().includes('csrf'))) {
+    return res.status(403).json({
+      error: true,
+      message: 'Invalid or missing CSRF token.',
+      code: 'EBADCSRFTOKEN',
+    });
+  }
+
   console.error('🔴 Unhandled error:', err);
   const isDev = process.env.NODE_ENV !== 'production';
   res.status(err.status || 500).json({
@@ -124,30 +249,45 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ─── Start server IMMEDIATELY (not inside db.once) ───────────────────────────
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`✅ Server running on port: ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-});
+// ─── Start server (skip during Jest — tests use in-memory MongoDB) ───────────
+if (process.env.NODE_ENV !== 'test') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`✅ Server running on port: ${PORT}`);
+    console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  });
 
-// ─── Connect to MongoDB (non-blocking relative to server start) ───────────────
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-}).then(() => {
-  console.log('✅ Connected to MongoDB');
-}).catch((err) => {
-  // Log the error but don't crash — routes will return 503 naturally if DB is down
-  console.error('❌ MongoDB connection error:', err.message);
-});
+  // ─── Mongo connection with exponential backoff ────────────────
+  const MONGO_RETRIES = 5;
+  const MONGO_BASE_DELAY_MS = 2000;
 
-// ─── Handle DB disconnection after initial connection ─────────────────────────
-mongoose.connection.on('disconnected', () => {
-  console.warn('⚠️  MongoDB disconnected — attempting to reconnect...');
-});
-mongoose.connection.on('reconnected', () => {
-  console.log('✅ MongoDB reconnected');
-});
+  async function connectMongo(attempt = 1) {
+    try {
+      await mongoose.connect(process.env.MONGO_URI, {
+        serverSelectionTimeoutMS: 5000,
+      });
+      console.log('✅ Connected to MongoDB');
+    } catch (err) {
+      console.error(`❌ MongoDB connection attempt ${attempt}/${MONGO_RETRIES} failed:`, err.message);
+      if (attempt >= MONGO_RETRIES) {
+        console.error('💥 Exhausted all MongoDB connection retries. Exiting.');
+        process.exit(1);
+      }
+      const delay = MONGO_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+      console.warn(`⏳ Retrying in ${delay / 1000}s...`);
+      await new Promise((r) => setTimeout(r, delay));
+      return connectMongo(attempt + 1);
+    }
+  }
+
+  connectMongo();
+
+  mongoose.connection.on('disconnected', () => {
+    console.warn('⚠️  MongoDB disconnected — Mongoose will attempt to reconnect');
+  });
+  mongoose.connection.on('reconnected', () => {
+    console.log('✅ MongoDB reconnected');
+  });
+}
 
 module.exports = app;

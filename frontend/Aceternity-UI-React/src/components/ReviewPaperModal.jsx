@@ -1,15 +1,36 @@
 import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import apiClient from '../api/client';
 import {
   X, CheckCircle, AlertTriangle, XCircle, FileText,
   User, BookOpen, Award, MessageSquare, Loader2, History
 } from 'lucide-react';
+import { reviewPaperSchema } from '../schemas/validationSchemas';
+import FormInput from './FormInput';
 
 const ReviewPaperModal = ({ paper, onClose, onComplete }) => {
-  const [action, setAction] = useState(paper?.reviewStatus && paper.reviewStatus !== 'pending' ? paper.reviewStatus : 'approved');
-  const [comments, setComments] = useState(paper?.reviewComments || '');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const defaultAction =
+    paper?.reviewStatus && paper.reviewStatus !== 'pending' ? paper.reviewStatus : 'approved';
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(reviewPaperSchema),
+    defaultValues: {
+      action: defaultAction,
+      comments: paper?.reviewComments || '',
+    },
+  });
+
+  const action = watch('action');
+  const comments = watch('comments') || '';
 
   const courseTitle = paper?.courseName || paper?.['Course Name'] || 'Untitled Course';
   const courseCode = paper?.courseCode || paper?.['Course Code'] || '';
@@ -18,15 +39,13 @@ const ReviewPaperModal = ({ paper, onClose, onComplete }) => {
   const questionsCount = paper?.questionsCount || (Array.isArray(paper?.questions) ? paper.questions.length : 0);
   const qualityScore = paper?.qualityScore || 75;
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  const onSubmit = async (data) => {
     setError('');
 
     try {
       const response = await apiClient.put(`/reviewer/papers/${paper._id}/review`, {
-        action,
-        comments: comments.trim(),
+        action: data.action,
+        comments: (data.comments || '').trim(),
       });
 
       if (response.data && !response.data.error) {
@@ -37,15 +56,12 @@ const ReviewPaperModal = ({ paper, onClose, onComplete }) => {
     } catch (err) {
       console.error('Review submission error:', err);
       setError(err.response?.data?.message || 'Failed to submit review. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto animate-fadeIn">
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden my-8">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900/90">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
@@ -57,6 +73,7 @@ const ReviewPaperModal = ({ paper, onClose, onComplete }) => {
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
           >
@@ -64,7 +81,6 @@ const ReviewPaperModal = ({ paper, onClose, onComplete }) => {
           </button>
         </div>
 
-        {/* Paper Overview Details */}
         <div className="p-6 space-y-6">
           <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800/80 space-y-3">
             <div className="flex items-start justify-between gap-2">
@@ -103,7 +119,6 @@ const ReviewPaperModal = ({ paper, onClose, onComplete }) => {
             </div>
           </div>
 
-          {/* Previous Review History Preview if available */}
           {paper?.reviewHistory && paper.reviewHistory.length > 0 && (
             <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-800/60 text-xs space-y-2">
               <div className="flex items-center gap-1.5 text-zinc-400 font-medium">
@@ -130,8 +145,9 @@ const ReviewPaperModal = ({ paper, onClose, onComplete }) => {
             </div>
           )}
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+            <input type="hidden" {...register('action')} />
+
             <div>
               <label className="block text-xs font-semibold text-zinc-300 uppercase tracking-wider mb-2">
                 Review Decision <span className="text-red-400">*</span>
@@ -139,7 +155,7 @@ const ReviewPaperModal = ({ paper, onClose, onComplete }) => {
               <div className="grid grid-cols-3 gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setAction('approved')}
+                  onClick={() => setValue('action', 'approved', { shouldValidate: true })}
                   className={`p-3 rounded-xl border text-sm font-medium flex flex-col items-center gap-1.5 transition-all ${
                     action === 'approved'
                       ? 'bg-green-500/15 border-green-500/50 text-green-300 shadow-md shadow-green-500/10'
@@ -152,7 +168,7 @@ const ReviewPaperModal = ({ paper, onClose, onComplete }) => {
 
                 <button
                   type="button"
-                  onClick={() => setAction('needs_revision')}
+                  onClick={() => setValue('action', 'needs_revision', { shouldValidate: true })}
                   className={`p-3 rounded-xl border text-sm font-medium flex flex-col items-center gap-1.5 transition-all ${
                     action === 'needs_revision'
                       ? 'bg-yellow-500/15 border-yellow-500/50 text-yellow-300 shadow-md shadow-yellow-500/10'
@@ -165,7 +181,7 @@ const ReviewPaperModal = ({ paper, onClose, onComplete }) => {
 
                 <button
                   type="button"
-                  onClick={() => setAction('rejected')}
+                  onClick={() => setValue('action', 'rejected', { shouldValidate: true })}
                   className={`p-3 rounded-xl border text-sm font-medium flex flex-col items-center gap-1.5 transition-all ${
                     action === 'rejected'
                       ? 'bg-red-500/15 border-red-500/50 text-red-300 shadow-md shadow-red-500/10'
@@ -176,6 +192,9 @@ const ReviewPaperModal = ({ paper, onClose, onComplete }) => {
                   <span>Reject</span>
                 </button>
               </div>
+              {errors.action && (
+                <p className="mt-1 text-sm text-red-500" role="alert">{errors.action.message}</p>
+              )}
             </div>
 
             <div>
@@ -183,15 +202,15 @@ const ReviewPaperModal = ({ paper, onClose, onComplete }) => {
                 <MessageSquare className="w-3.5 h-3.5 text-zinc-400" />
                 <span>Comments & Feedback for Teacher</span>
               </label>
-              <textarea
-                value={comments}
-                onChange={(e) => setComments(e.target.value)}
+              <FormInput
+                name="comments"
+                type="textarea"
+                register={register}
+                error={errors.comments}
                 placeholder="Provide constructive feedback, question clarity issues, or revision notes..."
                 rows={4}
-                maxLength={2000}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition-colors resize-y"
               />
-              <div className="flex justify-between text-[11px] text-zinc-500 mt-1">
+              <div className="flex justify-between text-[11px] text-zinc-500 -mt-2 mb-2">
                 <span>Feedback will be visible to the course instructor</span>
                 <span>{comments.length}/2000</span>
               </div>
@@ -207,17 +226,17 @@ const ReviewPaperModal = ({ paper, onClose, onComplete }) => {
               <button
                 type="button"
                 onClick={onClose}
-                disabled={loading}
+                disabled={isSubmitting}
                 className="px-4 py-2 text-sm text-zinc-400 hover:text-white transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={isSubmitting}
                 className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white font-medium text-sm rounded-xl shadow-lg hover:shadow-blue-500/25 transition-all flex items-center gap-2"
               >
-                {loading ? (
+                {isSubmitting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     <span>Submitting...</span>

@@ -18,7 +18,6 @@ const PaperSchema = new mongoose.Schema({
   "Course Teacher": { type: String, required: true },
   "Sequence":       [],
   "Collected Data": [],
-  "blommLevelMap":  { type: Object },
   "bloomLevelMap":  { type: Object },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
@@ -31,10 +30,13 @@ const PaperSchema = new mongoose.Schema({
   },
 
   // ── Review workflow ───────────────────────────────────────────────────────
+  submittedAt: { type: Date, default: null },
+  qualityScore: { type: Number, min: 0, max: 100, default: null },
+
   reviewStatus: {
     type: String,
-    enum: ['pending', 'approved', 'rejected', 'needs_revision'],
-    default: 'pending',
+    enum: ['draft', 'pending', 'approved', 'rejected', 'needs_revision'],
+    default: 'draft',
     index: true,
   },
   reviewedBy:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
@@ -44,15 +46,13 @@ const PaperSchema = new mongoose.Schema({
 
 }, { timestamps: true });
 
-// Ensure both bloomLevelMap and legacy typo field blommLevelMap stay in sync
-PaperSchema.pre('save', function(next) {
-  if (this.bloomLevelMap && !this.blommLevelMap) {
-    this.blommLevelMap = this.bloomLevelMap;
-  } else if (this.blommLevelMap && !this.bloomLevelMap) {
-    this.bloomLevelMap = this.blommLevelMap;
-  }
-  next();
-});
+PaperSchema.index({ userId: 1 });
+PaperSchema.index({ createdAt: -1 });
+// Compound for the teacher list query: filter by userId + sort by createdAt
+PaperSchema.index({ userId: 1, createdAt: -1 });
+// Compound for the reviewer/admin list query: collegeId + status + sort
+PaperSchema.index({ collegeId: 1, reviewStatus: 1, createdAt: -1 });
+
 
 const PaperInfo = mongoose.model('PaperInfo', PaperSchema);
 

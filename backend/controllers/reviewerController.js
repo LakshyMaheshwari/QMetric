@@ -1,9 +1,20 @@
 const Paper = require('../Model/PaperInfo');
 const User = require('../Model/user');
 const College = require('../Model/College');
+const paperFields = require('../core/constants/paperFields');
+const { paginate, getPaginationMeta } = require('../utils/pagination');
+const { logAudit } = require('../utils/auditLog');
+const { sendReviewStatusEmail } = require('../utils/mailer');
+const escapeRegex = require('../utils/escapeRegex');
+const { getUserId, getUserRole, getCollegeId, isAdmin, isReviewer, isSuperAdmin } = require('../utils/currentUser');
+const mongoose = require('mongoose');
+const PaperInfo = require('../Model/PaperInfo');
+const { createNotification } = require('./notificationController');
 
 /**
- * Helper to build the college query filter for papers
+ * Helper to build the college query filter for papers.
+ * Pure read — no write side effects. Legacy rows are backfilled by
+ * scripts/backfillCollegeRefs.js (one-time) instead of per request.
  */
 async function buildCollegePaperQuery(userId) {
   const user = await User.findById(userId).select('collegeId role');
@@ -21,85 +32,77 @@ async function buildCollegePaperQuery(userId) {
     return { error: 'You are not assigned to any college.', query: null, collegeId: null };
   }
 
-  const college = await College.findById(collegeId);
-  const codePrefix = college?.code ? college.code.replace(/[0-9]/g, '').trim() : '';
-  const firstNamePart = college?.name ? college.name.split(' ')[0].trim() : '';
+  // Exact collegeId matching only — no regex fallbacks (prevents data leaks)
+  const collegeUsers = await User.find({ collegeId }).distinct('_id');
 
-  // Match faculty/users by collegeId or college name / code variations
-  const userCollegeMatches = [
-    { collegeId: collegeId },
-    ...(college?.name ? [{ collegeName: { $regex: college.name, $options: 'i' } }] : []),
-    ...(college?.code ? [{ collegeName: { $regex: college.code, $options: 'i' } }] : []),
-    ...(codePrefix ? [{ collegeName: { $regex: '^' + codePrefix + '$', $options: 'i' } }] : []),
-    ...(firstNamePart && firstNamePart.length > 3 ? [{ collegeName: { $regex: firstNamePart, $options: 'i' } }] : []),
-  ];
-
-  const collegeUsers = await User.find({ $or: userCollegeMatches }).distinct('_id');
-
-  // Build match query for papers in this college
   const paperMatches = [
-    { collegeId: collegeId },
+    { collegeId },
     ...(collegeUsers.length > 0 ? [{ userId: { $in: collegeUsers } }] : []),
-    ...(college?.name ? [{ 'College Name': { $regex: college.name, $options: 'i' } }] : []),
-    ...(college?.code ? [{ 'College Name': { $regex: college.code, $options: 'i' } }] : []),
-    ...(codePrefix ? [{ 'College Name': { $regex: '^' + codePrefix + '$', $options: 'i' } }] : []),
-    ...(firstNamePart && firstNamePart.length > 3 ? [{ 'College Name': { $regex: firstNamePart, $options: 'i' } }] : []),
   ];
 
   const baseQuery = { $or: paperMatches };
-
-  // Opportunistically backfill collegeId on legacy users & papers
-  try {
-    if (collegeUsers.length > 0) {
-      User.updateMany(
-        { _id: { $in: collegeUsers }, $or: [{ collegeId: null }, { collegeId: { $exists: false } }] },
-        { $set: { collegeId: collegeId } }
-      ).exec().catch(() => {});
-    }
-    Paper.updateMany(
-      { $or: paperMatches, $or: [{ collegeId: null }, { collegeId: { $exists: false } }] },
-      { $set: { collegeId: collegeId } }
-    ).exec().catch(() => {});
-  } catch (e) {
-    // Non-blocking backfill
-  }
-
+  const college = await College.findById(collegeId);
   return { error: null, query: baseQuery, collegeId, college };
+}
+
+/**
+ * Build a MongoDB query from a base query + optional extra condition.
+ * Returns the base alone if no extra condition is provided.
+ */
+function mergeQuery(baseQuery, extraCondition) {
+  const hasBase = baseQuery && Object.keys(baseQuery).length > 0;
+  if (hasBase && extraCondition) {
+    return { $and: [baseQuery, extraCondition] };
+  }
+  if (hasBase) return baseQuery;
+  if (extraCondition) return extraCondition;
+  return {};
 }
 
 /**
  * Format paper object so both original keys and normalized keys exist
  */
 function formatPaper(p) {
-  const plain = typeof p.toObject === 'function' ? p.toObject() : p;
-  const collectedData = plain['Collected Data'] || [];
+  const plain = typeof p?.toObject === 'function' ? p.toObject() : p;
+  const collectedData = plain[paperFields.COLLECTED_DATA] || [];
   const questionsList = Array.isArray(collectedData) ? collectedData : (plain.questions || []);
   const questionsCount = questionsList.length;
 
   return {
     ...plain,
-    courseName: plain['Course Name'] || plain.courseName || 'Untitled',
-    courseCode: plain['Course Code'] || plain.courseCode || '',
-    courseTeacher: plain['Course Teacher'] || plain.courseTeacher || '',
-    collegeName: plain['College Name'] || plain.collegeName || '',
+    courseName: plain[paperFields.COURSE_NAME] || plain.courseName || 'Untitled',
+    courseCode: plain[paperFields.COURSE_CODE] || plain.courseCode || '',
+    courseTeacher: plain[paperFields.COURSE_TEACHER] || plain.courseTeacher || '',
+    collegeName: plain[paperFields.COLLEGE_NAME] || plain.collegeName || '',
     branch: plain['Branch'] || plain.branch || '',
     semester: plain['Semester'] || plain.semester || '',
     questions: questionsList,
     questionsCount,
-    qualityScore: plain.qualityScore !== undefined ? plain.qualityScore : (plain.bloomLevelMap ? 85 : 75),
+    qualityScore: plain.qualityScore || 0,
     reviewStatus: plain.reviewStatus || 'pending',
   };
+}
+
+/**
+ * Determine the audit-log action string from a review action.
+ * Extracted so the ternary chain below stays flat.
+ */
+function auditActionFor(reviewAction) {
+  if (reviewAction === 'approved') return 'APPROVE_PAPER';
+  if (reviewAction === 'rejected') return 'REJECT_PAPER';
+  return 'REVIEW_PAPER';
 }
 
 // GET /reviewer/papers - Get all papers in reviewer's college
 exports.getCollegePapers = async (req, res) => {
   try {
-    const { error, query: baseQuery } = await buildCollegePaperQuery(req.user.userId);
+    const { error, query: baseQuery } = await buildCollegePaperQuery(getUserId(req));
     if (error) {
       return res.status(400).json({ error: true, message: error });
     }
 
-    const { status, search, limit = 50, page = 1 } = req.query;
+    const { status, search } = req.query;
+    const { skip, limit, page } = paginate(req, 20, 100);
     const conditions = [];
 
     // Base college filter
@@ -107,38 +110,35 @@ exports.getCollegePapers = async (req, res) => {
       conditions.push(baseQuery);
     }
 
-    // Filter by review status
+    // Filter by review status — "pending" also matches papers missing the field
     if (status && status !== 'all') {
       if (status === 'pending') {
         conditions.push({
           $or: [
             { reviewStatus: 'pending' },
             { reviewStatus: { $exists: false } },
-            { reviewStatus: null }
-          ]
+            { reviewStatus: null },
+          ],
         });
       } else {
         conditions.push({ reviewStatus: status });
       }
     }
 
-    // Search by course name, code, or teacher
+    // Search by course name, code, or teacher — escaped to prevent ReDoS
     if (search && search.trim()) {
-      const searchRegex = { $regex: search.trim(), $options: 'i' };
+      const safe = escapeRegex(search.trim().slice(0, 100));
+      const searchRegex = new RegExp(safe, 'i');
       conditions.push({
         $or: [
-          { 'Course Name': searchRegex },
-          { 'Course Code': searchRegex },
-          { 'Course Teacher': searchRegex },
-        ]
+          { [paperFields.COURSE_NAME]: searchRegex },
+          { [paperFields.COURSE_CODE]: searchRegex },
+          { [paperFields.COURSE_TEACHER]: searchRegex },
+        ],
       });
     }
 
     const finalQuery = conditions.length > 1 ? { $and: conditions } : (conditions[0] || {});
-
-    const parsedLimit = Math.max(1, parseInt(limit) || 50);
-    const parsedPage = Math.max(1, parseInt(page) || 1);
-    const skip = (parsedPage - 1) * parsedLimit;
 
     const [rawPapers, total] = await Promise.all([
       Paper.find(finalQuery)
@@ -146,9 +146,9 @@ exports.getCollegePapers = async (req, res) => {
         .populate('reviewedBy', 'fullName userName email')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(parsedLimit)
+        .limit(limit)
         .lean(),
-      Paper.countDocuments(finalQuery)
+      Paper.countDocuments(finalQuery),
     ]);
 
     const papers = rawPapers.map(formatPaper);
@@ -156,12 +156,7 @@ exports.getCollegePapers = async (req, res) => {
     res.json({
       error: false,
       papers,
-      pagination: {
-        total,
-        page: parsedPage,
-        limit: parsedLimit,
-        pages: Math.ceil(total / parsedLimit),
-      },
+      pagination: getPaginationMeta(total, page, limit),
     });
   } catch (error) {
     console.error('Error fetching reviewer papers:', error);
@@ -173,7 +168,7 @@ exports.getCollegePapers = async (req, res) => {
 exports.getPaperDetails = async (req, res) => {
   try {
     const { id } = req.params;
-    const { error, query: baseQuery } = await buildCollegePaperQuery(req.user.userId);
+    const { error, query: baseQuery } = await buildCollegePaperQuery(getUserId(req));
     if (error) {
       return res.status(400).json({ error: true, message: error });
     }
@@ -194,7 +189,7 @@ exports.getPaperDetails = async (req, res) => {
 
     res.json({
       error: false,
-      paper: formatPaper(paper)
+      paper: formatPaper(paper),
     });
   } catch (error) {
     console.error('Error fetching paper details:', error);
@@ -207,12 +202,12 @@ exports.reviewPaper = async (req, res) => {
   try {
     const { id } = req.params;
     const { action, comments } = req.body;
-    const reviewerId = req.user.userId;
+    const reviewerId = getUserId(req);
 
     if (!['approved', 'rejected', 'needs_revision'].includes(action)) {
       return res.status(400).json({
         error: true,
-        message: 'Invalid action. Use approved, rejected, or needs_revision'
+        message: 'Invalid action. Use approved, rejected, or needs_revision',
       });
     }
 
@@ -230,6 +225,8 @@ exports.reviewPaper = async (req, res) => {
     if (!paper) {
       return res.status(404).json({ error: true, message: 'Paper not found in your college' });
     }
+
+    const previousReviewStatus = paper.reviewStatus || 'pending';
 
     // Update paper review fields
     paper.reviewStatus = action;
@@ -254,8 +251,54 @@ exports.reviewPaper = async (req, res) => {
 
     await paper.save();
 
+    await logAudit({
+      userId: reviewerId,
+      action: auditActionFor(action),
+      resource: `Paper:${paper._id}`,
+      changes: {
+        oldValue: { reviewStatus: previousReviewStatus },
+        newValue: { reviewStatus: action, comments },
+        fields: ['reviewStatus', 'reviewComments'],
+      },
+      request: req,
+    });
+
     await paper.populate('reviewedBy', 'fullName userName email');
     await paper.populate('reviewHistory.reviewerId', 'fullName userName email');
+    await paper.populate('userId', 'fullName email');
+
+        // ── Emit in-app notification to the paper's author ──
+    const notifTypeMap = {
+      approved: 'paper_approved',
+      rejected: 'paper_rejected',
+      needs_revision: 'revision_needed',
+    };
+    const notifTitleMap = {
+      approved: 'Paper approved',
+      rejected: 'Paper rejected',
+      needs_revision: 'Revision requested',
+    };
+    if (paper.userId?._id) {
+      createNotification({
+        userId: paper.userId._id,
+        type: notifTypeMap[action],
+        title: notifTitleMap[action],
+        message: `"${paper['Course Name'] || 'Untitled'}" was ${action.replace('_', ' ')} by ${paper.reviewedBy?.fullName || 'a reviewer'}.`,
+        relatedDocId: paper._id,
+        actionUrl: `/teacher/papers/${paper._id}`,
+      }).catch(() => {}); // fire-and-forget
+    }
+
+    // Notify author asynchronously if email is available
+    const authorEmail = paper.userId?.email;
+    if (authorEmail) {
+      sendReviewStatusEmail({
+        to: authorEmail,
+        courseName: paper[paperFields.COURSE_NAME] || paper.courseName || 'Untitled',
+        reviewStatus: action,
+        comments,
+      }).catch((err) => console.error('Notification dispatch error:', err.message));
+    }
 
     res.json({
       error: false,
@@ -263,6 +306,13 @@ exports.reviewPaper = async (req, res) => {
       paper: formatPaper(paper),
     });
   } catch (error) {
+    await logAudit({
+      userId: getUserId(req),
+      action: 'REVIEW_PAPER',
+      resource: `Paper:${req.params.id}`,
+      request: req,
+      error,
+    });
     console.error('Error reviewing paper:', error);
     res.status(500).json({ error: true, message: 'Server error' });
   }
@@ -271,27 +321,25 @@ exports.reviewPaper = async (req, res) => {
 // GET /reviewer/stats - Get review statistics
 exports.getReviewStats = async (req, res) => {
   try {
-    const { error, query: baseQuery } = await buildCollegePaperQuery(req.user.userId);
+    const { error, query: baseQuery } = await buildCollegePaperQuery(getUserId(req));
     if (error) {
       return res.status(400).json({ error: true, message: error });
     }
-
-    const hasBase = baseQuery && Object.keys(baseQuery).length > 0;
 
     const pendingCond = {
       $or: [
         { reviewStatus: 'pending' },
         { reviewStatus: { $exists: false } },
-        { reviewStatus: null }
-      ]
+        { reviewStatus: null },
+      ],
     };
 
-    const pendingQuery = hasBase ? { $and: [baseQuery, pendingCond] } : pendingCond;
-    const approvedQuery = hasBase ? { $and: [baseQuery, { reviewStatus: 'approved' }] } : { reviewStatus: 'approved' };
-    const rejectedQuery = hasBase ? { $and: [baseQuery, { reviewStatus: 'rejected' }] } : { reviewStatus: 'rejected' };
-    const needsRevisionQuery = hasBase ? { $and: [baseQuery, { reviewStatus: 'needs_revision' }] } : { reviewStatus: 'needs_revision' };
-    const totalQuery = hasBase ? baseQuery : {};
-    const myReviewsQuery = hasBase ? { $and: [baseQuery, { reviewedBy: req.user.userId }] } : { reviewedBy: req.user.userId };
+    const pendingQuery        = mergeQuery(baseQuery, pendingCond);
+    const approvedQuery       = mergeQuery(baseQuery, { reviewStatus: 'approved' });
+    const rejectedQuery       = mergeQuery(baseQuery, { reviewStatus: 'rejected' });
+    const needsRevisionQuery  = mergeQuery(baseQuery, { reviewStatus: 'needs_revision' });
+    const totalQuery          = baseQuery && Object.keys(baseQuery).length > 0 ? baseQuery : {};
+    const myReviewsQuery      = mergeQuery(baseQuery, { reviewedBy: getUserId(req) });
 
     const [pending, approved, rejected, needsRevision, total, myReviews] = await Promise.all([
       Paper.countDocuments(pendingQuery),
@@ -315,7 +363,7 @@ exports.getReviewStats = async (req, res) => {
     res.json({
       error: false,
       stats: formattedStats,
-      ...formattedStats
+      ...formattedStats,
     });
   } catch (error) {
     console.error('Error fetching review stats:', error);
@@ -326,21 +374,20 @@ exports.getReviewStats = async (req, res) => {
 // GET /reviewer/pending-count - Get pending papers count (for badge)
 exports.getPendingCount = async (req, res) => {
   try {
-    const { error, query: baseQuery } = await buildCollegePaperQuery(req.user.userId);
+    const { error, query: baseQuery } = await buildCollegePaperQuery(getUserId(req));
     if (error) {
       return res.status(400).json({ error: true, message: error });
     }
 
-    const hasBase = baseQuery && Object.keys(baseQuery).length > 0;
     const pendingCond = {
       $or: [
         { reviewStatus: 'pending' },
         { reviewStatus: { $exists: false } },
-        { reviewStatus: null }
-      ]
+        { reviewStatus: null },
+      ],
     };
 
-    const query = hasBase ? { $and: [baseQuery, pendingCond] } : pendingCond;
+    const query = mergeQuery(baseQuery, pendingCond);
     const count = await Paper.countDocuments(query);
 
     res.json({ error: false, pending: count });
@@ -349,3 +396,184 @@ exports.getPendingCount = async (req, res) => {
     res.status(500).json({ error: true, message: 'Server error' });
   }
 };
+
+/**
+ * GET /reviewer/papers/:id/recommendations/bloom
+ * Returns stored Bloom's recommendations for a paper.
+ * The Evaluate() pipeline writes `BloomRecommendations` onto PaperInfo.
+ * If it hasn't been generated yet, respond 404 telling the caller to re-evaluate.
+ */
+async function getBloomRecommendations(req, res) {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ error: true, message: 'Invalid paper ID' });
+        }
+
+        const paper = await PaperInfo.findById(id)
+            .select('collegeId BloomRecommendations')
+            .lean();
+
+        if (!paper) {
+            return res.status(404).json({ error: true, message: 'Paper not found' });
+        }
+
+        // Authorization: super_admin bypasses; everyone else must match college
+        if (
+            !isAdmin(req) &&
+            String(paper.collegeId) !== String(getCollegeId(req))
+        ) {
+            return res.status(403).json({ error: true, message: 'Forbidden' });
+        }
+
+        if (!paper.BloomRecommendations) {
+            return res.status(404).json({
+                error: true,
+                message:
+                    'Bloom recommendations not yet generated for this paper. Re-evaluate the paper first.',
+            });
+        }
+
+        const {
+            recommendations = [],
+            bloomLevelOverview = {},
+        } = paper.BloomRecommendations;
+
+        // Aggregate by expected level (1..6)
+        const byLevel = {};
+        for (let lvl = 1; lvl <= 6; lvl++) {
+            const subset = recommendations.filter((r) => r.expectedLevel === lvl);
+            byLevel[lvl] = {
+                expectedLevel: lvl,
+                totalQuestions: subset.length,
+                mismatched: subset.filter((r) => r.actualLevel !== r.expectedLevel).length,
+                avgGap: subset.length
+                    ? Number(
+                          (
+                              subset.reduce((s, r) => s + (r.gap || 0), 0) / subset.length
+                          ).toFixed(2)
+                      )
+                    : 0,
+                overview: bloomLevelOverview[lvl] || null,
+            };
+        }
+
+        const summary = {
+            totalGaps: recommendations.filter((r) => r.gap !== 0).length,
+            avgGap: recommendations.length
+                ? Number(
+                      (
+                          recommendations.reduce((s, r) => s + (r.gap || 0), 0) /
+                          recommendations.length
+                      ).toFixed(2)
+                  )
+                : 0,
+            criticalCount: recommendations.filter((r) => r.severity === 'critical').length,
+            estimatedPointsToGain: recommendations.reduce(
+                (s, r) => s + (r.estimatedPoints || 0),
+                0
+            ),
+        };
+
+        return res.status(200).json({
+            error: false,
+            recommendations: {
+                byLevel,
+                byQuestion: recommendations,
+                summary,
+            },
+        });
+    } catch (err) {
+        console.error('[reviewer.getBloomRecommendations]', err);
+        return res.status(500).json({ error: true, message: 'Internal server error' });
+    }
+}
+
+/**
+ * POST /reviewer/papers/:id/resend-decision-email
+ * Resend the decision email (approved / rejected / needs_revision) to the paper's owner.
+ */
+exports.resendDecisionEmail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const reviewerId = req.user?.userId;
+
+    const paper = await Paper.findById(id).populate('userId', 'email fullName');
+    if (!paper) {
+      return res.status(404).json({ error: true, message: 'Paper not found' });
+    }
+
+    const { error, query: baseQuery } = await buildCollegePaperQuery(reviewerId);
+    if (error) {
+      return res.status(400).json({ error: true, message: error });
+    }
+    if (baseQuery && Object.keys(baseQuery).length > 0) {
+      const allowed = await Paper.findOne({ _id: id, $and: [baseQuery] }).select('_id').lean();
+      if (!allowed) {
+        return res.status(404).json({ error: true, message: 'Paper not found in your college' });
+      }
+    }
+
+    const status = paper.reviewStatus;
+    if (!['approved', 'rejected', 'needs_revision'].includes(status)) {
+      return res.status(400).json({
+        error: true,
+        message: `Cannot resend decision — paper status is "${status}".`,
+      });
+    }
+
+    const authorEmail = paper.userId?.email;
+    if (!authorEmail) {
+      return res.status(400).json({ error: true, message: 'Author has no email on file.' });
+    }
+
+    const emailService = require('../utils/emailService');
+    const courseName = paper['Course Name'] || 'Untitled';
+    const courseCode = paper['Course Code'] || '';
+
+    const reviewer = await User.findById(reviewerId).select('fullName').lean();
+    const reviewerName = reviewer?.fullName || '';
+
+    if (status === 'approved') {
+      await emailService.sendPaperApprovedEmail({
+        to: authorEmail,
+        paperTitle: courseName,
+        courseCode,
+        reviewerName,
+        qualityScore: paper.qualityScore,
+        paperId: paper._id,
+      });
+    } else if (status === 'rejected') {
+      await emailService.sendPaperRejectedEmail({
+        to: authorEmail,
+        paperTitle: courseName,
+        courseCode,
+        reviewerName,
+        reason: paper.reviewComments || '',
+        comments: paper.reviewComments || '',
+        paperId: paper._id,
+      });
+    } else {
+      await emailService.sendPaperNeedsRevisionEmail({
+        to: authorEmail,
+        paperTitle: courseName,
+        courseCode,
+        reviewerName,
+        changes: paper.reviewComments || '',
+        deadline: '',
+        paperId: paper._id,
+      });
+    }
+
+    return res.json({
+      error: false,
+      message: `Decision email resent to ${authorEmail}.`,
+    });
+  } catch (err) {
+    console.error('resendDecisionEmail error:', err);
+    res.status(500).json({ error: true, message: err.message });
+  }
+};
+
+exports.getBloomRecommendations = getBloomRecommendations;

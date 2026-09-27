@@ -1,95 +1,168 @@
 /**
  * context/AuthContext.jsx
  * ------------------------
- * Centralised authentication state for the entire app.
+ * Centralised authentication state for the entire app using HttpOnly cookies.
  *
- * - Single source of truth: localStorage
- * - All components read/write auth via this context — no direct localStorage access elsewhere
- * - Listens to a custom 'authStateChanged' window event so unrelated components (e.g. Navbar)
- *   can react when other components (e.g. RegisterPage) complete a login.
+ * - The JWT is stored in an HttpOnly cookie managed by the browser (not accessible via JS)
+ * - User metadata is cached in localStorage ('user') for immediate UI rendering
+ * - On initial load, verifies the session with /auth/profile
+ * - Listens to custom 'authStateChanged', 'authExpired', and 'authBlocked' events
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import apiClient from '../api/client';
 
 const AuthContext = createContext(null);
 
-// ─── Storage helpers (always localStorage) ─────────────────────────────────────
-const STORAGE_KEY_TOKEN = 'accessToken';
-const STORAGE_KEY_USER  = 'user';
+// ─── Storage helpers ──────────────────────────────────────────────────
+const STORAGE_KEY_USER = 'user';
 
-function readStoredAuth() {
+function readStoredUser() {
   try {
-    const token = localStorage.getItem(STORAGE_KEY_TOKEN);
-    const raw   = localStorage.getItem(STORAGE_KEY_USER);
-    const user  = raw ? JSON.parse(raw) : null;
-    return { token, user };
+    const raw = localStorage.getItem(STORAGE_KEY_USER);
+    return raw ? JSON.parse(raw) : null;
   } catch {
-    return { token: null, user: null };
+    return null;
   }
 }
 
-function writeStoredAuth(token, user) {
-  localStorage.setItem(STORAGE_KEY_TOKEN, token);
+function writeStoredUser(user) {
   localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
 }
 
 function clearStoredAuth() {
-  // Clear from local storage
-  localStorage.removeItem(STORAGE_KEY_TOKEN);
   localStorage.removeItem(STORAGE_KEY_USER);
 }
 
 // ─── Provider ──────────────────────────────────────────────────────────────────
 export function AuthProvider({ children }) {
-  const [user,  setUser]  = useState(null);
-  const [token, setToken] = useState(null);
+  const [user, setUser] = useState(() => readStoredUser());
+  const [blockedMessage, setBlockedMessage] = useState(null);
 
-  // Initialise from storage on mount
-  useEffect(() => {
-    const { token: t, user: u } = readStoredAuth();
-    if (t && u) {
-      setToken(t);
-      setUser(u);
-    }
+  const clearBlockedMessage = useCallback(() => {
+    setBlockedMessage(null);
   }, []);
 
-  // React to auth changes triggered by other components or the axios interceptor
+  // Verify session with backend on mount
+  useEffect(() => {
+    const checkSession = async () => {
+      const stored = readStoredUser();
+      if (!stored) return;
+
+      try {
+        const res = await apiClient.get('/auth/profile');
+        if (res.data?.user) {
+          if (res.data.user.isBlocked) {
+            clearStoredAuth();
+            setUser(null);
+            setBlockedMessage('Your account has been blocked by an administrator. Please contact support.');
+            return;
+          }
+          writeStoredUser(res.data.user);
+          setUser(res.data.user);
+        }
+      } catch (err) {
+        if (err.response?.status === 403 && err.response?.data?.message?.toLowerCase().includes('blocked')) {
+          clearStoredAuth();
+          setUser(null);
+          setBlockedMessage(err.response.data.message || 'Your account has been blocked by an administrator. Please contact support.');
+        } else if (err.response?.status === 401 || err.response?.status === 403) {
+          clearStoredAuth();
+          setUser(null);
+        }
+      }
+    };
+
+    checkSession();
+  }, []);
+
+  // React to auth changes across tabs or components
   useEffect(() => {
     const handleChange = () => {
-      const { token: t, user: u } = readStoredAuth();
-      setToken(t || null);
-      setUser(u || null);
+      setUser(readStoredUser());
     };
     window.addEventListener('authStateChanged', handleChange);
     return () => window.removeEventListener('authStateChanged', handleChange);
   }, []);
 
-  /** Call this after a successful login / registration */
-  const login = useCallback((accessToken, userData) => {
-    writeStoredAuth(accessToken, userData);
-    setToken(accessToken);
-    setUser(userData);
-    window.dispatchEvent(new Event('authStateChanged'));
+  // Handle forced logout from authExpired event (401 response)
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      clearStoredAuth();
+      setUser(null);
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+        window.history.pushState(null, '', '/login');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
+    };
+
+    const handleAuthBlocked = () => {
+      clearStoredAuth();
+      setUser(null);
+      setBlockedMessage('Your account has been blocked by an administrator. Please contact support.');
+    };
+
+    window.addEventListener('authExpired', handleAuthExpired);
+    window.addEventListener('authBlocked', handleAuthBlocked);
+
+    return () => {
+      window.removeEventListener('authExpired', handleAuthExpired);
+      window.removeEventListener('authBlocked', handleAuthBlocked);
+    };
   }, []);
 
-  /** Call this on logout from any component */
-  const logout = useCallback(() => {
-    clearStoredAuth();
-    setToken(null);
-    setUser(null);
-    window.dispatchEvent(new Event('authStateChanged'));
+  /**
+   * Call after successful login / register.
+   */
+  const login = useCallback((userData) => {
+    if (userData) {
+      if (userData.isBlocked) {
+        clearStoredAuth();
+        setUser(null);
+        setBlockedMessage('Your account has been blocked by an administrator. Please contact support.');
+        return;
+      }
+      setBlockedMessage(null);
+      writeStoredUser(userData);
+      setUser(userData);
+      window.dispatchEvent(new Event('authStateChanged'));
+    }
   }, []);
 
-  const isAuthenticated = Boolean(token && user);
+  /**
+   * Call on logout - triggers backend cookie clearance and resets state
+   */
+  const logout = useCallback(async () => {
+    try {
+      await apiClient.post('/auth/logout');
+    } catch (e) {
+      // Ignore network errors on logout
+    } finally {
+      clearStoredAuth();
+      setUser(null);
+      setBlockedMessage(null);
+      window.dispatchEvent(new Event('authStateChanged'));
+    }
+  }, []);
+
+  const isAuthenticated = Boolean(user);
 
   return (
-    <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{
+      user,
+      isAuthenticated,
+      blockedMessage,
+      setBlockedMessage,
+      clearBlockedMessage,
+      login,
+      logout
+    }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-// ─── Hook ──────────────────────────────────────────────────────────────────────
+// ─── Hook ──────────────────────────────────────────────────────────────
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');

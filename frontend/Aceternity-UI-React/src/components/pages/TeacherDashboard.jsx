@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import apiClient from '../../api/client';
-import { FileText, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, X, FileSearch } from 'lucide-react';
+import { FileText, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw, X, FileSearch, Search } from 'lucide-react';
+import { DashboardSkeleton } from '../SkeletonLoader';
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
@@ -16,6 +17,8 @@ export default function TeacherDashboard() {
   
   const [selectedPaper, setSelectedPaper] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Guard: allow only teacher, reviewer, admin, super_admin
   useEffect(() => {
@@ -63,16 +66,33 @@ export default function TeacherDashboard() {
     setShowDetailsModal(true);
   };
 
-  if (loading && !papers.length) {
+  const filteredPapers = papers.filter(p => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const name = (p['Course Name'] || p.courseName || '').toLowerCase();
+    const code = (p['Course Code'] || p.courseCode || '').toLowerCase();
+    return name.includes(q) || code.includes(q);
+  });
+
+  const pageSize = 10;
+  const totalPages = Math.ceil(filteredPapers.length / pageSize) || 1;
+  const paginatedPapers = filteredPapers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  if (loading && papers.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
+      <div className="min-h-screen bg-gray-950 text-white py-10 px-4">
+        <div className="max-w-7xl mx-auto">
+          <DashboardSkeleton cards={5} tableRows={6} tableCols={6} />
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-950 text-white py-10 px-4">
+      {loading && papers.length > 0 && (
+        <div className="fixed top-0 left-0 right-0 h-1 bg-blue-500 animate-pulse z-50" />
+      )}
       <div className="max-w-7xl mx-auto">
         
         {/* Header */}
@@ -133,11 +153,27 @@ export default function TeacherDashboard() {
         )}
 
         {/* Filter & Controls */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
+          <div className="relative w-full sm:w-72">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search by course name or code..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full bg-gray-900 border border-gray-700 text-white pl-9 pr-4 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-500"
+            />
+          </div>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-gray-900 border border-gray-700 text-white px-4 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="bg-gray-900 border border-gray-700 text-white px-4 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
           >
             <option value="all">All Statuses</option>
             <option value="pending">Pending</option>
@@ -161,15 +197,19 @@ export default function TeacherDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800/50">
-                {papers.length === 0 ? (
+                {paginatedPapers.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
                       <FileSearch className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                      {statusFilter !== 'all' ? `No ${statusFilter} papers found` : 'You haven\'t uploaded any papers yet'}
+                      {searchQuery
+                        ? `No papers matching "${searchQuery}"`
+                        : statusFilter !== 'all'
+                        ? `No ${statusFilter} papers found`
+                        : "You haven't uploaded any papers yet"}
                     </td>
                   </tr>
                 ) : (
-                  papers.map(paper => {
+                  paginatedPapers.map(paper => {
                     const status = getStatusBadge(paper.reviewStatus);
                     const StatusIcon = status.icon;
                     const hasReview = paper.reviewStatus !== 'pending';
@@ -223,6 +263,34 @@ export default function TeacherDashboard() {
             </table>
           </div>
         </div>
+
+        {/* Pagination Controls */}
+        {filteredPapers.length > 10 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 px-2">
+            <span className="text-xs text-gray-400">
+              Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredPapers.length)} of {filteredPapers.length} papers
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Previous
+              </button>
+              <span className="text-xs text-gray-400 px-2">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="px-3 py-1.5 bg-gray-800 border border-gray-700 rounded-lg text-xs font-medium text-gray-300 hover:text-white hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Details Modal */}

@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/client';
 import ReviewPaperModal from '../ReviewPaperModal';
+import { DashboardSkeleton } from '../SkeletonLoader';
 import {
   FileText, CheckCircle2, Clock, XCircle, RotateCcw,
   UserCheck, Search, Filter, RefreshCw, X, AlertCircle,
@@ -136,8 +137,21 @@ const ReviewerDashboard = () => {
 
   const collegeNameDisplay = user?.collegeName || user?.collegeId?.name || 'Your College';
 
+  if (loading && papers.length === 0) {
+    return (
+      <div className="min-h-screen bg-black text-white p-4 sm:p-6 lg:p-8 pt-24">
+        <div className="max-w-7xl mx-auto">
+          <DashboardSkeleton cards={6} tableRows={8} tableCols={5} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black text-white p-4 sm:p-6 lg:p-8 pt-24">
+      {loading && papers.length > 0 && (
+        <div className="fixed top-0 left-0 right-0 h-1 bg-blue-500 animate-pulse z-50" />
+      )}
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Top Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-zinc-900/60 border border-zinc-800/80 p-6 rounded-2xl backdrop-blur-md">
@@ -318,14 +332,7 @@ const ReviewerDashboard = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60">
-                {loading ? (
-                  <tr>
-                    <td colSpan="6" className="py-16 text-center text-zinc-500">
-                      <RefreshCw className="w-6 h-6 animate-spin mx-auto text-blue-500 mb-2" />
-                      Loading assessment papers...
-                    </td>
-                  </tr>
-                ) : papers.length === 0 ? (
+                {papers.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="py-16 text-center text-zinc-500">
                       <FileText className="w-10 h-10 mx-auto text-zinc-600 mb-3" />
