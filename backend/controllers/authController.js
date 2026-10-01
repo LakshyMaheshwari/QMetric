@@ -1,5 +1,4 @@
 const bcrypt = require('bcrypt');
-const logger = require('../config/logger');
 const jwt = require('jsonwebtoken');
 const validator = require('validator');
 const User = require('../Model/user');
@@ -82,7 +81,7 @@ function extractOcrText(uploadResult) {
         if (!Array.isArray(textAnnotations) || textAnnotations.length === 0) return '';
         return textAnnotations[0]?.description || '';
     } catch (err) {
-        logger.error('  OCR text extraction error:', err.message);
+        console.error('  OCR text extraction error:', err.message);
         return '';
     }
 }
@@ -345,7 +344,7 @@ const login = async (req, res) => {
     try {
         turnstileResult = await verifyTurnstile(turnstileToken);
     } catch (turnstileErr) {
-        logger.error('Turnstile verification failed:', turnstileErr.message);
+        console.error('Turnstile verification failed:', turnstileErr.message);
         return res.status(503).json({
             error: true,
             message: 'CAPTCHA service is temporarily unavailable. Please try again later.',
@@ -458,7 +457,7 @@ const login = async (req, res) => {
             canUseFeatures: accountState === 'active',
         });
     } catch (error) {
-        logger.info(' Token creation error:', error.message);
+        console.error('Token creation error:', error.message);
         return res.status(500).json({ error: true, message: 'Error creating token' });
     }
 };
@@ -481,7 +480,16 @@ const register = async (req, res) => {
         if (!turnstileToken) {
             return res.status(400).json({ error: true, message: 'CAPTCHA token is missing. Please complete the verification.' });
         }
-        const turnstileResult = await verifyTurnstile(turnstileToken);
+        let turnstileResult;
+        try {
+            turnstileResult = await verifyTurnstile(turnstileToken);
+        } catch (turnstileErr) {
+            console.error('Turnstile verification failed:', turnstileErr.message);
+            return res.status(503).json({
+                error: true,
+                message: 'CAPTCHA service is temporarily unavailable. Please try again later.',
+            });
+        }
         if (!turnstileResult.success) {
             return res.status(403).json({
                 error: true,
@@ -584,7 +592,7 @@ const register = async (req, res) => {
                         };
                     }
                 } catch (ocrErr) {
-                    logger.error('Cloudinary/OCR processing error (non-blocking):', ocrErr.message);
+                    console.error('Cloudinary/OCR processing error (non-blocking):', ocrErr.message);
                 }
             }
 
@@ -623,7 +631,7 @@ const register = async (req, res) => {
                     request: req,
                 });
             } catch (auditErr) {
-                logger.error('Audit log failed (non-blocking):', auditErr.message);
+                console.error('Audit log failed (non-blocking):', auditErr.message);
             }
 
             // OCRLog record
@@ -639,7 +647,7 @@ const register = async (req, res) => {
                     imageUrl: uploadResult ? uploadResult.secure_url : '',
                 });
             } catch (logErr) {
-                logger.error('OCR log save failed (non-blocking):', logErr.message);
+                console.error('OCR log save failed (non-blocking):', logErr.message);
             }
 
             // Notify all college admins
@@ -660,7 +668,7 @@ const register = async (req, res) => {
                     }).catch(() => {});
                 }
             } catch (notifErr) {
-                logger.error('Admin notification dispatch failed (non-blocking):', notifErr.message);
+                console.error('Admin notification dispatch failed (non-blocking):', notifErr.message);
             }
 
             // Welcome notification for the user
@@ -726,7 +734,7 @@ const register = async (req, res) => {
                     request: req,
                 });
             } catch (auditErr) {
-                logger.error('Audit log failed (non-blocking):', auditErr.message);
+                console.error('Audit log failed (non-blocking):', auditErr.message);
             }
 
             createNotification({
@@ -734,7 +742,7 @@ const register = async (req, res) => {
                 type: 'welcome',
                 title: 'Welcome to QMetric',
                 message: 'Your independent teacher account is active. Upload a paper to get started.',
-                actionUrl: '/teacher/upload',
+                actionUrl: '/student/papers',
             }).catch(() => {});
 
             const accessToken = jwt.sign(
@@ -792,7 +800,7 @@ const register = async (req, res) => {
                     request: req,
                 });
             } catch (auditErr) {
-                logger.error('Audit log failed (non-blocking):', auditErr.message);
+                console.error('Audit log failed (non-blocking):', auditErr.message);
             }
 
             createNotification({
@@ -800,7 +808,7 @@ const register = async (req, res) => {
                 type: 'welcome',
                 title: 'Welcome to QMetric',
                 message: 'Your student account is active. Upload a paper to check its quality.',
-                actionUrl: '/teacher/upload',
+                actionUrl: '/student/papers',
             }).catch(() => {});
 
             const accessToken = jwt.sign(
@@ -834,7 +842,7 @@ const register = async (req, res) => {
 
         return res.status(400).json({ error: true, message: 'Unhandled signup flow.' });
     } catch (error) {
-        logger.error('Registration error:', error);
+        console.error('Registration error:', error);
         return res.status(500).json({
             error: true,
             message: 'Error creating account.',
@@ -854,6 +862,7 @@ const REQUIRED_FIELDS = [
 const VALID_POSITIONS = ['Professor', 'Associate Professor', 'Assistant Professor', 'Lecturer', 'HoD', 'Other'];
 const VALID_STREAMS = ['Engineering', 'Management', 'Science', 'Commerce', 'Arts', 'Law', 'Medicine', 'Other'];
 const PHONE_RE = /^\d{10}$/;
+const VALID_BULK_ROLES = ['teacher', 'reviewer'];
 
 /**
  * Validate a single bulk row. Returns either
@@ -882,6 +891,10 @@ function validateBulkRow(row, defaultPassword) {
 
     if (!VALID_STREAMS.includes(row.stream)) {
         return { ok: false, reason: `Invalid stream "${row.stream}". Allowed: ${VALID_STREAMS.join(', ')}.` };
+    }
+
+    if (row.role && !VALID_BULK_ROLES.includes(String(row.role).trim())) {
+        return { ok: false, reason: `Invalid role "${row.role}". Allowed: ${VALID_BULK_ROLES.join(', ')}.` };
     }
 
     const rawPassword = row.password || defaultPassword;
@@ -930,7 +943,16 @@ const bulkRegister = async (req, res) => {
 
     // ── Turnstile gate ─────────────────────────────────
     if (turnstileToken && !hasAdminSecret) {
-        const turnstileResult = await verifyTurnstile(turnstileToken);
+        let turnstileResult;
+        try {
+            turnstileResult = await verifyTurnstile(turnstileToken);
+        } catch (turnstileErr) {
+            console.error('Turnstile verification failed:', turnstileErr.message);
+            return res.status(503).json({
+                error: true,
+                message: 'CAPTCHA service is temporarily unavailable. Please try again later.',
+            });
+        }
         if (!turnstileResult.success) {
             return res.status(403).json({
                 error: true,
@@ -978,7 +1000,7 @@ const bulkRegister = async (req, res) => {
             ],
         }).select('email phone employeeId').lean();
     } catch (dbErr) {
-        logger.error(' DB duplicate-check error:', dbErr.message);
+        console.error(' DB duplicate-check error:', dbErr.message);
         return res.status(500).json({ error: true, message: 'Database error during duplicate check.' });
     }
 
@@ -1043,6 +1065,7 @@ const bulkRegister = async (req, res) => {
             employeeId: empIdStr,
             department: data.department.trim(),
             stream: data.stream,
+            role: String(data.role || 'teacher').trim(),
             collegeIdPhoto: '',
             idVerification: {
                 status: 'unverified',
@@ -1122,7 +1145,7 @@ const bulkRegister = async (req, res) => {
                 reason: 'Bulk insert failed. No users were created.',
             });
             inserted = [];
-            logger.error(' Bulk write rolled back:', bulkErr.message);
+            console.error(' Bulk write rolled back:', bulkErr.message);
         }
     }
 
@@ -1159,35 +1182,23 @@ const bulkRegister = async (req, res) => {
             }
         }
     } catch (e) {
-        logger.error(' Bulk summary email failed (non-blocking):', e.message);
+        console.error(' Bulk summary email failed (non-blocking):', e.message);
     }
 
     try {
-        let auditUserId = getUserId(req) || req.adminId;
-
-        if (!auditUserId || !mongoose.isValidObjectId(auditUserId)) {
-            const adminUser = await User.findOne({
-                role: { $in: ['super_admin', 'admin'] }
-            })
-                .select('_id')
-                .lean();
-
-            // Bulk-register can be authenticated only with X-Admin-Secret,
-            // so there may be no logged-in admin user.
-            auditUserId =
-                adminUser?._id ||
-                new mongoose.Types.ObjectId();
-        }
+        const auditUserId = getUserId(req) || req.adminId;
+        const hasUserActor = mongoose.isValidObjectId(auditUserId);
 
         await logAudit({
-            userId: auditUserId,
+            userId: hasUserActor ? auditUserId : null,
+            actorType: hasUserActor ? 'user' : 'admin_secret',
             action: 'BULK_REGISTER',
             resource:
                 `BulkRegister:created=${totalCreated}:failed=${skippedRows.length + duplicates.length + dbErrors.length}`,
             request: req,
         });
     } catch (auditErr) {
-        logger.error(
+        console.error(
             'Bulk register audit log failed (non-blocking):',
             auditErr.message
         );
@@ -1298,7 +1309,7 @@ const createAdmin = async (req, res) => {
             user: adminResponse,
         });
     } catch (err) {
-        logger.error(' Create admin error:', err.message);
+        console.error(' Create admin error:', err.message);
         return res.status(500).json({ error: true, message: 'Error creating admin account.' });
     }
 };
@@ -1338,7 +1349,7 @@ const verifyEmail = async (req, res) => {
 
         return res.json({ error: false, message: 'Email verified successfully.' });
     } catch (err) {
-        logger.error(' verifyEmail error:', err);
+        console.error(' verifyEmail error:', err);
         return res.status(500).json({ error: true, message: 'Server error.' });
     }
 };
@@ -1370,7 +1381,7 @@ const resendVerificationEmail = async (req, res) => {
 
         return res.json({ error: false, message: 'If that email exists, a verification link has been sent.' });
     } catch (err) {
-        logger.error(' resendVerificationEmail error:', err);
+        console.error(' resendVerificationEmail error:', err);
         return res.status(500).json({ error: true, message: 'Server error.' });
     }
 };
@@ -1455,7 +1466,7 @@ const requestAffiliation = async (req, res) => {
                     };
                 }
             } catch (ocrErr) {
-                logger.error('OCR processing error (non-blocking):', ocrErr.message);
+                console.error('OCR processing error (non-blocking):', ocrErr.message);
             }
         }
 
@@ -1481,7 +1492,7 @@ const requestAffiliation = async (req, res) => {
                 request: req,
             });
         } catch (auditErr) {
-            logger.error('Audit log failed (non-blocking):', auditErr.message);
+            console.error('Audit log failed (non-blocking):', auditErr.message);
         }
 
         // OCRLog record (if OCR ran)
@@ -1503,7 +1514,7 @@ const requestAffiliation = async (req, res) => {
                     imageUrl: uploadResult.secure_url,
                 });
             } catch (logErr) {
-                logger.error('OCR log save failed (non-blocking):', logErr.message);
+                console.error('OCR log save failed (non-blocking):', logErr.message);
             }
         }
 
@@ -1525,7 +1536,7 @@ const requestAffiliation = async (req, res) => {
                 }).catch(() => {});
             }
         } catch (notifErr) {
-            logger.error('Admin notification dispatch failed (non-blocking):', notifErr.message);
+            console.error('Admin notification dispatch failed (non-blocking):', notifErr.message);
         }
 
         return res.json({
@@ -1535,7 +1546,7 @@ const requestAffiliation = async (req, res) => {
             accountState: 'pending_approval',
         });
     } catch (err) {
-        logger.error('requestAffiliation error:', err);
+        console.error('requestAffiliation error:', err);
         return res.status(500).json({ error: true, message: 'Server error.' });
     }
 };
@@ -1595,7 +1606,7 @@ const upgradeToTeacher = async (req, res) => {
                     request: req,
                 });
             } catch (auditErr) {
-                logger.error('Audit log failed (non-blocking):', auditErr.message);
+                console.error('Audit log failed (non-blocking):', auditErr.message);
             }
 
             createNotification({
@@ -1603,7 +1614,7 @@ const upgradeToTeacher = async (req, res) => {
                 type: 'welcome',
                 title: 'Account upgraded',
                 message: 'You are now an independent teacher. Upload papers to get started.',
-                actionUrl: '/teacher/upload',
+                actionUrl: '/student/papers',
             }).catch(() => {});
 
             return res.json({
@@ -1659,7 +1670,7 @@ const upgradeToTeacher = async (req, res) => {
                     };
                 }
             } catch (ocrErr) {
-                logger.error('OCR processing error (non-blocking):', ocrErr.message);
+                console.error('OCR processing error (non-blocking):', ocrErr.message);
             }
         }
 
@@ -1690,7 +1701,7 @@ const upgradeToTeacher = async (req, res) => {
                 request: req,
             });
         } catch (auditErr) {
-            logger.error('Audit log failed (non-blocking):', auditErr.message);
+            console.error('Audit log failed (non-blocking):', auditErr.message);
         }
 
         if (uploadResult) {
@@ -1711,7 +1722,7 @@ const upgradeToTeacher = async (req, res) => {
                     imageUrl: uploadResult.secure_url,
                 });
             } catch (logErr) {
-                logger.error('OCR log save failed (non-blocking):', logErr.message);
+                console.error('OCR log save failed (non-blocking):', logErr.message);
             }
         }
 
@@ -1732,7 +1743,7 @@ const upgradeToTeacher = async (req, res) => {
                 }).catch(() => {});
             }
         } catch (notifErr) {
-            logger.error('Admin notification dispatch failed (non-blocking):', notifErr.message);
+            console.error('Admin notification dispatch failed (non-blocking):', notifErr.message);
         }
 
         return res.json({
@@ -1742,7 +1753,7 @@ const upgradeToTeacher = async (req, res) => {
             accountState: 'pending_approval',
         });
     } catch (err) {
-        logger.error('upgradeToTeacher error:', err);
+        console.error('upgradeToTeacher error:', err);
         return res.status(500).json({ error: true, message: 'Server error.' });
     }
 };
@@ -1778,7 +1789,7 @@ const getBulkFormat = (req, res) => {
             supportedRoles: ['teacher', 'reviewer'],
             columns: [
                 { name: 'email',      type: 'string', required: true,  example: 'john@college.edu',     constraints: 'valid email, max 254 chars' },
-                { name: 'password',   type: 'string', required: true,  example: 'TempPass123!',         constraints: 'min 8 chars, 1 upper, 1 number, 1 special' },
+                { name: 'password',   type: 'string', required: false, example: 'TempPass123',          constraints: 'min 8 chars, 1 upper, 1 lower, 1 number; may use defaultPassword' },
                 { name: 'fullName',   type: 'string', required: true,  example: 'John Doe',             constraints: '2-100 chars' },
                 { name: 'userName',   type: 'string', required: true,  example: 'john_doe',             constraints: '3-30 chars' },
                 { name: 'phone',      type: 'string', required: true,  example: '9876543210',           constraints: 'exactly 10 digits' },
@@ -1828,7 +1839,7 @@ const forgotPassword = async (req, res) => {
             fullName: user.fullName || user.userName,
             resetToken: rawToken,
         }).catch((err) => {
-            logger.error('Password reset email failed (non-blocking):', err.message);
+            console.error('Password reset email failed (non-blocking):', err.message);
         });
 
         await logAudit({
@@ -1843,7 +1854,7 @@ const forgotPassword = async (req, res) => {
             message: 'If an account with that email exists, password reset instructions have been sent.',
         });
     } catch (err) {
-        logger.error('forgotPassword error:', err);
+        console.error('forgotPassword error:', err);
         return res.status(500).json({ error: true, message: 'Server error processing password reset.' });
     }
 };
@@ -1897,7 +1908,7 @@ const resetPassword = async (req, res) => {
             message: 'Password reset successful. You can now log in with your new password.',
         });
     } catch (err) {
-        logger.error('resetPassword error:', err);
+        console.error('resetPassword error:', err);
         return res.status(500).json({ error: true, message: 'Server error resetting password.' });
     }
 };
@@ -2034,7 +2045,7 @@ const refreshToken = async (req, res) => {
 
         return res.json(response);
     } catch (err) {
-        logger.error(
+        console.error(
             'refreshToken error:',
             err
         );
@@ -2092,7 +2103,7 @@ const revokeAllSessions = async (req, res) => {
             message: 'All active sessions have been revoked. Please log in again.',
         });
     } catch (err) {
-        logger.error('revokeAllSessions error:', err);
+        console.error('revokeAllSessions error:', err);
         return res.status(500).json({ error: true, message: 'Server error revoking sessions.' });
     }
 };

@@ -1,6 +1,4 @@
-const logger = require('../../config/logger');
-
-﻿const m = require('mongoose');
+const m = require('mongoose');
 require('dotenv').config();
 m.connect(process.env.MONGO_URI || process.env.MONGODB_URI)
   .then(async () => {
@@ -8,7 +6,7 @@ m.connect(process.env.MONGO_URI || process.env.MONGODB_URI)
     const b = require('bcrypt');
     const h = b.hashSync('Test1234!', 10);
     const r = await U.updateOne({ email: process.argv[2] }, { $set: { password: h } });
-    logger.info(r);
+    console.log(r);
     process.exit(0);
   })
-  .catch((e) => { logger.error(e.message); process.exit(1); });
+  .catch((e) => { console.error(e.message); process.exit(1); });

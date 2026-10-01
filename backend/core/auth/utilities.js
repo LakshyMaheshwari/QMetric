@@ -23,12 +23,16 @@ async function authenticateToken(req, res, next) {
         });
     }
 
-    // Reject tokens that were revoked via logout
-    if (await isRevoked(token)) {
-        return res.status(401).json({
-            error: true,
-            message: 'Token has been revoked. Please log in again.',
-        });
+    try {
+        // Reject tokens that were revoked via logout
+        if (await isRevoked(token)) {
+            return res.status(401).json({
+                error: true,
+                message: 'Token has been revoked. Please log in again.',
+            });
+        }
+    } catch (blacklistErr) {
+        return res.status(503).json({ error: true, message: 'Authentication service is temporarily unavailable.' });
     }
 
     jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, async (err, payload) => {
@@ -90,6 +94,7 @@ async function authenticateToken(req, res, next) {
                 collegeId: user.collegeId,
                 collegeName: user.collegeName,
                 collegeApprovalStatus: user.collegeApprovalStatus,
+                isBlocked: user.isBlocked,
             };
             return next();
         } catch (dbErr) {

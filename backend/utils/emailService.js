@@ -1,8 +1,7 @@
 'use strict';
 
-const logger = require('../config/logger');
-
 const { sendMail } = require('./mailer');
+const logger = require('../config/logger');
 
 // ============================================================
 // Layout
@@ -273,10 +272,10 @@ async function _send(to, { subject, html, text }) {
     try {
         if (!to) return { success: false, error: 'No recipient' };
         await sendMail({ to, subject, html, text });
-        logger.info(`[emailService] Sent "${subject}" to ${to}`);
+        logger.debug({ subject }, 'Email sent');
         return { success: true };
     } catch (err) {
-        logger.error(`[emailService] Failed to send "${subject}" to ${to}:`, err.message);
+        logger.error({ err, subject }, 'Email send failed');
         return { success: false, error: err.message };
     }
 }
@@ -292,7 +291,7 @@ exports.sendNewUserEmail = (user, tempPassword) =>
 exports.sendVerificationEmail = (email, token, fullName) =>
     _send(email, tplVerifyEmail({
         fullName,
-        verifyUrl: `${FRONTEND_URL}/auth/verify/${token}`,
+        verifyUrl: `${FRONTEND_URL}/auth/verify-email/${token}`,
         expiry: '24 hours',
     }));
 

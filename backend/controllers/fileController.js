@@ -4,7 +4,6 @@
  * persists the resulting paper, and returns the evaluation result.
  */
 const path = require('node:path');
-const logger = require('../config/logger');
 const fs = require('node:fs');
 const { Structurize } = require('../core/Regex/Regex');
 const PaperInfo = require('../Model/PaperInfo');
@@ -14,6 +13,8 @@ const escapeRegex = require('../utils/escapeRegex');
 const { tryAcquire, release } = require('../utils/uploadGate');
 const { getUserId, getCollegeId, isTeacher } = require('../utils/currentUser');
 const paperFields = require('../core/constants/paperFields');
+const logger = require('../config/logger');
+const { paginate, getPaginationMeta } = require('../utils/pagination');
 
 /**
  * POST /upload/totext
@@ -21,11 +22,10 @@ const paperFields = require('../core/constants/paperFields');
  */
 exports.convertToText = async (req, res) => {
     if (!req.file) {
-        return res.status(400).send({ error: "No file uploaded." });
+        return res.status(400).json({ error: true, message: "No file uploaded." });
     }
 
     const userId = getUserId(req);
-
 
     const inputFileName = req.file.originalname;
     const fileExtension = path.extname(inputFileName).toLowerCase();
@@ -50,7 +50,7 @@ exports.convertToText = async (req, res) => {
         }
     } catch (signatureErr) {
         cleanupTempFile(req.file);
-        logger.error('File signature validation error:', signatureErr);
+        logger.warn({ err: signatureErr }, 'File signature validation error');
         return res.status(400).json({
             error: true,
             message: 'Unable to validate the uploaded file.',
@@ -69,21 +69,19 @@ exports.convertToText = async (req, res) => {
     }
 
     try {
-        const outputDir = path.join(__dirname, '../Converted');
-        if (!fs.existsSync(outputDir)) {
-            fs.mkdirSync(outputDir, { recursive: true });
-        }
-
         const collegeId = getCollegeId(req) || null;
         const result = await saveToDB(userId, req.body.Sequence, req.body.FormData, req.file.path, collegeId);
         if (result.error) {
-            return res.status(500).send(result);
+            return res.status(result.status || 500).json({
+                error: true,
+                message: result.error,
+            });
         }
 
         return res.send(result);
 
     } catch (error) {
-        logger.error('Error during conversion or DB save:', error);
+        logger.error({ err: error }, 'Error during conversion or DB save');
         return res.status(500).send({ error: "Server error while processing file" });
     } finally {
         release();
@@ -138,7 +136,7 @@ function cleanupTempFile(file) {
         try {
             fs.unlinkSync(file.path);
         } catch (unlinkErr) {
-            logger.warn('Failed to clean up temp upload file:', unlinkErr.message);
+            console.warn('Failed to clean up temp upload file:', unlinkErr.message);
         }
     }
 }
@@ -157,8 +155,8 @@ const saveToDB = async (userId, Sequence, FormData, filePath, collegeId = null) 
             sequenceArray = JSON.parse(Sequence);
             formData = JSON.parse(FormData);
         } catch (parseErr) {
-            logger.error("Error parsing JSON:", parseErr);
-            return { error: "Invalid JSON in Sequence or FormData" };
+            logger.debug({ err: parseErr }, 'Invalid upload metadata JSON');
+            return { status: 400, error: "Invalid JSON in Sequence or FormData" };
         }
 
         const coWeights = {};
@@ -205,7 +203,6 @@ const saveToDB = async (userId, Sequence, FormData, filePath, collegeId = null) 
             evaluate: 5,
             create: 6,
         };
-
 
         // â”€â”€â”€ Step 4: Structurize Excel file â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         const questionData = await Structurize([], filePath, bloomLevelMap);
@@ -268,7 +265,7 @@ const saveToDB = async (userId, Sequence, FormData, filePath, collegeId = null) 
         };
 
     } catch (error) {
-        logger.error("Error in saveToDB:", error);
+        logger.error({ err: error }, 'Error in saveToDB');
         return { error: "Failed to process and save data" };
     }
 };
@@ -279,7 +276,10 @@ const saveToDB = async (userId, Sequence, FormData, filePath, collegeId = null) 
  */
 exports.getResults = async (req, res) => {
     try {
-        const userId = getUserId(req) ?? 'anonymous';
+        const userId = getUserId(req);
+        if (!userId) {
+            return res.status(401).json({ error: true, message: 'Authentication required.' });
+        }
 
         const latestResult = await PaperInfo.findOne({ userId })
             .sort({ createdAt: -1 })
@@ -300,7 +300,7 @@ exports.getResults = async (req, res) => {
         });
 
     } catch (error) {
-        logger.error('Get results error:', error);
+        logger.error({ err: error }, 'Get results error');
         res.status(500).json({
             error: 'Internal server error',
             message: 'Failed to retrieve results'
@@ -314,13 +314,21 @@ exports.getResults = async (req, res) => {
  */
 exports.getResultsById = async (req, res) => {
     try {
-        const userId = getUserId(req) ?? 'anonymous';
+        const userId = getUserId(req);
+        if (!userId) {
+            return res.status(401).json({ error: true, message: 'Authentication required.' });
+        }
 
-        const userResults = await PaperInfo.find({ userId })
-            .select('-extractedText')
-            .sort({ createdAt: -1 })
-            .limit(100)
-            .lean();
+        const { skip, limit, page } = paginate(req, 20, 100);
+        const [userResults, total] = await Promise.all([
+            PaperInfo.find({ userId })
+                .select('-extractedText')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            PaperInfo.countDocuments({ userId }),
+        ]);
 
         if (userResults.length === 0) {
             return res.status(404).json({
@@ -333,11 +341,12 @@ exports.getResultsById = async (req, res) => {
 
         res.json({
             success: true,
-            data: results
+            data: results,
+            pagination: getPaginationMeta(total, page, limit),
         });
 
     } catch (error) {
-        logger.error('Get results error:', error);
+        logger.error({ err: error }, 'Get results error');
         res.status(500).json({
             error: 'Internal server error',
             message: 'Failed to retrieve results'
@@ -376,11 +385,11 @@ exports.searchPapers = async (req, res) => {
                 { [paperFields.COURSE_NAME]: searchRegex },
                 { [paperFields.COURSE_CODE]: searchRegex },
             ]
-        }).lean();
+        }).sort({ createdAt: -1 }).limit(100).lean();
 
         res.json(papers);
     } catch (error) {
-        logger.error('searchPapers error:', error);
+        logger.error({ err: error }, 'searchPapers error');
         res.status(500).json({ error: 'Failed to search papers' });
     }
 };

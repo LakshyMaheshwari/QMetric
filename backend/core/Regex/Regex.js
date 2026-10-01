@@ -16,7 +16,7 @@
 // function extractVerbsPython(text) {
 //     const result = spawnSync('python', ['extraction_logic.py', text], { encoding: 'utf-8' });
 //     if (result.error) {
-//         logger.error('Python error:', result.error);
+//         console.error('Python error:', result.error);
 //         return [];
 //     }
 //     return result.stdout.trim().split(',').filter(Boolean);
@@ -37,7 +37,7 @@
 //                 const questionText = row.question || row.Question || row.QUESTION || '';
 
 //                 if (!questionText) {
-//                     logger.warn(`Missing question text for row: ${JSON.stringify(row)}`);
+//                     console.warn(`Missing question text for row: ${JSON.stringify(row)}`);
 //                     return null; // Skip this row if no question text is found
 //                 }
 
@@ -139,7 +139,7 @@
 // function extractVerbsPython(text) {
 //     const result = spawnSync('python', ['extraction_logic.py', text], { encoding: 'utf-8' });
 //     if (result.error) {
-//         logger.error('Python error:', result.error);
+//         console.error('Python error:', result.error);
 //         return [];
 //     }
 //     return result.stdout.trim().split(',').filter(Boolean);
@@ -160,7 +160,7 @@
 //                 const questionText = row.question || row.Question || row.QUESTION || '';
 
 //                 if (!questionText) {
-//                     logger.warn(`Missing question text for row: ${JSON.stringify(row)}`);
+//                     console.warn(`Missing question text for row: ${JSON.stringify(row)}`);
 //                     return null; // Skip this row if no question text is found
 //                 }
 
@@ -258,7 +258,7 @@
 // // function extractVerbsPython(text) {
 // //     const result = spawnSync('python', ['extraction_logic.py', text], { encoding: 'utf-8' });
 // //     if (result.error) {
-// //         logger.error('Python error:', result.error);
+// //         console.error('Python error:', result.error);
 // //         return [];
 // //     }
 // //     return result.stdout.trim().split(',').filter(Boolean);
@@ -279,7 +279,7 @@
 //                 const questionText = row.question || row.Question || row.QUESTION || '';
 
 //                 if (!questionText) {
-//                     logger.warn(`Missing question text for row: ${JSON.stringify(row)}`);
+//                     console.warn(`Missing question text for row: ${JSON.stringify(row)}`);
 //                     return null;
 //                 }
 
@@ -346,7 +346,7 @@
 
 //     // If no Bloom verbs found, assign default level 6
 //     if (highestLevel === Infinity || highestLevel === 7) {
-//         logger.warn('Warning: No Bloom verbs found in question text');
+//         console.warn(`Warning: No Bloom verbs found in: "${text.substring(0, 50)}..."`);
 //         highestLevel = 6;
 //         highestVerb = "N/A";
 //     }
@@ -364,7 +364,7 @@
 //     const mappedLevel = bloomLevelMap[level];
 
 //     if (mappedLevel === undefined) {
-//         logger.warn(`Warning: Bloom level "${level}" not found in bloomLevelMap, defaulting to 6`);
+//         console.warn(`Warning: Bloom level "${level}" not found in bloomLevelMap, defaulting to 6`);
 //         return 6;
 //     }
 
@@ -398,7 +398,6 @@
  */
 
 const paperFields = require('../constants/paperFields');
-const logger = require('../../config/logger');
 const xlsx = require('xlsx');
 
 // ═══════════════════════════════════════════════════════════════════
@@ -460,7 +459,7 @@ exports.Structurize = (data, inputFile, bloomLevelMap) => {
             }
 
             if (!headerFound) {
-                logger.warn('⚠️ No "Question" column found in first 10 rows — using row 0 as header');
+                console.warn('⚠️ No "Question" column found in first 10 rows — using row 0 as header');
             }
 
 
@@ -498,7 +497,7 @@ exports.Structurize = (data, inputFile, bloomLevelMap) => {
                     ).trim();
 
                     if (!questionText) {
-                        logger.warn(`Row ${idx + 1}: no question text — skipping`);
+                        console.warn(`Row ${idx + 1}: no question text — skipping`);
                         return null;
                     }
 
@@ -536,7 +535,7 @@ exports.Structurize = (data, inputFile, bloomLevelMap) => {
 
             resolve(StructurizedData);
         } catch (error) {
-            logger.error('❌ Structurize error:', error);
+            console.error('❌ Structurize error:', error);
             reject(new Error(`Error processing the file: ${error.message}`));
         }
     });
@@ -579,7 +578,7 @@ exports.FindBloomLevelsInText = (text, bloomLevelMap) => {
 
     // If no Bloom verbs found, assign default level 6
     if (highestLevel === Infinity || highestLevel === 7) {
-        logger.warn('Warning: No Bloom verbs found in question text');
+        console.warn(`Warning: No Bloom verbs found in: "${String(text).substring(0, 50)}..."`);
         highestLevel = 6;
         highestVerb = "N/A";
     }
@@ -596,7 +595,7 @@ function getBloomLevelIndex(level, bloomLevelMap) {
     const mappedLevel = bloomLevelMap[level];
 
     if (mappedLevel === undefined) {
-        logger.warn(`Warning: Bloom level "${level}" not found in bloomLevelMap, defaulting to 6`);
+        console.warn(`Warning: Bloom level "${level}" not found in bloomLevelMap, defaulting to 6`);
         return 6;
     }
 

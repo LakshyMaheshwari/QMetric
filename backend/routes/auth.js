@@ -1,5 +1,3 @@
-const logger = require('../config/logger');
-
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
@@ -422,7 +420,7 @@ router.post('/logout', async (req, res) => {
 
     return res.json({ error: false, message: 'Logged out successfully' });
   } catch (err) {
-    logger.error('Logout error:', err.message);
+    console.error('Logout error:', err.message);
     return res.status(500).json({ error: true, message: 'Logout failed' });
   }
 });

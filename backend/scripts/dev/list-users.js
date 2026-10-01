@@ -1,6 +1,4 @@
-const logger = require('../../config/logger');
-
-﻿const m = require('mongoose');
+const m = require('mongoose');
 require('dotenv').config();
 m.connect(process.env.MONGO_URI || process.env.MONGODB_URI)
   .then(async () => {
@@ -9,7 +7,7 @@ m.connect(process.env.MONGO_URI || process.env.MONGODB_URI)
       { role: { $in: ['reviewer', 'admin', 'super_admin'] } },
       { email: 1, role: 1, fullName: 1 }
     ).limit(10).lean();
-    logger.info(JSON.stringify(u, null, 2));
+    console.log(JSON.stringify(u, null, 2));
     process.exit(0);
   })
-  .catch((e) => { logger.error(e.message); process.exit(1); });
+  .catch((e) => { console.error(e.message); process.exit(1); });

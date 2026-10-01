@@ -1,5 +1,4 @@
 const bcrypt = require('bcrypt');
-const logger = require('../config/logger');
 const jwt = require('jsonwebtoken');
 const User = require('../Model/user');
 const { getUserId } = require('../utils/currentUser');
@@ -24,7 +23,7 @@ const getProfile = async (req, res) => {
 
     res.json({ error: false, user });
   } catch (err) {
-    logger.error('Error fetching profile:', err);
+    console.error('Error fetching profile:', err);
     res.status(500).json({ error: true, message: 'Server error fetching profile' });
   }
 };
@@ -76,7 +75,7 @@ const updateProfile = async (req, res) => {
       user: updatedUser,
     });
   } catch (err) {
-    logger.error('Error updating profile:', err);
+    console.error('Error updating profile:', err);
     res.status(500).json({
       error: true,
       message: 'Server error updating profile',
@@ -166,7 +165,7 @@ const changePassword = async (req, res) => {
 
     return res.json({ error: false, message: 'Password changed successfully.' });
   } catch (err) {
-    logger.error('changePassword error:', err);
+    console.error('changePassword error:', err);
     return res.status(500).json({ error: true, message: 'Server error changing password' });
   }
 };

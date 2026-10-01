@@ -1,5 +1,4 @@
 const bcrypt = require('bcrypt');
-const logger = require('../config/logger');
 const crypto = require('node:crypto');
 const User = require('../Model/user');
 const College = require('../Model/College');
@@ -8,7 +7,7 @@ const { paginate, getPaginationMeta } = require('../utils/pagination');
 const { logAudit } = require('../utils/auditLog');
 const escapeRegex = require('../utils/escapeRegex');
 const { withTransaction } = require('../utils/withTransaction');
-const { syncCollegeRoleMembership } = require('../utils/syncCollegeCounters');
+const { syncCollegeMembership } = require('../utils/collegeMembership');
 const {
   BCRYPT_ROUNDS,
   PASSWORD_ERROR_MESSAGE,
@@ -151,7 +150,7 @@ const getCollegeUsers = async (req, res) => {
       )
     });
   } catch (error) {
-    logger.error(
+    console.error(
       'Error fetching college users:',
       error
     );
@@ -220,17 +219,17 @@ const changeUserRole = async (req, res) => {
 
         const oldRole = user.role;
         user.role = role;
-
-        await user.save(
-          session ? { session } : {}
-        );
-        await syncCollegeRoleMembership({
+        await syncCollegeMembership({
           collegeId: user.collegeId,
           userId: user._id,
           oldRole,
           newRole: role,
           session,
         });
+
+        await user.save(
+          session ? { session } : {}
+        );
 
         return {
           user,
@@ -273,7 +272,7 @@ const changeUserRole = async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error(
+    console.error(
       'Error changing role:',
       error
     );
@@ -395,7 +394,7 @@ const toggleBlockUser = async (req, res) => {
       },
     });
   } catch (error) {
-    logger.error(
+    console.error(
       'Error toggling block:',
       error
     );
@@ -632,6 +631,8 @@ const addCollegeUser = async (req, res) => {
 
     const { user } = result;
 
+    emailService.sendNewUserEmail(user, password).catch(() => {});
+
     await logAudit({
       userId: getUserId(req),
       action: 'CREATE_USER',
@@ -658,7 +659,7 @@ const addCollegeUser = async (req, res) => {
       },
     });
   } catch (error) {
-    logger.error(
+    console.error(
       'Error adding user:',
       error
     );
@@ -823,7 +824,7 @@ const getCollegeStats = async (req, res) => {
             ) >= thirtyDaysAgo
         ).length;
     } catch (e) {
-      logger.warn(
+      console.warn(
         'Paper stats calculation warning:',
         e.message
       );
@@ -878,7 +879,7 @@ const getCollegeStats = async (req, res) => {
       stats
     });
   } catch (error) {
-    logger.error(
+    console.error(
       'Error fetching stats:',
       error
     );
@@ -1041,7 +1042,7 @@ exports.getPendingTeachers = async (
       },
     });
   } catch (err) {
-    logger.error(
+    console.error(
       '[collegeAdmin.getPendingTeachers]',
       err
     );
@@ -1128,7 +1129,7 @@ exports.getPendingTeacherDetail =
         teacher
       });
     } catch (err) {
-      logger.error(
+      console.error(
         '[collegeAdmin.getPendingTeacherDetail]',
         err
       );
@@ -1355,7 +1356,7 @@ exports.approvePendingTeacher =
           request: req,
         });
       } catch (auditErr) {
-        logger.error(
+        console.error(
           'Audit log failed (non-blocking):',
           auditErr.message
         );
@@ -1382,7 +1383,7 @@ exports.approvePendingTeacher =
       } catch (
         notifErr
       ) {
-        logger.error(
+        console.error(
           'Notification create failed (non-blocking):',
           notifErr.message
         );
@@ -1397,7 +1398,7 @@ exports.approvePendingTeacher =
         )
         .catch(
           (err) =>
-            logger.error(
+            console.error(
               'Approval email failed:',
               err.message
             )
@@ -1423,7 +1424,7 @@ exports.approvePendingTeacher =
         },
       });
     } catch (err) {
-      logger.error(
+      console.error(
         '[collegeAdmin.approvePendingTeacher]',
         err
       );
@@ -1605,7 +1606,7 @@ exports.rejectPendingTeacher =
       } catch (
         auditErr
       ) {
-        logger.error(
+        console.error(
           'Audit log failed (non-blocking):',
           auditErr.message
         );
@@ -1632,7 +1633,7 @@ exports.rejectPendingTeacher =
       } catch (
         notifErr
       ) {
-        logger.error(
+        console.error(
           'Notification create failed (non-blocking):',
           notifErr.message
         );
@@ -1648,7 +1649,7 @@ exports.rejectPendingTeacher =
         )
         .catch(
           (err) =>
-            logger.error(
+            console.error(
               'Rejection email failed:',
               err.message
             )
@@ -1674,7 +1675,7 @@ exports.rejectPendingTeacher =
         },
       });
     } catch (err) {
-      logger.error(
+      console.error(
         '[collegeAdmin.rejectPendingTeacher]',
         err
       );
@@ -1738,7 +1739,7 @@ exports.getPendingTeacherCount =
         count
       });
     } catch (err) {
-      logger.error(
+      console.error(
         '[collegeAdmin.getPendingTeacherCount]',
         err
       );

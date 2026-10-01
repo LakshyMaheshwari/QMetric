@@ -4,7 +4,13 @@ const auditLogSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
+    required: false,
+    index: true,
+  },
+  actorType: {
+    type: String,
+    enum: ['user', 'admin_secret', 'system'],
+    default: 'user',
     index: true,
   },
   // Free-form String on purpose: see utils/auditActions.js. A Mongoose enum here

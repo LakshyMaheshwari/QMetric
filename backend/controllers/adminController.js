@@ -1,5 +1,4 @@
 const bcrypt = require('bcrypt');
-const logger = require('../config/logger');
 const mongoose = require('mongoose');
 const crypto = require('node:crypto');
 const validator = require('validator');
@@ -21,7 +20,7 @@ const {
 } = require('../config/security');
 const { getUserId, getUserRole, getCollegeId } = require('../utils/currentUser');
 const { withTransaction } = require('../utils/withTransaction');
-const { syncCollegeRoleMembership } = require('../utils/syncCollegeCounters');
+const { syncCollegeMembership } = require('../utils/collegeMembership');
 
 /**
  * Build a tenant-scoped filter for a target user id.
@@ -45,6 +44,16 @@ const getUsers = async (req, res) => {
     try {
         const { skip, limit, page } = paginate(req);
         const query = {};
+        const requestedRole = typeof req.query.role === 'string' ? req.query.role.trim() : '';
+
+        if (requestedRole && !ASSIGNABLE_ROLES.includes(requestedRole)) {
+            return res.status(400).json({
+                error: true,
+                message: `Invalid role filter. Must be one of: ${ASSIGNABLE_ROLES.join(', ')}`,
+            });
+        }
+
+        if (requestedRole) query.role = requestedRole;
 
         if (getUserRole(req) === 'super_admin') {
             // super_admin can see all users
@@ -74,7 +83,7 @@ const getUsers = async (req, res) => {
             pagination: getPaginationMeta(total, page, limit)
         });
     } catch (err) {
-        logger.error('Admin getUsers error:', err);
+        console.error('Admin getUsers error:', err);
         res.status(500).json({ error: true, message: 'Server error fetching users' });
     }
 };
@@ -233,7 +242,7 @@ const createUser = async (req, res) => {
             error: err,
         });
 
-        logger.error('Admin createUser error:', err);
+        console.error('Admin createUser error:', err);
         res.status(500).json({
             error: true,
             message: 'Server error creating user'
@@ -287,15 +296,15 @@ const updateRole = async (req, res) => {
 
             const oldRole = user.role;
             user.role = newRole;
-
-            await user.save(session ? { session } : {});
-            await syncCollegeRoleMembership({
+            await syncCollegeMembership({
                 collegeId: user.collegeId,
                 userId: user._id,
                 oldRole,
                 newRole,
                 session,
             });
+
+            await user.save(session ? { session } : {});
 
             return { user, oldRole };
         });
@@ -338,7 +347,7 @@ const updateRole = async (req, res) => {
             error: err,
         });
 
-        logger.error('Admin updateRole error:', err);
+        console.error('Admin updateRole error:', err);
         res.status(500).json({
             error: true,
             message: 'Server error updating role'
@@ -428,7 +437,7 @@ const toggleBlock = async (req, res) => {
             error: err,
         });
 
-        logger.error('Admin toggleBlock error:', err);
+        console.error('Admin toggleBlock error:', err);
         res.status(500).json({
             error: true,
             message: 'Server error toggling block status'
@@ -511,7 +520,7 @@ const deleteUser = async (req, res) => {
                     user.collegeIdPhotoPublicId
                 );
             } catch (cloudErr) {
-                logger.warn(
+                console.warn(
                     'Cloudinary user photo delete failed (non-blocking):',
                     cloudErr.message
                 );
@@ -546,7 +555,7 @@ const deleteUser = async (req, res) => {
             error: err,
         });
 
-        logger.error('Admin deleteUser error:', err);
+        console.error('Admin deleteUser error:', err);
         res.status(500).json({
             error: true,
             message: 'Server error deleting user'
@@ -674,7 +683,7 @@ const getPapers = async (req, res) => {
             ),
         });
     } catch (err) {
-        logger.error('Admin getPapers error:', err);
+        console.error('Admin getPapers error:', err);
 
         return res.status(500).json({
             error: true,
@@ -759,7 +768,7 @@ const getPaperStats = async (req, res) => {
             },
         });
     } catch (err) {
-        logger.error('Admin getPaperStats error:', err);
+        console.error('Admin getPaperStats error:', err);
 
         return res.status(500).json({
             error: true,
@@ -810,7 +819,7 @@ const getPaperById = async (req, res) => {
             paper
         });
     } catch (err) {
-        logger.error('Admin getPaperById error:', err);
+        console.error('Admin getPaperById error:', err);
 
         return res.status(500).json({
             error: true,

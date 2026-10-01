@@ -1,5 +1,4 @@
 const logger = require('../config/logger');
-
 const User = require('../Model/user');
 const { getUserId, getUserRole, getCollegeId } = require('../utils/currentUser');
 
@@ -40,26 +39,7 @@ async function requireSuperAdmin(req, res, next) {
     req.currentUser = user;
     next();
   } catch (err) {
-    logger.error('Super Admin authorization error:', err);
-    return res.status(500).json({ error: true, message: 'Server error during authorization check.' });
-  }
-}
-
-async function requireAdmin(req, res, next) {
-  try {
-    if (!req.user || !getUserId(req)) {
-      return res.status(401).json({ error: true, message: 'Authentication required.' });
-    }
-    const user = await loadUserIfNeeded(req);
-    if (!user) return res.status(404).json({ error: true, message: 'User not found.' });
-    if (user.isBlocked) return res.status(403).json({ error: true, message: 'Account is blocked.' });
-    if (user.role !== 'admin' && user.role !== 'super_admin') {
-      return res.status(403).json({ error: true, message: 'Admin access required.' });
-    }
-    req.currentUser = user;
-    next();
-  } catch (err) {
-    logger.error('Admin authorization error:', err);
+    logger.error({ err }, 'Super Admin authorization error');
     return res.status(500).json({ error: true, message: 'Server error during authorization check.' });
   }
 }
@@ -79,7 +59,7 @@ function requireRole(...roles) {
       req.currentUser = user;
       next();
     } catch (err) {
-      logger.error('Role authorization error:', err);
+      logger.error({ err }, 'Role authorization error');
       return res.status(500).json({ error: true, message: 'Server error during authorization check.' });
     }
   };
@@ -87,6 +67,5 @@ function requireRole(...roles) {
 
 module.exports = {
   requireSuperAdmin,
-  requireAdmin,
   requireRole,
 };

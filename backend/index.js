@@ -18,7 +18,7 @@ const helmet      = require('helmet');
 const setupSwagger = require('./config/swagger');
 const { csrfWithBearerSkip } = require('./middleware/csrf');
 const { RedisStore } = require('rate-limit-redis');
-const { connectRedis, closeRedis, getRedisClient, isRedisConfigured } = require('./config/redis');
+const { sendCommand, connectRedis, disconnectRedis, isRedisEnabled, isRedisReady } = require('./utils/redisClient');
 
 const fileRouter  = require('./routes/file');
 const usersRouter = require('./routes/auth');
@@ -29,15 +29,6 @@ const reviewerRouter = require('./routes/reviewer');
 const teacherRouter = require('./routes/teacher');
 const studentRouter = require('./routes/student');
 const devAuthRouter = require('./routes/devAuth');
-
-const createRateLimitStore = (prefix) => {
-  const client = getRedisClient();
-  if (!client) return undefined;
-  return new RedisStore({
-    prefix,
-    sendCommand: (...args) => client.sendCommand(args),
-  });
-};
 
 const app = express();
 
@@ -153,9 +144,9 @@ app.use((req, res, next) => {
 app.use(cookieParser());
 
 // ─── Dev Auth Bypass (never mounts in production) ──────────────
-if (process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEV_AUTH === 'true') {
+if (process.env.NODE_ENV === 'development' && process.env.ENABLE_DEV_AUTH === 'true') {
     app.use('/dev', devAuthRouter);
-    logger.info('⚠️  Dev auth ENABLED — POST /dev/login with { email }');
+    console.log('⚠️  Dev auth ENABLED — POST /dev/login with { email }');
 }
 
 // ─── CSRF Protection ──────────────────────────────────────────────────────────
@@ -168,12 +159,23 @@ app.use(express.static(path.join(__dirname, 'public')));
 setupSwagger(app);
 
 // ─── Rate Limiters ────────────────────────────────────────────────────────────
-// Use Redis when REDIS_URL is configured; otherwise keep the in-memory fallback
-// for local/single-instance deployments.
+// Redis is used when REDIS_URL is configured; otherwise express-rate-limit's
+// in-memory store remains available for local/single-instance deployments.
+function createLimiter(name, options) {
+  if (!isRedisEnabled()) return rateLimit(options);
+  return rateLimit({
+    ...options,
+    store: new RedisStore({
+      sendCommand,
+      prefix: `qmetric:rl:${name}:`,
+    }),
+    passOnStoreError: process.env.NODE_ENV !== 'production',
+  });
+}
 
 // Login / password change: only FAILED attempts count, so a campus NAT full of
 // teachers logging in successfully doesn't lock everyone out.
-const loginLimiter = rateLimit({
+const loginLimiter = createLimiter('login', {
   windowMs: 15 * 60 * 1000,
   max: 15,
   skipSuccessfulRequests: true,
@@ -183,12 +185,11 @@ const loginLimiter = rateLimit({
     error: true,
     message: 'Too many failed attempts from this IP. Please wait 15 minutes before trying again.',
   },
-  ...(isRedisConfigured() ? { store: createRateLimitStore('qmetric:rl:login:') } : {}),
 });
 
 // Everything else under /auth (profile reads, colleges list, logout...).
 // Its own instance, so it does not share a bucket with the admin/teacher routes.
-const authGeneralLimiter = rateLimit({
+const authGeneralLimiter = createLimiter('auth-general', {
   windowMs: 15 * 60 * 1000,
   max: 300,
   standardHeaders: true,
@@ -197,11 +198,10 @@ const authGeneralLimiter = rateLimit({
     error: true,
     message: 'Too many requests from this IP. Please slow down.',
   },
-  ...(isRedisConfigured() ? { store: createRateLimitStore('qmetric:rl:auth:') } : {}),
 });
 
 // Account creation / verification-email resend: every request counts.
-const signupLimiter = rateLimit({
+const signupLimiter = createLimiter('signup', {
   windowMs: 60 * 60 * 1000,
   max: 20,
   standardHeaders: true,
@@ -210,11 +210,18 @@ const signupLimiter = rateLimit({
     error: true,
     message: 'Too many sign-up requests from this IP. Please try again later.',
   },
-  ...(isRedisConfigured() ? { store: createRateLimitStore('qmetric:rl:signup:') } : {}),
+});
+
+const adminCreationLimiter = createLimiter('admin-create', {
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: true, message: 'Too many admin-creation attempts from this IP. Please try again later.' },
 });
 
 // General limiter for protected admin/reviewer/teacher routes
-const generalLimiter = rateLimit({
+const generalLimiter = createLimiter('general', {
   windowMs: 15 * 60 * 1000,
   max: 200,
   standardHeaders: true,
@@ -223,11 +230,10 @@ const generalLimiter = rateLimit({
     error: true,
     message: 'Too many requests from this IP. Please slow down.',
   },
-  ...(isRedisConfigured() ? { store: createRateLimitStore('qmetric:rl:general:') } : {}),
 });
 
 // Upload: 20 uploads per hour per IP
-const uploadLimiter = rateLimit({
+const uploadLimiter = createLimiter('upload', {
   windowMs: 60 * 60 * 1000,
   max: 20,
   standardHeaders: true,
@@ -236,11 +242,10 @@ const uploadLimiter = rateLimit({
     error: true,
     message: 'Upload limit reached. You can upload up to 20 files per hour.',
   },
-  ...(isRedisConfigured() ? { store: createRateLimitStore('qmetric:rl:upload:') } : {}),
 });
 
 // Bulk register: 3 attempts per hour (admin-only but still protect it)
-const bulkLimiter = rateLimit({
+const bulkLimiter = createLimiter('bulk', {
   windowMs: 60 * 60 * 1000,
   max: 3,
   standardHeaders: true,
@@ -256,15 +261,16 @@ const bulkLimiter = rateLimit({
     if (req.method !== 'POST') return true;               // read requests are fine
     return false;                                         // rate-limit only the POST
   },
-  ...(isRedisConfigured() ? { store: createRateLimitStore('qmetric:rl:bulk:') } : {}),
 });
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/upload', uploadLimiter, fileRouter);
 // Scope strict limits to credential endpoints only. Reads like GET /auth/profile,
+// /auth/colleges and /auth/logout must NOT consume the login budget.
 app.use('/auth/login',               loginLimiter);
 app.use('/auth/password',            loginLimiter);
 app.use('/auth/create-account',      signupLimiter);
+app.use('/auth/create-admin',        adminCreationLimiter);
 app.use('/auth/resend-verification', signupLimiter);
 app.use('/auth/forgot-password',     signupLimiter);
 app.use('/auth/reset-password',      loginLimiter);
@@ -279,17 +285,19 @@ app.use('/notifications', generalLimiter, notificationsRouter);
 
 // ─── Health check (responds even if DB is not yet connected) ──────────────────
 const healthHandler = (req, res) => {
+  const dbState = mongoose.connection.readyState;
+  const dbStatus = ['disconnected', 'connected', 'connecting', 'disconnecting'][dbState];
   res.json({ status: 'ok', uptime: process.uptime() });
 };
 
 const readinessHandler = (req, res) => {
   const dbReady = mongoose.connection.readyState === 1;
-  const redisReady = !isRedisConfigured() || Boolean(getRedisClient()?.isReady);
+  const redisReady = !isRedisEnabled() || isRedisReady();
   const ready = dbReady && redisReady;
   return res.status(ready ? 200 : 503).json({
     status: ready ? 'ready' : 'not_ready',
     db: dbReady ? 'connected' : 'not_connected',
-    redis: !isRedisConfigured() ? 'not_configured' : (redisReady ? 'connected' : 'not_connected'),
+    redis: isRedisEnabled() ? (redisReady ? 'connected' : 'not_connected') : 'disabled',
     uptime: process.uptime(),
   });
 };
@@ -334,7 +342,7 @@ app.use((err, req, res, next) => {
     });
   }
 
-  logger.error({ err, requestId: req.id }, 'Unhandled error');
+  console.error('🔴 Unhandled error:', err);
   // Never send stack traces to a client — dev or prod. Full error is in
   // the server log; the client gets a safe, generic message.
   res.status(err.status || 500).json({
@@ -362,7 +370,7 @@ const shutdown = async (signal) => {
       await new Promise((resolve) => httpServer.close(resolve));
     }
     await mongoose.connection.close(false);
-    await closeRedis();
+    await disconnectRedis();
     clearTimeout(forceExit);
     process.exit(0);
   } catch (err) {
@@ -389,6 +397,10 @@ process.on('uncaughtException', (err) => {
 // ─── Start server (skip during Jest — tests use in-memory MongoDB) ───────────
 if (process.env.NODE_ENV !== 'test') {
   const PORT = process.env.PORT || 5000;
+  httpServer = app.listen(PORT, () => {
+    logger.info({ port: PORT }, 'Server started');
+    logger.info({ health: '/health', readiness: '/ready' }, 'Health endpoints available');
+  });
 
   // ─── Mongo connection with exponential backoff ────────────────
   const MONGO_RETRIES = 5;
@@ -415,26 +427,20 @@ if (process.env.NODE_ENV !== 'test') {
     }
   }
 
+  connectMongo();
+
+  if (isRedisEnabled()) {
+    connectRedis()
+      .then(() => logger.info('Connected to Redis'))
+      .catch((err) => logger.error({ err }, 'Redis connection failed; rate limit/revocation will use fallback behavior where available'));
+  }
+
   mongoose.connection.on('disconnected', () => {
     logger.warn('MongoDB disconnected — Mongoose will attempt to reconnect');
   });
   mongoose.connection.on('reconnected', () => {
     logger.info('MongoDB reconnected');
   });
-
-  (async () => {
-    try {
-      await connectRedis();
-      httpServer = app.listen(PORT, () => {
-        logger.info({ port: PORT }, 'Server started');
-        logger.info({ health: '/health', readiness: '/ready' }, 'Health endpoints available');
-      });
-      connectMongo();
-    } catch (err) {
-      logger.fatal({ err }, 'Redis connection failed during startup');
-      process.exit(1);
-    }
-  })();
 }
 
 module.exports = app;

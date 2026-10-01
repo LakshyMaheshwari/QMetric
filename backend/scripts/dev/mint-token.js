@@ -1,13 +1,11 @@
-const logger = require('../../config/logger');
-
-﻿const m = require('mongoose');
+const m = require('mongoose');
 require('dotenv').config();
 m.connect(process.env.MONGO_URI || process.env.MONGODB_URI)
   .then(async () => {
     const U = require('./Model/user');
     const auth = require('./core/auth/utilities');
     const user = await U.findOne({ email: process.argv[2] }).lean();
-    if (!user) { logger.error('User not found'); process.exit(1); }
+    if (!user) { console.error('User not found'); process.exit(1); }
 
     // Try the common export shapes for token generation
     let token;
@@ -22,11 +20,11 @@ m.connect(process.env.MONGO_URI || process.env.MONGODB_URI)
     } else if (auth.default && typeof auth.default.generateToken === 'function') {
       token = auth.default.generateToken(user);
     } else {
-      logger.error('Could not find token generator. Exports:', Object.keys(auth));
+      console.error('Could not find token generator. Exports:', Object.keys(auth));
       process.exit(1);
     }
 
-    logger.info(token);
+    console.log(token);
     process.exit(0);
   })
-  .catch((e) => { logger.error(e.message); process.exit(1); });
+  .catch((e) => { console.error(e.message); process.exit(1); });

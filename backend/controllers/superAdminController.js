@@ -1,5 +1,4 @@
 const College = require('../Model/College');
-const logger = require('../config/logger');
 const User = require('../Model/user');
 const Paper = require('../Model/PaperInfo');
 const AuditLog = require('../Model/AuditLog');
@@ -11,7 +10,7 @@ const { paginate, getPaginationMeta, getSortOptions } = require('../utils/pagina
 const { logAudit } = require('../utils/auditLog');
 const { getUserId } = require('../utils/currentUser');
 const { withTransaction } = require('../utils/withTransaction');
-const { syncCollegeRoleMembership } = require('../utils/syncCollegeCounters');
+const { syncCollegeMembership } = require('../utils/collegeMembership');
 const escapeRegex = require('../utils/escapeRegex');
 
 /**
@@ -67,7 +66,7 @@ const createCollege = async (req, res) => {
       college: newCollege,
     });
   } catch (err) {
-    logger.error('Error creating college:', err);
+    console.error('Error creating college:', err);
     return res.status(500).json({ error: true, message: 'Server error creating college.' });
   }
 };
@@ -120,7 +119,7 @@ const getGlobalStats = async (req, res) => {
       },
     });
   } catch (err) {
-    logger.error('Error fetching global stats:', err);
+    console.error('Error fetching global stats:', err);
     return res.status(500).json({ error: true, message: 'Server error fetching global stats.' });
   }
 };
@@ -207,7 +206,7 @@ const getAllColleges = async (req, res) => {
       },
     });
   } catch (err) {
-    logger.error('Error fetching colleges for super admin:', err);
+    console.error('Error fetching colleges for super admin:', err);
     return res.status(500).json({ error: true, message: 'Server error fetching colleges.' });
   }
 };
@@ -251,7 +250,14 @@ const getCollegeDetails = async (req, res) => {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     // Safe regex — escaped and length-capped to avoid ReDoS
-    const paperQuery = { collegeId: id };
+    const safeName = college.name ? escapeRegex(String(college.name).slice(0, 100)) : null;
+
+    const paperQuery = {
+      $or: [
+        { collegeId: id },
+        ...(safeName ? [{ 'College Name': new RegExp(safeName, 'i') }] : []),
+      ],
+    };
 
     const [totalPapers, recentPapers, users, papers] = await Promise.all([
       Paper.countDocuments(paperQuery),
@@ -283,7 +289,7 @@ const getCollegeDetails = async (req, res) => {
       papersPagination: getPaginationMeta(totalPapers, paperPage, paperLimit),
     });
   } catch (err) {
-    logger.error('Error fetching college details:', err);
+    console.error('Error fetching college details:', err);
     return res.status(500).json({ error: true, message: 'Server error fetching college details.' });
   }
 };
@@ -327,6 +333,13 @@ const updateCollege = async (req, res) => {
 
     await college.save();
 
+    if (oldName !== college.name) {
+      await User.updateMany(
+        { collegeId: college._id },
+        { $set: { collegeName: college.name } }
+      );
+    }
+
     await logAudit({
       userId: getUserId(req),
       action: 'UPDATE_COLLEGE',
@@ -341,7 +354,7 @@ const updateCollege = async (req, res) => {
 
     return res.json({ error: false, message: 'College updated successfully.', college });
   } catch (err) {
-    logger.error('Error updating college:', err);
+    console.error('Error updating college:', err);
     return res.status(500).json({ error: true, message: 'Server error updating college.' });
   }
 };
@@ -400,7 +413,7 @@ const deleteCollege = async (req, res) => {
       message: isPermanent ? 'College permanently deleted.' : 'College deactivated successfully.',
     });
   } catch (err) {
-    logger.error('Error deleting college:', err);
+    console.error('Error deleting college:', err);
     return res.status(500).json({ error: true, message: 'Server error deleting college.' });
   }
 };
@@ -468,7 +481,7 @@ const getAuditLogs = async (req, res) => {
       },
     });
   } catch (error) {
-    logger.error('getAuditLogs error:', error);
+    console.error('getAuditLogs error:', error);
     res.status(500).json({ error: true, message: 'Server error fetching audit logs' });
   }
 };
@@ -502,7 +515,7 @@ const testEmailConfig = async (req, res) => {
       timestamp: new Date(),
     });
   } catch (err) {
-    logger.error('testEmailConfig error:', err);
+    console.error('testEmailConfig error:', err);
     res.status(500).json({
       error: true,
       message: 'Failed to send test email.',
@@ -552,7 +565,7 @@ const getAllUsers = async (req, res) => {
       pagination: getPaginationMeta(total, page, limit),
     });
   } catch (err) {
-    logger.error('Error fetching users for super admin:', err);
+    console.error('Error fetching users for super admin:', err);
     return res.status(500).json({ error: true, message: 'Server error fetching users.' });
   }
 };
@@ -570,7 +583,7 @@ const getUserById = async (req, res) => {
     }
     return res.json({ error: false, user });
   } catch (err) {
-    logger.error('Error fetching user by ID:', err);
+    console.error('Error fetching user by ID:', err);
     return res.status(500).json({ error: true, message: 'Server error fetching user.' });
   }
 };
@@ -601,14 +614,14 @@ const updateUserRole = async (req, res) => {
 
       const oldRole = user.role;
       user.role = role;
-      await user.save(session ? { session } : {});
-      await syncCollegeRoleMembership({
+      await syncCollegeMembership({
         collegeId: user.collegeId,
         userId: user._id,
         oldRole,
         newRole: role,
         session,
       });
+      await user.save(session ? { session } : {});
 
       return { user, oldRole };
     });
@@ -636,7 +649,7 @@ const updateUserRole = async (req, res) => {
       user: updated,
     });
   } catch (err) {
-    logger.error('Error updating user role:', err);
+    console.error('Error updating user role:', err);
     return res.status(500).json({ error: true, message: 'Server error updating user role.' });
   }
 };
@@ -681,7 +694,7 @@ const toggleUserBlock = async (req, res) => {
       user,
     });
   } catch (err) {
-    logger.error('Error toggling user block:', err);
+    console.error('Error toggling user block:', err);
     return res.status(500).json({ error: true, message: 'Server error toggling block status.' });
   }
 };
@@ -704,22 +717,17 @@ const deleteUser = async (req, res) => {
     }
 
     // Do not hard-delete users that are referenced by business/history records.
-    const [paperRefs, ocrLogs, corrections, taughtVerbs, notificationRefs, adminMemberships] = await Promise.all([
-      Paper.countDocuments({
-        $or: [
-          { userId: id },
-          { reviewedBy: id },
-          { 'reviewHistory.reviewerId': id },
-        ],
-      }),
+    const [paperRefs, reviewHistoryRefs, ocrLogs, corrections, taughtVerbs, adminMemberships, notifications] = await Promise.all([
+      Paper.countDocuments({ $or: [{ userId: id }, { reviewedBy: id }] }),
+      Paper.countDocuments({ 'reviewHistory.reviewerId': id }),
       OCRLog.countDocuments({ userId: id }),
       VerifiedQuestion.countDocuments({ correctedBy: id }),
       LearnedVerb.countDocuments({ taughtBy: id }),
-      Notification.countDocuments({ userId: id }),
       College.countDocuments({ adminIds: id }),
+      Notification.countDocuments({ userId: id }),
     ]);
 
-    if (paperRefs > 0 || ocrLogs > 0 || corrections > 0 || taughtVerbs > 0 || notificationRefs > 0 || adminMemberships > 0) {
+    if (paperRefs > 0 || reviewHistoryRefs > 0 || ocrLogs > 0 || corrections > 0 || taughtVerbs > 0 || adminMemberships > 0 || notifications > 0) {
       return res.status(409).json({
         error: true,
         message: 'User cannot be permanently deleted because records still reference this account. Block the account instead.',
@@ -731,7 +739,7 @@ const deleteUser = async (req, res) => {
         const cloudinary = require('../config/cloudinary');
         await cloudinary.uploader.destroy(user.collegeIdPhotoPublicId);
       } catch (cloudErr) {
-        logger.warn('Cloudinary photo destroy failed (non-blocking):', cloudErr.message);
+        console.warn('Cloudinary photo destroy failed (non-blocking):', cloudErr.message);
       }
     }
 
@@ -747,7 +755,7 @@ const deleteUser = async (req, res) => {
 
     return res.json({ error: false, message: 'User deleted successfully.' });
   } catch (err) {
-    logger.error('Error deleting user:', err);
+    console.error('Error deleting user:', err);
     return res.status(500).json({ error: true, message: 'Server error deleting user.' });
   }
 };

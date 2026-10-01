@@ -1,5 +1,4 @@
 const crypto = require('node:crypto');
-const logger = require('../config/logger');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const validator = require('validator');
@@ -41,7 +40,7 @@ const forgotPassword = async (req, res) => {
             fullName: user.fullName || user.userName,
             resetToken: rawToken,
         }).catch((err) => {
-            logger.error('Password reset email failed (non-blocking):', err.message);
+            console.error('Password reset email failed (non-blocking):', err.message);
         });
 
         await logAudit({
@@ -56,7 +55,7 @@ const forgotPassword = async (req, res) => {
             message: 'If an account with that email exists, password reset instructions have been sent.',
         });
     } catch (err) {
-        logger.error('forgotPassword error:', err);
+        console.error('forgotPassword error:', err);
         return res.status(500).json({ error: true, message: 'Server error processing password reset.' });
     }
 };
@@ -110,7 +109,7 @@ const resetPassword = async (req, res) => {
             message: 'Password reset successful. You can now log in with your new password.',
         });
     } catch (err) {
-        logger.error('resetPassword error:', err);
+        console.error('resetPassword error:', err);
         return res.status(500).json({ error: true, message: 'Server error resetting password.' });
     }
 };
@@ -248,7 +247,7 @@ const refreshToken = async (req, res) => {
 
         return res.json(response);
     } catch (err) {
-        logger.error(
+        console.error(
             'refreshToken error:',
             err
         );
@@ -307,7 +306,7 @@ const revokeAllSessions = async (req, res) => {
             message: 'All active sessions have been revoked. Please log in again.',
         });
     } catch (err) {
-        logger.error('revokeAllSessions error:', err);
+        console.error('revokeAllSessions error:', err);
         return res.status(500).json({ error: true, message: 'Server error revoking sessions.' });
     }
 };
