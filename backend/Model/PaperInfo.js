@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const reviewHistorySchema = new mongoose.Schema({
   reviewerId:  { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   action:      { type: String, enum: ['approved', 'rejected', 'needs_revision', 'comment'] },
-  comments:    { type: String, default: '' },
+  comments:    { type: String, default: '', maxlength: 2000 },
   timestamp:   { type: Date, default: Date.now },
 }, { _id: false });
 
@@ -19,6 +19,9 @@ const PaperSchema = new mongoose.Schema({
   "Sequence":       [],
   "Collected Data": [],
   "bloomLevelMap":  { type: Object },
+  BloomRecommendations: { type: Array, default: null },
+  appliedCorrections: { type: Array, default: [] },
+  correctionsSummary: { type: Object, default: null },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
   // ── Multi-tenant college reference (optional for backward-compat) ─────────
@@ -28,6 +31,10 @@ const PaperSchema = new mongoose.Schema({
     default: null,
     index: true,
   },
+
+  // ── Cloudinary storage reference ──────────────────────────────────────────
+  cloudinaryPublicId: { type: String, default: null },
+  fileUrl:            { type: String, default: '' },
 
   // ── Review workflow ───────────────────────────────────────────────────────
   submittedAt: { type: Date, default: null },

@@ -1,3 +1,5 @@
+const logger = require('../config/logger');
+
 const User = require('../Model/user');
 const { getUserId, getUserRole, getCollegeId } = require('../utils/currentUser');
 
@@ -38,7 +40,7 @@ async function requireSuperAdmin(req, res, next) {
     req.currentUser = user;
     next();
   } catch (err) {
-    console.error('Super Admin authorization error:', err);
+    logger.error('Super Admin authorization error:', err);
     return res.status(500).json({ error: true, message: 'Server error during authorization check.' });
   }
 }
@@ -57,7 +59,7 @@ async function requireAdmin(req, res, next) {
     req.currentUser = user;
     next();
   } catch (err) {
-    console.error('Admin authorization error:', err);
+    logger.error('Admin authorization error:', err);
     return res.status(500).json({ error: true, message: 'Server error during authorization check.' });
   }
 }
@@ -77,7 +79,7 @@ function requireRole(...roles) {
       req.currentUser = user;
       next();
     } catch (err) {
-      console.error('Role authorization error:', err);
+      logger.error('Role authorization error:', err);
       return res.status(500).json({ error: true, message: 'Server error during authorization check.' });
     }
   };

@@ -36,4 +36,20 @@ function getPaginationMeta(total, page, limit) {
   };
 }
 
-module.exports = { paginate, getPaginationMeta };
+/**
+ * Extract safe sort options from query parameters
+ * @param {Object} req - Express request object
+ * @param {Array<string>} allowedFields - List of allowed field names to sort by
+ * @param {Object} defaultSort - Default sort object (default: { createdAt: -1 })
+ * @returns {Object} MongoDB sort object
+ */
+function getSortOptions(req, allowedFields = ['createdAt'], defaultSort = { createdAt: -1 }) {
+  const { sortBy, order } = req.query;
+  if (sortBy && allowedFields.includes(sortBy)) {
+    const sortOrder = (order && (order.toLowerCase() === 'asc' || order === '1')) ? 1 : -1;
+    return { [sortBy]: sortOrder };
+  }
+  return defaultSort;
+}
+
+module.exports = { paginate, getPaginationMeta, getSortOptions };

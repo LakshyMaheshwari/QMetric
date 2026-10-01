@@ -1,6 +1,7 @@
 'use strict';
 
 const mongoose = require('mongoose');
+const logger = require('../config/logger');
 const Notification = require('../Model/Notification');
 
 const MAX_PAGE_LIMIT = 100;
@@ -38,7 +39,7 @@ async function createNotification({
 }) {
   try {
     if (!userId || !type || !title) {
-      console.warn('[notification.create] missing required fields');
+      logger.warn('[notification.create] missing required fields');
       return null;
     }
     return await Notification.create({
@@ -50,7 +51,7 @@ async function createNotification({
       actionUrl: String(actionUrl).slice(0, 500),
     });
   } catch (err) {
-    console.error('[notification.create]', err.message);
+    logger.error('[notification.create]', err.message);
     return null;
   }
 }
@@ -82,7 +83,7 @@ async function getNotifications(req, res) {
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (err) {
-    console.error('[notification.getNotifications]', err);
+    logger.error('[notification.getNotifications]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -98,7 +99,7 @@ async function getUnreadCount(req, res) {
     const unreadCount = await Notification.countDocuments({ userId, isRead: false });
     return res.json({ error: false, unreadCount });
   } catch (err) {
-    console.error('[notification.getUnreadCount]', err);
+    logger.error('[notification.getUnreadCount]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -127,7 +128,7 @@ async function markAsRead(req, res) {
 
     return res.json({ error: false, notification: doc });
   } catch (err) {
-    console.error('[notification.markAsRead]', err);
+    logger.error('[notification.markAsRead]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -147,7 +148,7 @@ async function markAllAsRead(req, res) {
 
     return res.json({ error: false, markedCount: result.modifiedCount || 0 });
   } catch (err) {
-    console.error('[notification.markAllAsRead]', err);
+    logger.error('[notification.markAllAsRead]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -171,7 +172,7 @@ async function deleteNotification(req, res) {
 
     return res.json({ error: false, message: 'Deleted' });
   } catch (err) {
-    console.error('[notification.deleteNotification]', err);
+    logger.error('[notification.deleteNotification]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }

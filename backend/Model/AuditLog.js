@@ -7,28 +7,12 @@ const auditLogSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
+  // Free-form String on purpose: see utils/auditActions.js. A Mongoose enum here
+  // silently dropped every audit write whose action wasn't listed.
   action: {
     type: String,
-    enum: [
-      'LOGIN',
-      'LOGOUT',
-      'CREATE_ACCOUNT',
-      'UPDATE_PROFILE',
-      'CREATE_USER',
-      'UPDATE_ROLE',
-      'BLOCK_USER',
-      'UNBLOCK_USER',
-      'DELETE_USER',
-      'UPLOAD_PAPER',
-      'REVIEW_PAPER',
-      'APPROVE_PAPER',
-      'REJECT_PAPER',
-      'CREATE_COLLEGE',
-      'UPDATE_COLLEGE',
-      'DELETE_COLLEGE',
-      'CREATE_ADMIN',
-    ],
     required: true,
+    trim: true,
     index: true,
   },
   resource: {
@@ -52,12 +36,20 @@ const auditLogSchema = new mongoose.Schema({
   timestamp: {
     type: Date,
     default: Date.now,
-    index: true,
   },
 });
 
 // Compound indexes for common queries
 auditLogSchema.index({ userId: 1, timestamp: -1 });
 auditLogSchema.index({ action: 1, timestamp: -1 });
+auditLogSchema.index({ resource: 1, timestamp: -1 });
+
+// TTL: auto-delete after AUDIT_LOG_TTL_DAYS (default 730 = 2 years)
+// Consistent with OCRLog (90 days) and Notification (90 days) expiry patterns.
+const AUDIT_TTL_SECONDS = parseInt(process.env.AUDIT_LOG_TTL_DAYS || '730', 10) * 24 * 60 * 60;
+auditLogSchema.index(
+  { timestamp: 1 },
+  { expireAfterSeconds: AUDIT_TTL_SECONDS }
+);
 
 module.exports = mongoose.model('AuditLog', auditLogSchema);

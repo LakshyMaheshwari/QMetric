@@ -1,6 +1,7 @@
 'use strict';
 
 const mongoose = require('mongoose');
+const logger = require('../config/logger');
 const LearnedVerb = require('../Model/LearnedVerb');
 const { logAudit } = require('../utils/auditLog');
 
@@ -119,7 +120,7 @@ async function createLearnedVerb(req, res) {
 
     return res.status(201).json({ error: false, learnedVerb: doc });
   } catch (err) {
-    console.error('[learnedVerb.createLearnedVerb]', err);
+    logger.error('[learnedVerb.createLearnedVerb]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -168,7 +169,7 @@ async function getLearnedVerbs(req, res) {
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (err) {
-    console.error('[learnedVerb.getLearnedVerbs]', err);
+    logger.error('[learnedVerb.getLearnedVerbs]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -229,7 +230,7 @@ async function updateLearnedVerb(req, res) {
 
     return res.json({ error: false, updated: doc });
   } catch (err) {
-    console.error('[learnedVerb.updateLearnedVerb]', err);
+    logger.error('[learnedVerb.updateLearnedVerb]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -265,7 +266,7 @@ async function deleteLearnedVerb(req, res) {
 
     return res.json({ error: false, message: 'Verb deleted' });
   } catch (err) {
-    console.error('[learnedVerb.deleteLearnedVerb]', err);
+    logger.error('[learnedVerb.deleteLearnedVerb]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -286,7 +287,7 @@ async function getSuggestedVerbs(req, res) {
     if (collegeId && isObjectId(collegeId)) paperQuery.collegeId = collegeId;
 
     const papers = await PaperInfo.find(paperQuery)
-      .select('"Collected Data"')
+      .select({ 'Collected Data': 1 })
       .limit(500)
       .lean();
 
@@ -326,7 +327,7 @@ async function getSuggestedVerbs(req, res) {
 
     return res.json({ error: false, suggestions });
   } catch (err) {
-    console.error('[learnedVerb.getSuggestedVerbs]', err);
+    logger.error('[learnedVerb.getSuggestedVerbs]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -388,7 +389,7 @@ async function bulkImportVerbs(req, res) {
       errors,
     });
   } catch (err) {
-    console.error('[learnedVerb.bulkImportVerbs]', err);
+    logger.error('[learnedVerb.bulkImportVerbs]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }

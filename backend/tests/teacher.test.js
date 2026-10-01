@@ -394,3 +394,30 @@ describe('Teacher Endpoints', () => {
     });
   });
 });
+
+describe('POST /teacher/papers/:id/resend-review-email (regression: missing logAudit import)', () => {
+  const request = require('supertest');
+  const app = require('../index');
+  const AuditLog = require('../Model/AuditLog');
+  const h = require('./helpers');
+
+  it('returns 200 and writes an audit entry for a pending paper', async () => {
+    const college = await h.createTestCollege();
+    const teacher = await h.createTestUser({ role: 'teacher', collegeId: college._id });
+    await h.createTestUser({ role: 'reviewer', collegeId: college._id });
+    const paper = await h.createTestPaper({ userId: teacher._id, collegeId: college._id, reviewStatus: 'pending' });
+
+    const res = await request(app).post(`/teacher/papers/${paper._id}/resend-review-email`).set('Cookie', h.getCookieString(teacher));
+    expect(res.status).toBe(200);
+    expect(res.body.sentCount).toBe(1);
+    expect(await AuditLog.countDocuments({ action: 'RESEND_REVIEW_EMAIL' })).toBe(1);
+  });
+
+  it('rejects a draft paper with 400', async () => {
+    const college = await h.createTestCollege();
+    const teacher = await h.createTestUser({ role: 'teacher', collegeId: college._id });
+    const paper = await h.createTestPaper({ userId: teacher._id, collegeId: college._id, reviewStatus: 'draft' });
+    const res = await request(app).post(`/teacher/papers/${paper._id}/resend-review-email`).set('Cookie', h.getCookieString(teacher));
+    expect(res.status).toBe(400);
+  });
+});

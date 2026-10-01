@@ -3,7 +3,14 @@ const router = express.Router();
 const authenticateToken = require('../core/auth/utilities');
 const adminController = require('../controllers/adminController');
 const { requireRole } = require('../middleware/roleMiddleware');
-const { validatePagination, validateCreateUser, validateUserId, validateRoleUpdate, handleValidationErrors } = require('../middleware/validators');
+const {
+  validatePagination,
+  validateCreateUser,
+  validateUserId,
+  validateMongoId,
+  validateRoleUpdate,
+  handleValidationErrors
+} = require('../middleware/validators');
 
 /**
  * @swagger
@@ -116,7 +123,12 @@ router.put('/users/:id/role', validateUserId, validateRoleUpdate, handleValidati
  *       200:
  *         description: User blocked/unblocked
  */
-router.put('/users/:id/block', validateUserId, handleValidationErrors, adminController.toggleBlock);
+router.put(
+  '/users/:id/block',
+  validateUserId,
+  handleValidationErrors,
+  adminController.toggleBlock
+);
 
 /**
  * @swagger
@@ -144,8 +156,15 @@ const ocrLogController = require('../controllers/ocrLogController');
 
 router.get('/ocr-logs', validatePagination, handleValidationErrors, ocrLogController.listOcrLogs);
 router.get('/ocr-logs/stats', ocrLogController.getOcrStats);
-router.get('/ocr-logs/:logId', ocrLogController.getOcrLog);
-router.put('/ocr-logs/:logId/verify', ocrLogController.verifyOcrLog);
-router.put('/ocr-logs/:logId/reject', ocrLogController.rejectOcrLog);
+router.get('/ocr-logs/:logId', ...validateMongoId('logId'), handleValidationErrors, ocrLogController.getOcrLog);
+router.put('/ocr-logs/:logId/verify', ...validateMongoId('logId'), handleValidationErrors, ocrLogController.verifyOcrLog);
+router.put('/ocr-logs/:logId/reject', ...validateMongoId('logId'), handleValidationErrors, ocrLogController.rejectOcrLog);
+
+/* -------------------------------------------------------------------------- */
+/* Question Papers (College-scoped visibility for admins)                     */
+/* -------------------------------------------------------------------------- */
+router.get('/papers', validatePagination, handleValidationErrors, adminController.getPapers);
+router.get('/papers/stats', adminController.getPaperStats);
+router.get('/papers/:id', validateMongoId('id'), handleValidationErrors, adminController.getPaperById);
 
 module.exports = router;

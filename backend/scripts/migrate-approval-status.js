@@ -1,3 +1,5 @@
+const logger = require('../config/logger');
+
 /**
  * One-time migration: grandfather existing users into the new
  * collegeApprovalStatus field.
@@ -20,13 +22,13 @@ const mongoose = require('mongoose');
 
 async function migrate() {
   if (!process.env.MONGO_URI) {
-    console.error('❌ MONGO_URI is not set');
+    logger.error('❌ MONGO_URI is not set');
     process.exit(1);
   }
 
-  console.log('🔌 Connecting to MongoDB...');
+  logger.info('🔌 Connecting to MongoDB...');
   await mongoose.connect(process.env.MONGO_URI);
-  console.log('✅ Connected');
+  logger.info('✅ Connected');
 
   const User = require('../Model/user');
 
@@ -40,14 +42,14 @@ async function migrate() {
     },
     { $set: { collegeApprovalStatus: 'approved' } }
   );
-  console.log(`✅ Set 'approved' for ${r1.modifiedCount} users`);
+  logger.info(`✅ Set 'approved' for ${r1.modifiedCount} users`);
 
   // ── 2. Super admins → 'not_applicable' ────────────────
   const r2 = await User.updateMany(
     { role: 'super_admin' },
     { $set: { collegeApprovalStatus: 'not_applicable' } }
   );
-  console.log(`✅ Set 'not_applicable' for ${r2.modifiedCount} super admins`);
+  logger.info(`✅ Set 'not_applicable' for ${r2.modifiedCount} super admins`);
 
   // ── 3. Defensive: student cleanup (no students should exist yet) ──
   const r3 = await User.updateMany(
@@ -60,7 +62,7 @@ async function migrate() {
       },
     }
   );
-  console.log(`✅ Normalized ${r3.modifiedCount} student accounts`);
+  logger.info(`✅ Normalized ${r3.modifiedCount} student accounts`);
 
   // ── Summary ───────────────────────────────────────────
   const total = await User.countDocuments({});
@@ -69,18 +71,18 @@ async function migrate() {
     { $sort: { count: -1 } },
   ]);
 
-  console.log('\n📊 Final state:');
-  console.log(`   Total users: ${total}`);
+  logger.info('\n📊 Final state:');
+  logger.info(`   Total users: ${total}`);
   for (const row of breakdown) {
-    console.log(`   ${row._id || '(unset)'}: ${row.count}`);
+    logger.info(`   ${row._id || '(unset)'}: ${row.count}`);
   }
 
   await mongoose.disconnect();
-  console.log('\n✅ Migration complete');
+  logger.info('\n✅ Migration complete');
   process.exit(0);
 }
 
 migrate().catch((err) => {
-  console.error('❌ Migration failed:', err);
+  logger.error('❌ Migration failed:', err);
   process.exit(1);
 });

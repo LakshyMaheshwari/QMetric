@@ -1,3 +1,5 @@
+const logger = require('./logger');
+
 const swaggerJsDoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
@@ -111,7 +113,7 @@ function setupSwagger(app) {
       customSiteTitle: 'QMetric API Docs',
     })
   );
-  console.log('📚 API docs available at /api-docs');
+  logger.info('📚 API docs available at /api-docs');
 }
 
 module.exports = setupSwagger;

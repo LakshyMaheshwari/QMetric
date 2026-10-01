@@ -42,7 +42,8 @@ async function createTestUser({
 } = {}) {
   const suffix = uniqueSuffix();
   const uniqueEmail = email || `${role}-${suffix}@test.com`;
-  const hashedPassword = await bcrypt.hash(password, 10);
+  const rounds = process.env.NODE_ENV === 'test' ? 4 : 10;
+  const hashedPassword = await bcrypt.hash(password, rounds);
 
   const base = {
     userName: `${userName}_${suffix}`.slice(0, 50),

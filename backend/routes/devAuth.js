@@ -47,8 +47,15 @@ const router = express.Router();
  *       404:
  *         description: User not found or dev auth disabled
  */
+router.use((req, res, next) => {
+    if (process.env.NODE_ENV === 'production' || process.env.ENABLE_DEV_AUTH !== 'true') {
+        return res.status(404).json({ error: true, message: 'Not found' });
+    }
+    next();
+});
+
 router.post('/login', async (req, res) => {
-    const { email } = req.body;
+    const { email } = req.body || {};
 
     if (!email || typeof email !== 'string' || !email.trim()) {
         return res.status(400).json({ error: true, message: 'Email is required' });

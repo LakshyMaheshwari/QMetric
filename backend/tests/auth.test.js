@@ -1,6 +1,7 @@
 const request = require('supertest');
 const app = require('../index');
 const { createTestUser, createTestCollege, getCookieString } = require('./helpers');
+const User = require('../Model/user');
 
 describe('Auth Endpoints', () => {
   describe('POST /auth/login', () => {
@@ -99,6 +100,28 @@ describe('Auth Endpoints', () => {
       expect(res.status).toBe(200);
       expect(res.body.error).toBe(false);
       expect(res.headers['set-cookie'][0]).toMatch(/accessToken=;/);
+    });
+
+    it('does not clear another user refresh state from a forged access token', async () => {
+      const college = await createTestCollege();
+      const victim = await createTestUser({ role: 'teacher', collegeId: college._id });
+      victim.refreshTokenHash = 'victim-refresh-hash';
+      victim.refreshTokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
+      await victim.save({ validateBeforeSave: false });
+
+      const forgedToken = require('jsonwebtoken').sign(
+        { userId: victim._id },
+        'wrong-secret',
+        { expiresIn: '1h' }
+      );
+
+      const res = await request(app)
+        .post('/auth/logout')
+        .set('Cookie', `accessToken=${forgedToken}`);
+
+      expect(res.status).toBe(200);
+      const reloaded = await User.findById(victim._id).select('+refreshTokenHash +refreshTokenExpiresAt');
+      expect(reloaded.refreshTokenHash).toBe('victim-refresh-hash');
     });
   });
 

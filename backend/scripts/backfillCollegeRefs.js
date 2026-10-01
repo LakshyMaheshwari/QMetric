@@ -1,3 +1,5 @@
+const logger = require('../config/logger');
+
 const mongoose = require('mongoose');
 require('dotenv').config();
 const User = require('../Model/user');
@@ -13,10 +15,10 @@ const College = require('../Model/College');
  */
 (async () => {
   await mongoose.connect(process.env.MONGO_URI);
-  console.log('Connected');
+  logger.info('Connected');
 
   const colleges = await College.find({}).select('_id name').lean();
-  console.log(`Found ${colleges.length} colleges`);
+  logger.info(`Found ${colleges.length} colleges`);
 
   let usersFixed = 0;
   let papersFixed = 0;
@@ -47,12 +49,12 @@ const College = require('../Model/College');
     }
   }
 
-  console.log(`Users backfilled: ${usersFixed}`);
-  console.log(`Papers backfilled: ${papersFixed}`);
+  logger.info(`Users backfilled: ${usersFixed}`);
+  logger.info(`Papers backfilled: ${papersFixed}`);
 
   await mongoose.disconnect();
   process.exit(0);
 })().catch((err) => {
-  console.error(err);
+  logger.error(err);
   process.exit(1);
 });

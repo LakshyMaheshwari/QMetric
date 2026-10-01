@@ -1,4 +1,5 @@
 const College = require('../Model/College');
+const logger = require('../config/logger');
 const User = require('../Model/user');
 const { logAudit } = require('../utils/auditLog');
 
@@ -66,7 +67,7 @@ const { logAudit } = require('../utils/auditLog');
 //             }
 //         });
 //     } catch (err) {
-//         console.error('Error fetching colleges:', err);
+//         logger.error('Error fetching colleges:', err);
 //         return res.status(500).json({ error: true, message: 'Server error fetching colleges', details: err.message });
 //     }
 // };
@@ -133,7 +134,7 @@ const { logAudit } = require('../utils/auditLog');
 //             college: newCollege
 //         });
 //     } catch (err) {
-//         console.error('Error creating college:', err);
+//         logger.error('Error creating college:', err);
 //         return res.status(500).json({ error: true, message: 'Server error creating college', details: err.message });
 //     }
 // };
@@ -190,7 +191,7 @@ const { logAudit } = require('../utils/auditLog');
 //             college
 //         });
 //     } catch (err) {
-//         console.error('Error updating college:', err);
+//         logger.error('Error updating college:', err);
 //         return res.status(500).json({ error: true, message: 'Server error updating college', details: err.message });
 //     }
 // };
@@ -223,7 +224,7 @@ const { logAudit } = require('../utils/auditLog');
 //             message: 'College deleted successfully.'
 //         });
 //     } catch (err) {
-//         console.error('Error deleting college:', err);
+//         logger.error('Error deleting college:', err);
 //         return res.status(500).json({ error: true, message: 'Server error deleting college', details: err.message });
 //     }
 // };
@@ -244,7 +245,7 @@ const getActiveColleges = async (req, res) => {
             colleges
         });
     } catch (err) {
-        console.error('Error fetching active colleges:', err);
+        logger.error('Error fetching active colleges:', err);
         return res.status(500).json({ error: true, message: 'Error fetching active colleges.' });
     }
 };

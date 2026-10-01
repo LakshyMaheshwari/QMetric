@@ -1,6 +1,7 @@
 'use strict';
 
 const mongoose = require('mongoose');
+const logger = require('../config/logger');
 const VerifiedQuestion = require('../Model/VerifiedQuestion');
 const PaperInfo = require('../Model/PaperInfo');
 const { withTransaction } = require('../utils/withTransaction');
@@ -205,7 +206,7 @@ async function submitCorrection(req, res) {
       message: existing ? 'Correction updated' : 'Correction submitted',
     });
   } catch (err) {
-    console.error('[verifiedQuestion.submitCorrection]', err);
+    logger.error('[verifiedQuestion.submitCorrection]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -255,7 +256,7 @@ async function getCorrectionsForPaper(req, res) {
       },
     });
   } catch (err) {
-    console.error('[verifiedQuestion.getCorrectionsForPaper]', err);
+    logger.error('[verifiedQuestion.getCorrectionsForPaper]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -298,7 +299,7 @@ async function getSingleCorrection(req, res) {
 
     return res.status(200).json({ error: false, correction });
   } catch (err) {
-    console.error('[verifiedQuestion.getSingleCorrection]', err);
+    logger.error('[verifiedQuestion.getSingleCorrection]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -415,7 +416,7 @@ async function updateCorrection(req, res) {
 
     return res.status(200).json({ error: false, updated });
   } catch (err) {
-    console.error('[verifiedQuestion.updateCorrection]', err);
+    logger.error('[verifiedQuestion.updateCorrection]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -477,7 +478,7 @@ async function deleteCorrection(req, res) {
 
     return res.status(200).json({ error: false, message: 'Correction deleted' });
   } catch (err) {
-    console.error('[verifiedQuestion.deleteCorrection]', err);
+    logger.error('[verifiedQuestion.deleteCorrection]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }

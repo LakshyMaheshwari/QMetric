@@ -1,5 +1,7 @@
 'use strict';
 
+const logger = require('../config/logger');
+
 const { sendMail } = require('./mailer');
 
 // ============================================================
@@ -56,7 +58,7 @@ function button(href, label) {
 // Templates (functions returning { subject, html, text })
 // ============================================================
 
-function tplNewUser({ fullName, email, tempPassword, loginUrl }) {
+function _tplNewUser({ fullName, email, tempPassword, loginUrl }) {
     const subject = `Welcome to ${BRAND}`;
     const body = `
       <p>Hi ${fullName || 'there'},</p>
@@ -72,7 +74,7 @@ function tplNewUser({ fullName, email, tempPassword, loginUrl }) {
     return { subject, html: layout({ title: subject, body }), text };
 }
 
-function tplVerifyEmail({ fullName, verifyUrl, expiry }) {
+function _tplVerifyEmail({ fullName, verifyUrl, expiry }) {
     const subject = `Verify your ${BRAND} email`;
     const body = `
       <p>Hi ${fullName || 'there'},</p>
@@ -85,7 +87,7 @@ function tplVerifyEmail({ fullName, verifyUrl, expiry }) {
     return { subject, html: layout({ title: subject, body }), text };
 }
 
-function tplPaperApproved({ paperTitle, courseCode, reviewerName, qualityScore, url }) {
+function _tplPaperApproved({ paperTitle, courseCode, reviewerName, qualityScore, url }) {
     const subject = `Paper approved: ${paperTitle}`;
     const body = `
       <p>Good news — your paper has been approved.</p>
@@ -100,7 +102,7 @@ function tplPaperApproved({ paperTitle, courseCode, reviewerName, qualityScore, 
     return { subject, html: layout({ title: subject, body }), text };
 }
 
-function tplPaperRejected({ paperTitle, courseCode, reviewerName, reason, comments, url }) {
+function _tplPaperRejected({ paperTitle, courseCode, reviewerName, reason, comments, url }) {
     const subject = `Paper needs attention: ${paperTitle}`;
     const body = `
       <p>Your paper was reviewed and has been marked as <strong>rejected</strong>.</p>
@@ -116,7 +118,7 @@ function tplPaperRejected({ paperTitle, courseCode, reviewerName, reason, commen
     return { subject, html: layout({ title: subject, body }), text };
 }
 
-function tplPaperNeedsRevision({ paperTitle, courseCode, reviewerName, changes, deadline, url }) {
+function _tplPaperNeedsRevision({ paperTitle, courseCode, reviewerName, changes, deadline, url }) {
     const subject = `Revision requested: ${paperTitle}`;
     const body = `
       <p>Your paper requires revisions before it can be approved.</p>
@@ -132,7 +134,7 @@ function tplPaperNeedsRevision({ paperTitle, courseCode, reviewerName, changes, 
     return { subject, html: layout({ title: subject, body }), text };
 }
 
-function tplReviewerAssigned({ reviewerName, paperTitle, courseCode, teacherName, questionCount, url }) {
+function _tplReviewerAssigned({ reviewerName, paperTitle, courseCode, teacherName, questionCount, url }) {
     const subject = `New paper assigned: ${paperTitle}`;
     const body = `
       <p>Hi ${reviewerName || 'there'},</p>
@@ -148,7 +150,7 @@ function tplReviewerAssigned({ reviewerName, paperTitle, courseCode, teacherName
     return { subject, html: layout({ title: subject, body }), text };
 }
 
-function tplBulkRegistrationSummary({ adminName, totalCreated, totalFailed, totalSkipped, failedList }) {
+function _tplBulkRegistrationSummary({ adminName, totalCreated, totalFailed, totalSkipped, failedList }) {
     const subject = `Bulk registration complete — ${totalCreated} created`;
     const failedRows = Array.isArray(failedList) && failedList.length
         ? `<ul style="color:#4b5563;font-size:13px;">${failedList
@@ -170,7 +172,7 @@ function tplBulkRegistrationSummary({ adminName, totalCreated, totalFailed, tota
     return { subject, html: layout({ title: subject, body }), text };
 }
 
-function tplTeacherApproved({ fullName, collegeName }) {
+function _tplTeacherApproved({ fullName, collegeName }) {
     const subject = `Your QMetric affiliation with ${collegeName} is approved`;
     const body = `
       <p>Hi ${fullName || 'there'},</p>
@@ -187,7 +189,7 @@ function tplTeacherApproved({ fullName, collegeName }) {
     return { subject, html: layout({ title: subject, body }), text };
 }
 
-function tplTeacherRejected({ fullName, collegeName, reason }) {
+function _tplTeacherRejected({ fullName, collegeName, reason }) {
     const subject = `Update on your ${collegeName} affiliation request`;
     const body = `
       <p>Hi ${fullName || 'there'},</p>
@@ -201,7 +203,7 @@ function tplTeacherRejected({ fullName, collegeName, reason }) {
     return { subject, html: layout({ title: subject, body }), text };
 }
 
-function tplWelcomeAffiliatedTeacher({ fullName, collegeName }) {
+function _tplWelcomeAffiliatedTeacher({ fullName, collegeName }) {
     const subject = `Welcome to QMetric — awaiting approval from ${collegeName}`;
     const body = `
       <p>Hi ${fullName || 'there'},</p>
@@ -220,6 +222,50 @@ function tplWelcomeAffiliatedTeacher({ fullName, collegeName }) {
 }
 
 // ============================================================
+// HTML-injection protection
+// ------------------------------------------------------------
+// Templates interpolate user-controlled strings (names, paper titles, reviewer
+// comments, rejection reasons). Escape every string parameter before it reaches
+// a template, then reverse the escaping for the plain-text body and subject,
+// where entities would show up literally.
+// ============================================================
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+const escapeHtml = (v) => String(v).replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
+// Exact inverse of escapeHtml (&amp; must be decoded LAST).
+const unescapeHtml = (v) =>
+    String(v)
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&amp;/g, '&');
+
+function escapeDeep(value) {
+    if (typeof value === 'string') return escapeHtml(value);
+    if (Array.isArray(value)) return value.map(escapeDeep);
+    if (value && typeof value === 'object') {
+        return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, escapeDeep(v)]));
+    }
+    return value; // numbers, booleans, null, undefined pass through untouched
+}
+
+const safeTemplate = (tpl) => (params = {}) => {
+    const { subject, html, text } = tpl(escapeDeep(params));
+    return { subject: unescapeHtml(subject), html, text: unescapeHtml(text) };
+};
+
+const tplNewUser = safeTemplate(_tplNewUser);
+const tplVerifyEmail = safeTemplate(_tplVerifyEmail);
+const tplPaperApproved = safeTemplate(_tplPaperApproved);
+const tplPaperRejected = safeTemplate(_tplPaperRejected);
+const tplPaperNeedsRevision = safeTemplate(_tplPaperNeedsRevision);
+const tplReviewerAssigned = safeTemplate(_tplReviewerAssigned);
+const tplBulkRegistrationSummary = safeTemplate(_tplBulkRegistrationSummary);
+const tplTeacherApproved = safeTemplate(_tplTeacherApproved);
+const tplTeacherRejected = safeTemplate(_tplTeacherRejected);
+const tplWelcomeAffiliatedTeacher = safeTemplate(_tplWelcomeAffiliatedTeacher);
+
+// ============================================================
 // Service methods — all fire-and-forget, never throw
 // ============================================================
 
@@ -227,10 +273,10 @@ async function _send(to, { subject, html, text }) {
     try {
         if (!to) return { success: false, error: 'No recipient' };
         await sendMail({ to, subject, html, text });
-        console.log(`[emailService] Sent "${subject}" to ${to}`);
+        logger.info(`[emailService] Sent "${subject}" to ${to}`);
         return { success: true };
     } catch (err) {
-        console.error(`[emailService] Failed to send "${subject}" to ${to}:`, err.message);
+        logger.error(`[emailService] Failed to send "${subject}" to ${to}:`, err.message);
         return { success: false, error: err.message };
     }
 }
@@ -287,3 +333,28 @@ exports.sendTeacherRejectedEmail = (email, fullName, collegeName, reason) =>
 
 exports.sendWelcomeAffiliatedTeacherEmail = (email, fullName, collegeName) =>
     _send(email, tplWelcomeAffiliatedTeacher({ fullName, collegeName }));
+
+// ─── Password Reset ──────────────────────────────────────────────────────────
+
+function tplPasswordReset({ fullName, resetUrl }) {
+    const subject = `Reset your ${BRAND} password`;
+    const body = `
+      <p>Hi ${fullName || 'there'},</p>
+      <p>We received a request to reset the password for your ${BRAND} account.</p>
+      <p>Click the button below to choose a new password. This link expires in <strong>1 hour</strong>.</p>
+      ${button(resetUrl, 'Reset password')}
+      <p style="color:#6b7280;font-size:13px;">
+        If you didn't request a password reset, you can safely ignore this email — your password will not change.
+      </p>
+      <p style="color:#6b7280;font-size:13px;">
+        For security, this link can only be used once and will expire after 1 hour.
+      </p>`;
+    const text = `Hi ${fullName || 'there'},\n\nClick the link below to reset your ${BRAND} password (expires in 1 hour):\n${resetUrl}\n\nIf you didn't request this, ignore this email.`;
+    return { subject, html: layout({ title: subject, body }), text };
+}
+
+exports.sendPasswordResetEmail = ({ to, fullName, resetToken }) =>
+    _send(to, tplPasswordReset({
+        fullName,
+        resetUrl: `${FRONTEND_URL}/auth/reset-password/${resetToken}`,
+    }));

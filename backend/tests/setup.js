@@ -3,12 +3,16 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 
 let mongoServer;
 
-// Mock Cloudflare Turnstile verification for login/register tests
+// Mock Cloudflare Turnstile verification for login/register tests.
+// Must include ok: true — verifyTurnstile() now checks response.ok before
+// calling response.json(), so a mock without it throws and returns 503.
 global.fetch = jest.fn(() =>
   Promise.resolve({
+    ok: true,
     json: () => Promise.resolve({ success: true }),
   })
 );
+jest.setTimeout(60000);
 
 beforeAll(async () => {
   process.env.NODE_ENV = 'test';
@@ -39,12 +43,9 @@ afterEach(async () => {
   jest.clearAllMocks();
   global.fetch.mockImplementation(() =>
     Promise.resolve({
+      ok: true,
       json: () => Promise.resolve({ success: true }),
     })
   );
 });
 
-if (process.env.DEBUG_TESTS !== 'true') {
-  global.console.error = jest.fn();
-  global.console.warn = jest.fn();
-}

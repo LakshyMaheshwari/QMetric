@@ -1,3 +1,5 @@
+const logger = require('../config/logger');
+
 /**
  * middleware/adminAuth.js
  * -----------------------
@@ -27,7 +29,7 @@ module.exports = function adminAuth(req, res, next) {
 
     // Fail closed — if no secret is configured, deny everything
     if (!adminSecret) {
-        console.error('[adminAuth] ADMIN_SECRET_KEY is not set in .env — blocking request');
+        logger.error('[adminAuth] ADMIN_SECRET_KEY is not set in .env — blocking request');
         return res.status(503).json({
             error: true,
             message: 'Admin operations are not configured. Contact the server administrator.',

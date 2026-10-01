@@ -185,40 +185,40 @@
 //         }
 //     });
 
-//     // console.log("QP: ",QP);
-//     // console.log("QPMax: ",QPMax);
-//     // console.log("QPMin: ",QPMin);
+//     // logger.info("QP: ",QP);
+//     // logger.info("QPMax: ",QPMax);
+//     // logger.info("QPMin: ",QPMin);
 
 //     // Normalize QP score
 //     const QP_Final = ((QP - QPMin) / ((QPMax - QPMin) || 1)) * 100;
 
-//     console.log("QP_Final: ",QP_Final);
+//     logger.info("QP_Final: ",QP_Final);
 
 //     // Penalty Calculations
 //     const C2 = checkModule ? calculateModulePenalty(ModuleWeights) : 0;
 //     const C3 = calculateCOPenalty(dataArray, CO_Map);
 
 //     const P_Final = checkModule ? (C2 + C3) / 2 : C3;
-//     console.log("P_Final: ",P_Final);
+//     logger.info("P_Final: ",P_Final);
 //     const PF_Percentage = (P_Final / 2) * 100;
 
 //     const FinalScore = parseFloat(((QP_Final + (100 - PF_Percentage)) / 2).toFixed(2));
 
-//     console.log("Final Score: ", FinalScore);
+//     logger.info("Final Score: ", FinalScore);
 
-//     console.log("BT_Weights: ", BT_Weights);
+//     logger.info("BT_Weights: ", BT_Weights);
 
 //       // Generate recommendations and log them
 //     // const bloomRecommendations = generateBloomRecommendations(SequenceData, pre_data, bloomLevelMap, CO_Map);
-//     // console.log("Bloom Recommendations:", bloomRecommendations); 
+//     // logger.info("Bloom Recommendations:", bloomRecommendations); 
 
 //     const coRecommendations = generateCORecommendations(pre_data, CO_Map);
-//     console.log("CO Recommendations:", coRecommendations); 
+//     logger.info("CO Recommendations:", coRecommendations); 
 
 //     const moduleRecommendations = generateModuleRecommendations(ModuleWeights);
-//     console.log("Module Recommendations:", moduleRecommendations); 
+//     logger.info("Module Recommendations:", moduleRecommendations); 
 
-//     console.log("Question Recommendations:", questionRecommendations);
+//     logger.info("Question Recommendations:", questionRecommendations);
 
 
 //     return {
@@ -238,6 +238,7 @@
 //v2
 //v2
 const paperFields = require('../constants/paperFields');
+const logger = require('../../config/logger');
 const { classifyPaper, aggregateInsights } = require('../nlp/verbClassifier');
 const LearnedVerb = require('../../Model/LearnedVerb');
 const VerifiedQuestion = require('../../Model/VerifiedQuestion');
@@ -412,12 +413,12 @@ exports.Evaluate = async (SequenceData, pre_data, Module_Hrs, bloomLevelMap, opt
                 };
             });
             if (corrections.length > 0) {
-                console.log(
+                logger.info(
                     `[Evaluate] Applied ${corrections.length} correction(s) for paper ${paperId}`
                 );
             }
         } catch (e) {
-            console.warn('[Evaluate] Failed to load corrections:', e.message);
+            logger.warn('[Evaluate] Failed to load corrections:', e.message);
         }
     }
 
@@ -432,7 +433,9 @@ exports.Evaluate = async (SequenceData, pre_data, Module_Hrs, bloomLevelMap, opt
     SequenceData.forEach((i, idx) => {
         QT_Map[i[paperFields.QUESTION_TYPE]] = (QT_Map[i[paperFields.QUESTION_TYPE]] || 0) + 1;
 
-        const co = Number.parseInt(i.CO.match(/\d+/)[0], 10);
+        const rawCO = String(i.CO ?? i[paperFields.COURSE_OUTCOME] ?? '1');
+        const coMatch = rawCO.match(/\d+/);
+        const co = coMatch ? Number.parseInt(coMatch[0], 10) : 1;
         const coKey = `CO${co}`;
         const coBloom = (pre_data[coKey]?.blooms?.[0] || '').toLowerCase();
         const COBTL = bloomLevelMap[coBloom] || 6;
@@ -441,7 +444,7 @@ exports.Evaluate = async (SequenceData, pre_data, Module_Hrs, bloomLevelMap, opt
         let QHBTL = Number.parseInt(i[paperFields.BLOOMS_TAXONOMY_LEVEL], 10);
 
         if (Number.isNaN(QHBTL) || QHBTL < 1 || QHBTL > 6) {
-            console.warn(
+            logger.warn(
                 `Warning: Invalid Bloom level ${i[paperFields.BLOOMS_TAXONOMY_LEVEL]} for question ${i[paperFields.QUESTION_NO]}, defaulting to 6`
             );
             QHBTL = 6;
@@ -501,7 +504,7 @@ exports.Evaluate = async (SequenceData, pre_data, Module_Hrs, bloomLevelMap, opt
 
         if (checkModule && i.Module) {
             // Single unambiguous pattern — avoids catastrophic backtracking (S8786)
-            const match = i.Module.match(/\d+(?:\.\d+)?/);
+            const match = String(i.Module).match(/\d+(?:\.\d+)?/);
             if (match) {
                 const moduleNumber = Number.parseFloat(match[0]);
                 const moduleIndex = moduleNumber - 1;
@@ -514,26 +517,26 @@ exports.Evaluate = async (SequenceData, pre_data, Module_Hrs, bloomLevelMap, opt
 
     // Normalize QP score
     const QP_Final = ((QP - QPMin) / ((QPMax - QPMin) || 1)) * 100;
-    console.log('QP_Final: ', QP_Final);
+    logger.info('QP_Final: ', QP_Final);
 
     // Penalty calculations
     const C2 = checkModule ? calculateModulePenalty(ModuleWeights) : 0;
     const C3 = calculateCOPenalty(dataArray, CO_Map);
 
     const P_Final = checkModule ? (C2 + C3) / 2 : C3;
-    console.log('P_Final: ', P_Final);
+    logger.info('P_Final: ', P_Final);
     const PF_Percentage = (P_Final / 2) * 100;
 
     const FinalScore = Number.parseFloat(((QP_Final + (100 - PF_Percentage)) / 2).toFixed(2));
 
-    console.log('Final Score: ', FinalScore);
-    console.log('BT_Weights: ', BT_Weights);
+    logger.info('Final Score: ', FinalScore);
+    logger.info('BT_Weights: ', BT_Weights);
 
     const coRecommendations = generateCORecommendations(pre_data, CO_Map);
-    console.log('CO Recommendations:', coRecommendations);
+    logger.info('CO Recommendations:', coRecommendations);
 
     const moduleRecommendations = generateModuleRecommendations(ModuleWeights);
-    console.log('Module Recommendations:', moduleRecommendations);
+    logger.info('Module Recommendations:', moduleRecommendations);
 
     const bloomRecommendations = generateBloomRecommendations(
         SequenceData,
@@ -541,9 +544,9 @@ exports.Evaluate = async (SequenceData, pre_data, Module_Hrs, bloomLevelMap, opt
         bloomLevelMap,
         CO_Map
     );
-    console.log('Bloom Recommendations:', bloomRecommendations);
+    logger.info('Bloom Recommendations:', bloomRecommendations);
 
-    console.log('Question Recommendations:', questionRecommendations);
+    logger.info('Question Recommendations:', questionRecommendations);
 
     // ─── Learning Domain Insights ─────────────────────────────
     let learnedCache = {};
@@ -557,7 +560,7 @@ exports.Evaluate = async (SequenceData, pre_data, Module_Hrs, bloomLevelMap, opt
             };
         });
     } catch (e) {
-        console.warn('LearnedVerb cache load failed:', e.message);
+        logger.warn('LearnedVerb cache load failed:', e.message);
     }
 
     const questionTexts = SequenceData.map((q) => q.Question || q[paperFields.QUESTION_NO] || q.text || '');

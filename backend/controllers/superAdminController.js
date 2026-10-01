@@ -1,10 +1,17 @@
 const College = require('../Model/College');
+const logger = require('../config/logger');
 const User = require('../Model/user');
 const Paper = require('../Model/PaperInfo');
 const AuditLog = require('../Model/AuditLog');
-const { paginate, getPaginationMeta } = require('../utils/pagination');
+const OCRLog = require('../Model/OCRLog');
+const VerifiedQuestion = require('../Model/VerifiedQuestion');
+const LearnedVerb = require('../Model/LearnedVerb');
+const Notification = require('../Model/Notification');
+const { paginate, getPaginationMeta, getSortOptions } = require('../utils/pagination');
 const { logAudit } = require('../utils/auditLog');
 const { getUserId } = require('../utils/currentUser');
+const { withTransaction } = require('../utils/withTransaction');
+const { syncCollegeRoleMembership } = require('../utils/syncCollegeCounters');
 const escapeRegex = require('../utils/escapeRegex');
 
 /**
@@ -13,7 +20,7 @@ const escapeRegex = require('../utils/escapeRegex');
  */
 const createCollege = async (req, res) => {
   try {
-    const { name, code, address, city, state, adminIds, isActive } = req.body;
+    const { name, code, address, city, state, adminIds, isActive } = req.body || {};
 
     if (!name?.trim()) return res.status(400).json({ error: true, message: 'College name is required.' });
     if (!code?.trim()) return res.status(400).json({ error: true, message: 'College code is required.' });
@@ -24,7 +31,7 @@ const createCollege = async (req, res) => {
     const existing = await College.findOne({
       $or: [
         { code: trimmedCode },
-        { name: { $regex: `^${trimmedName}$`, $options: 'i' } },
+        { name: { $regex: `^${escapeRegex(trimmedName)}$`, $options: 'i' } },
       ],
     });
     if (existing) {
@@ -60,7 +67,7 @@ const createCollege = async (req, res) => {
       college: newCollege,
     });
   } catch (err) {
-    console.error('Error creating college:', err);
+    logger.error('Error creating college:', err);
     return res.status(500).json({ error: true, message: 'Server error creating college.' });
   }
 };
@@ -113,7 +120,7 @@ const getGlobalStats = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('Error fetching global stats:', err);
+    logger.error('Error fetching global stats:', err);
     return res.status(500).json({ error: true, message: 'Server error fetching global stats.' });
   }
 };
@@ -175,7 +182,7 @@ const getAllColleges = async (req, res) => {
       return {
         ...college,
         liveTeacherCount: userCountMap.get(colIdStr) || 0,
-        livePaperCount: paperCountMap.get(colIdStr) || (college.totalPapers || 0),
+        livePaperCount: paperCountMap.get(colIdStr) ?? 0,
       };
     });
 
@@ -184,7 +191,7 @@ const getAllColleges = async (req, res) => {
       College.countDocuments(),
       College.countDocuments({ isActive: true }),
       User.countDocuments({ role: 'teacher' }),
-      Paper.aggregate([{ $group: { _id: null, total: { $sum: '$totalPapers' } } }]),
+      Paper.countDocuments(),
     ]);
 
     return res.json({
@@ -196,11 +203,11 @@ const getAllColleges = async (req, res) => {
         activeColleges,
         inactiveColleges: totalColleges - activeColleges,
         totalTeachers,
-        totalPapers: papersAgg[0]?.total || 0,
+        totalPapers: papersAgg,
       },
     });
   } catch (err) {
-    console.error('Error fetching colleges for super admin:', err);
+    logger.error('Error fetching colleges for super admin:', err);
     return res.status(500).json({ error: true, message: 'Server error fetching colleges.' });
   }
 };
@@ -218,40 +225,53 @@ const getCollegeDetails = async (req, res) => {
       return res.status(404).json({ error: true, message: 'College not found.' });
     }
 
-    // Fetch all users in the college
-    const users = await User.find({ collegeId: id }).select('-password').sort({ createdAt: -1 }).lean();
+    const userPage = Math.max(1, Number.parseInt(req.query.userPage, 10) || 1);
+    const userLimit = Math.min(100, Math.max(1, Number.parseInt(req.query.userLimit, 10) || 20));
+    const paperPage = Math.max(1, Number.parseInt(req.query.paperPage, 10) || 1);
+    const paperLimit = Math.min(100, Math.max(1, Number.parseInt(req.query.paperLimit, 10) || 20));
 
-    const userIds = users.map((u) => u._id);
+    // Efficient stats calculation using countDocuments
+    const [totalUsers, teachers, reviewers, admins, blocked] = await Promise.all([
+      User.countDocuments({ collegeId: id }),
+      User.countDocuments({ collegeId: id, role: 'teacher' }),
+      User.countDocuments({ collegeId: id, role: 'reviewer' }),
+      User.countDocuments({ collegeId: id, role: 'admin' }),
+      User.countDocuments({ collegeId: id, isBlocked: true }),
+    ]);
+
     const stats = {
-      totalUsers: users.length,
-      teachers: users.filter((u) => u.role === 'teacher').length,
-      reviewers: users.filter((u) => u.role === 'reviewer').length,
-      admins: users.filter((u) => u.role === 'admin').length,
-      blocked: users.filter((u) => u.isBlocked).length,
+      totalUsers,
+      teachers,
+      reviewers,
+      admins,
+      blocked,
     };
 
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     // Safe regex — escaped and length-capped to avoid ReDoS
-    const safeName = college.name ? escapeRegex(String(college.name).slice(0, 100)) : null;
+    const paperQuery = { collegeId: id };
 
-    const paperQuery = {
-      $or: [
-        { userId: { $in: userIds } },
-        ...(safeName ? [{ 'College Name': new RegExp(safeName, 'i') }] : []),
-      ],
-    };
+    const [totalPapers, recentPapers, users, papers] = await Promise.all([
+      Paper.countDocuments(paperQuery),
+      Paper.countDocuments({ ...paperQuery, createdAt: { $gte: sevenDaysAgo } }),
+      User.find({ collegeId: id })
+        .select('-password')
+        .sort({ createdAt: -1 })
+        .skip((userPage - 1) * userLimit)
+        .limit(userLimit)
+        .lean(),
+      Paper.find(paperQuery)
+        .populate('userId', 'userName fullName')
+        .sort({ createdAt: -1 })
+        .skip((paperPage - 1) * paperLimit)
+        .limit(paperLimit)
+        .lean(),
+    ]);
 
-    const papers = await Paper.find(paperQuery)
-      .populate('userId', 'userName fullName')
-      .sort({ createdAt: -1 })
-      .lean();
-
-    stats.totalPapers = papers.length;
-    stats.recentPapers = papers.filter(
-      (p) => p.createdAt && new Date(p.createdAt) >= sevenDaysAgo
-    ).length;
+    stats.totalPapers = totalPapers;
+    stats.recentPapers = recentPapers;
 
     return res.json({
       error: false,
@@ -259,9 +279,11 @@ const getCollegeDetails = async (req, res) => {
       stats,
       users,
       papers,
+      usersPagination: getPaginationMeta(totalUsers, userPage, userLimit),
+      papersPagination: getPaginationMeta(totalPapers, paperPage, paperLimit),
     });
   } catch (err) {
-    console.error('Error fetching college details:', err);
+    logger.error('Error fetching college details:', err);
     return res.status(500).json({ error: true, message: 'Server error fetching college details.' });
   }
 };
@@ -273,7 +295,7 @@ const getCollegeDetails = async (req, res) => {
 const updateCollege = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, address, city, state, isActive } = req.body;
+    const { name, code, address, city, state, isActive } = req.body || {};
 
     const college = await College.findById(id);
     if (!college) {
@@ -286,7 +308,7 @@ const updateCollege = async (req, res) => {
     if (name && name.trim()) {
       const conflict = await College.findOne({
         _id: { $ne: id },
-        name: { $regex: `^${name.trim()}$`, $options: 'i' },
+        name: { $regex: `^${escapeRegex(name.trim())}$`, $options: 'i' },
       });
       if (conflict) return res.status(409).json({ error: true, message: 'College name already taken.' });
       college.name = name.trim();
@@ -319,7 +341,7 @@ const updateCollege = async (req, res) => {
 
     return res.json({ error: false, message: 'College updated successfully.', college });
   } catch (err) {
-    console.error('Error updating college:', err);
+    logger.error('Error updating college:', err);
     return res.status(500).json({ error: true, message: 'Server error updating college.' });
   }
 };
@@ -347,6 +369,18 @@ const deleteCollege = async (req, res) => {
 
     const isPermanent = req.query.permanent === 'true';
     if (isPermanent) {
+      const [paperCount, learnedVerbCount] = await Promise.all([
+        Paper.countDocuments({ collegeId: id }),
+        require('../Model/LearnedVerb').countDocuments({ collegeId: id }),
+      ]);
+
+      if (paperCount > 0 || learnedVerbCount > 0) {
+        return res.status(400).json({
+          error: true,
+          message: `Cannot permanently delete this college: ${paperCount} paper(s) and ${learnedVerbCount} learned verb(s) still reference it. Deactivate it instead.`,
+        });
+      }
+
       await College.findByIdAndDelete(id);
     } else {
       college.isActive = false;
@@ -366,7 +400,7 @@ const deleteCollege = async (req, res) => {
       message: isPermanent ? 'College permanently deleted.' : 'College deactivated successfully.',
     });
   } catch (err) {
-    console.error('Error deleting college:', err);
+    logger.error('Error deleting college:', err);
     return res.status(500).json({ error: true, message: 'Server error deleting college.' });
   }
 };
@@ -381,15 +415,34 @@ const getAuditLogs = async (req, res) => {
     const limit = Math.min(100, Number.parseInt(req.query.limit, 10) || 50);
     const skip = (page - 1) * limit;
 
-    const { action, userId, startDate, endDate } = req.query;
+    const { action, userId, startDate, endDate, resource } = req.query;
 
     const query = {};
     if (action) query.action = action;
     if (userId) query.userId = userId;
+    if (resource) query.resource = new RegExp(escapeRegex(resource), 'i');
     if (startDate || endDate) {
       query.timestamp = {};
-      if (startDate) query.timestamp.$gte = new Date(startDate);
-      if (endDate) query.timestamp.$lte = new Date(endDate);
+
+      if (startDate) {
+        const parsedStart = new Date(startDate);
+        if (Number.isNaN(parsedStart.getTime())) {
+          return res.status(400).json({ error: true, message: 'Invalid startDate.' });
+        }
+        query.timestamp.$gte = parsedStart;
+      }
+
+      if (endDate) {
+        const parsedEnd = new Date(endDate);
+        if (Number.isNaN(parsedEnd.getTime())) {
+          return res.status(400).json({ error: true, message: 'Invalid endDate.' });
+        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+          parsedEnd.setUTCHours(0, 0, 0, 0);
+          parsedEnd.setUTCDate(parsedEnd.getUTCDate() + 1);
+        }
+        query.timestamp.$lt = parsedEnd;
+      }
     }
 
     const [logs, total] = await Promise.all([
@@ -415,7 +468,8 @@ const getAuditLogs = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(500).json({ error: true, message: error.message });
+    logger.error('getAuditLogs error:', error);
+    res.status(500).json({ error: true, message: 'Server error fetching audit logs' });
   }
 };
 
@@ -448,13 +502,253 @@ const testEmailConfig = async (req, res) => {
       timestamp: new Date(),
     });
   } catch (err) {
-    console.error('testEmailConfig error:', err);
+    logger.error('testEmailConfig error:', err);
     res.status(500).json({
       error: true,
       message: 'Failed to send test email.',
-      details: err.message,
       smtpConfigured: Boolean(process.env.SMTP_HOST),
     });
+  }
+};
+
+/**
+ * GET /super-admin/users
+ * Global user listing across all colleges with role, collegeId, search, and status filters.
+ */
+const getAllUsers = async (req, res) => {
+  try {
+    const { page, limit, skip } = paginate(req, 20, 100);
+    const { search, role, collegeId, isBlocked } = req.query;
+    const sort = getSortOptions(req, ['userName', 'email', 'role', 'createdAt', 'fullName']);
+
+    const query = {};
+    if (role) query.role = role;
+    if (collegeId) query.collegeId = collegeId;
+    if (isBlocked !== undefined) query.isBlocked = isBlocked === 'true';
+
+    if (search && typeof search === 'string') {
+      const safe = escapeRegex(search.trim().slice(0, 50));
+      query.$or = [
+        { userName: new RegExp(safe, 'i') },
+        { email: new RegExp(safe, 'i') },
+        { fullName: new RegExp(safe, 'i') },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      User.find(query)
+        .select('-password')
+        .populate('collegeId', 'name code')
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      User.countDocuments(query),
+    ]);
+
+    return res.json({
+      error: false,
+      users,
+      pagination: getPaginationMeta(total, page, limit),
+    });
+  } catch (err) {
+    logger.error('Error fetching users for super admin:', err);
+    return res.status(500).json({ error: true, message: 'Server error fetching users.' });
+  }
+};
+
+/**
+ * GET /super-admin/users/:id
+ * Retrieve single user by ID.
+ */
+const getUserById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id).select('-password').populate('collegeId', 'name code').lean();
+    if (!user) {
+      return res.status(404).json({ error: true, message: 'User not found.' });
+    }
+    return res.json({ error: false, user });
+  } catch (err) {
+    logger.error('Error fetching user by ID:', err);
+    return res.status(500).json({ error: true, message: 'Server error fetching user.' });
+  }
+};
+
+/**
+ * PUT /super-admin/users/:id/role
+ * Change user role across colleges.
+ */
+const updateUserRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body || {};
+
+    const allowedRoles = ['teacher', 'reviewer', 'admin', 'student'];
+    if (!role || !allowedRoles.includes(role)) {
+      return res.status(400).json({
+        error: true,
+        message: `Invalid role. Allowed roles: ${allowedRoles.join(', ')}`,
+      });
+    }
+
+    const result = await withTransaction(async (session) => {
+      const userQuery = User.findById(id);
+      if (session) userQuery.session(session);
+      const user = await userQuery;
+
+      if (!user) return { user: null };
+
+      const oldRole = user.role;
+      user.role = role;
+      await user.save(session ? { session } : {});
+      await syncCollegeRoleMembership({
+        collegeId: user.collegeId,
+        userId: user._id,
+        oldRole,
+        newRole: role,
+        session,
+      });
+
+      return { user, oldRole };
+    });
+
+    if (!result.user) {
+      return res.status(404).json({ error: true, message: 'User not found.' });
+    }
+
+    const { user, oldRole } = result;
+
+    await logAudit({
+      userId: getUserId(req),
+      action: 'UPDATE_ROLE',
+      resource: `User:${id}`,
+      changes: { oldValue: { role: oldRole }, newValue: { role } },
+      request: req,
+    });
+
+    const updated = user.toObject();
+    delete updated.password;
+
+    return res.json({
+      error: false,
+      message: `User role updated to ${role}.`,
+      user: updated,
+    });
+  } catch (err) {
+    logger.error('Error updating user role:', err);
+    return res.status(500).json({ error: true, message: 'Server error updating user role.' });
+  }
+};
+
+/**
+ * PUT /super-admin/users/:id/block
+ * Toggle or set user blocked status.
+ */
+const toggleUserBlock = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isBlocked } = req.body || {};
+
+    if (isBlocked === undefined) {
+      return res.status(400).json({ error: true, message: 'isBlocked must be provided as a boolean.' });
+    }
+
+    if (id === getUserId(req)?.toString()) {
+      return res.status(400).json({ error: true, message: 'You cannot block your own account.' });
+    }
+
+    const user = await User.findOneAndUpdate(
+      { _id: id },
+      { $set: { isBlocked: Boolean(isBlocked) } },
+      { new: true }
+    ).select('userName email isBlocked');
+
+    if (!user) {
+      return res.status(404).json({ error: true, message: 'User not found.' });
+    }
+
+    await logAudit({
+      userId: getUserId(req),
+      action: user.isBlocked ? 'BLOCK_USER' : 'UNBLOCK_USER',
+      resource: `User:${id}`,
+      request: req,
+    });
+
+    return res.json({
+      error: false,
+      message: `User has been ${user.isBlocked ? 'blocked' : 'unblocked'}.`,
+      user,
+    });
+  } catch (err) {
+    logger.error('Error toggling user block:', err);
+    return res.status(500).json({ error: true, message: 'Server error toggling block status.' });
+  }
+};
+
+/**
+ * DELETE /super-admin/users/:id
+ * Delete user across colleges.
+ */
+const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (id === getUserId(req)?.toString()) {
+      return res.status(400).json({ error: true, message: 'You cannot delete your own account.' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ error: true, message: 'User not found.' });
+    }
+
+    // Do not hard-delete users that are referenced by business/history records.
+    const [paperRefs, ocrLogs, corrections, taughtVerbs, notificationRefs, adminMemberships] = await Promise.all([
+      Paper.countDocuments({
+        $or: [
+          { userId: id },
+          { reviewedBy: id },
+          { 'reviewHistory.reviewerId': id },
+        ],
+      }),
+      OCRLog.countDocuments({ userId: id }),
+      VerifiedQuestion.countDocuments({ correctedBy: id }),
+      LearnedVerb.countDocuments({ taughtBy: id }),
+      Notification.countDocuments({ userId: id }),
+      College.countDocuments({ adminIds: id }),
+    ]);
+
+    if (paperRefs > 0 || ocrLogs > 0 || corrections > 0 || taughtVerbs > 0 || notificationRefs > 0 || adminMemberships > 0) {
+      return res.status(409).json({
+        error: true,
+        message: 'User cannot be permanently deleted because records still reference this account. Block the account instead.',
+      });
+    }
+
+    if (user.collegeIdPhotoPublicId) {
+      try {
+        const cloudinary = require('../config/cloudinary');
+        await cloudinary.uploader.destroy(user.collegeIdPhotoPublicId);
+      } catch (cloudErr) {
+        logger.warn('Cloudinary photo destroy failed (non-blocking):', cloudErr.message);
+      }
+    }
+
+    await User.findByIdAndDelete(id);
+
+    await logAudit({
+      userId: getUserId(req),
+      action: 'DELETE_USER',
+      resource: `User:${id}`,
+      changes: { oldValue: { userName: user.userName, email: user.email, role: user.role } },
+      request: req,
+    });
+
+    return res.json({ error: false, message: 'User deleted successfully.' });
+  } catch (err) {
+    logger.error('Error deleting user:', err);
+    return res.status(500).json({ error: true, message: 'Server error deleting user.' });
   }
 };
 
@@ -467,4 +761,9 @@ module.exports = {
   deleteCollege,
   getAuditLogs,
   testEmailConfig,
+  getAllUsers,
+  getUserById,
+  updateUserRole,
+  toggleUserBlock,
+  deleteUser,
 };

@@ -1,4 +1,5 @@
 const bcrypt = require('bcrypt');
+const logger = require('../config/logger');
 const jwt = require('jsonwebtoken');
 const validator = require('validator');
 const User = require('../Model/user');
@@ -11,7 +12,12 @@ const { withTransaction } = require('../utils/withTransaction');
 const { BCRYPT_ROUNDS, isStrongPassword, PASSWORD_ERROR_MESSAGE } = require('../config/security');
 const { createNotification } = require('./notificationController');
 const crypto = require('node:crypto');
+const mongoose = require('mongoose');
 const emailService = require('../utils/emailService');
+const { revoke } = require('../utils/tokenBlacklist');
+
+// Pre-computed hash used to equalise login timing for unknown emails.
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('timing-equaliser-not-a-real-password', BCRYPT_ROUNDS);
 
 // Node 22 has a built-in global `fetch` — no import needed.
 
@@ -76,7 +82,7 @@ function extractOcrText(uploadResult) {
         if (!Array.isArray(textAnnotations) || textAnnotations.length === 0) return '';
         return textAnnotations[0]?.description || '';
     } catch (err) {
-        console.error('  OCR text extraction error:', err.message);
+        logger.error('  OCR text extraction error:', err.message);
         return '';
     }
 }
@@ -290,31 +296,62 @@ function uploadToCloudinaryWithOcr(fileBuffer) {
  * Verify a Cloudflare Turnstile token. Returns true if valid.
  */
 async function verifyTurnstile(turnstileToken) {
-    const response = await fetch(
-        'https://challenges.cloudflare.com/turnstile/v0/siteverify',
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                secret: process.env.TURNSTILE_SECRET_KEY,
-                response: turnstileToken,
-            }).toString(),
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    try {
+        const response = await fetch(
+            'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    secret: process.env.TURNSTILE_SECRET_KEY,
+                    response: turnstileToken,
+                }).toString(),
+                signal: controller.signal,
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`Turnstile returned HTTP ${response.status}`);
         }
-    );
-    return response.json();
+
+        return await response.json();
+    } finally {
+        clearTimeout(timeout);
+    }
 }
 
 // ============================================================
 // LOGIN CONTROLLER
 // ============================================================
 const login = async (req, res) => {
-    const { email, password, turnstileToken } = req.body;
+    const { email, password, turnstileToken } = req.body || {};
+
+    if (!email || !password) {
+        return res.status(400).json({ error: true, message: 'Credentials required.' });
+    }
+
+    if (typeof password !== 'string') {
+        return res.status(400).json({ error: true, message: 'Invalid email or password.' });
+    }
 
     if (!turnstileToken) {
         return res.status(400).json({ error: true, message: 'CAPTCHA token is missing. Please complete the verification.' });
     }
 
-    const turnstileResult = await verifyTurnstile(turnstileToken);
+    let turnstileResult;
+    try {
+        turnstileResult = await verifyTurnstile(turnstileToken);
+    } catch (turnstileErr) {
+        logger.error('Turnstile verification failed:', turnstileErr.message);
+        return res.status(503).json({
+            error: true,
+            message: 'CAPTCHA service is temporarily unavailable. Please try again later.',
+        });
+    }
+
     if (!turnstileResult.success) {
         return res.status(403).json({
             error: true,
@@ -323,16 +360,21 @@ const login = async (req, res) => {
         });
     }
 
-    if (!email || !password) {
-        return res.status(400).json({ error: true, message: 'Credentials required.' });
-    }
-
     const user = await User.findOne({ email });
+
+    // Always run a bcrypt compare (against a dummy hash when the user doesn't
+    // exist) so response time doesn't reveal whether the email is registered.
+    const isPasswordValid = await bcrypt.compare(
+        password,
+        user ? user.password : DUMMY_PASSWORD_HASH
+    );
+
     if (!user) {
         return res.status(401).json({ error: true, message: 'Invalid email or password.' });
     }
 
-    if (user.isBlocked) {
+    // Blocked status is only revealed to someone who knows the password.
+    if (isPasswordValid && user.isBlocked) {
         await logAudit({
             userId: user._id,
             action: 'LOGIN_BLOCKED',
@@ -346,7 +388,6 @@ const login = async (req, res) => {
         });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
         await logAudit({
             userId: user._id,
@@ -362,14 +403,29 @@ const login = async (req, res) => {
         const accessToken = jwt.sign(
             { userId: user._id },
             process.env.ACCESS_TOKEN_SECRET,
-            { expiresIn: '72h' }
+            { expiresIn: '24h' }
         );
 
         res.cookie('accessToken', accessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
-            maxAge: 72 * 60 * 60 * 1000,
+            maxAge: 24 * 60 * 60 * 1000,
+        });
+
+        // Issue refresh token (7 days)
+        const rawRefreshToken = crypto.randomBytes(40).toString('hex');
+        const refreshHash = crypto.createHash('sha256').update(rawRefreshToken).digest('hex');
+        user.refreshTokenHash = refreshHash;
+        user.refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        await user.save({ validateBeforeSave: false });
+
+        res.cookie('refreshToken', rawRefreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            path: '/auth',
         });
 
         const accountState = user.collegeApprovalStatus === 'pending'
@@ -402,7 +458,7 @@ const login = async (req, res) => {
             canUseFeatures: accountState === 'active',
         });
     } catch (error) {
-        console.log(' Token creation error:', error.message);
+        logger.info(' Token creation error:', error.message);
         return res.status(500).json({ error: true, message: 'Error creating token' });
     }
 };
@@ -419,7 +475,7 @@ const register = async (req, res) => {
             turnstileToken,
             role = 'teacher',
             signupIntent,
-        } = req.body;
+        } = req.body || {};
 
         // ── Turnstile gate ──────────────────────────────
         if (!turnstileToken) {
@@ -477,7 +533,8 @@ const register = async (req, res) => {
             } else if (collegeCode) {
                 matchedCollege = await College.findOne({ code: collegeCode.trim().toUpperCase() });
             } else if (collegeName) {
-                matchedCollege = await College.findOne({ name: { $regex: `^${collegeName.trim()}$`, $options: 'i' } });
+                // Escape user input — never interpolate raw strings into $regex.
+                matchedCollege = await College.findOne({ name: { $regex: `^${escapeRegexLiteral(String(collegeName).trim())}$`, $options: 'i' } });
             }
             if (!matchedCollege) {
                 return res.status(400).json({
@@ -527,7 +584,7 @@ const register = async (req, res) => {
                         };
                     }
                 } catch (ocrErr) {
-                    console.error('Cloudinary/OCR processing error (non-blocking):', ocrErr.message);
+                    logger.error('Cloudinary/OCR processing error (non-blocking):', ocrErr.message);
                 }
             }
 
@@ -550,6 +607,7 @@ const register = async (req, res) => {
                     department,
                     stream,
                     collegeIdPhoto: uploadResult ? uploadResult.secure_url : '',
+                    collegeIdPhotoPublicId: uploadResult ? uploadResult.public_id : null,
                     idVerification,
                     collegeApprovalStatus: 'pending',
                 }], opts);
@@ -565,7 +623,7 @@ const register = async (req, res) => {
                     request: req,
                 });
             } catch (auditErr) {
-                console.error('Audit log failed (non-blocking):', auditErr.message);
+                logger.error('Audit log failed (non-blocking):', auditErr.message);
             }
 
             // OCRLog record
@@ -581,7 +639,7 @@ const register = async (req, res) => {
                     imageUrl: uploadResult ? uploadResult.secure_url : '',
                 });
             } catch (logErr) {
-                console.error('OCR log save failed (non-blocking):', logErr.message);
+                logger.error('OCR log save failed (non-blocking):', logErr.message);
             }
 
             // Notify all college admins
@@ -602,7 +660,7 @@ const register = async (req, res) => {
                     }).catch(() => {});
                 }
             } catch (notifErr) {
-                console.error('Admin notification dispatch failed (non-blocking):', notifErr.message);
+                logger.error('Admin notification dispatch failed (non-blocking):', notifErr.message);
             }
 
             // Welcome notification for the user
@@ -668,7 +726,7 @@ const register = async (req, res) => {
                     request: req,
                 });
             } catch (auditErr) {
-                console.error('Audit log failed (non-blocking):', auditErr.message);
+                logger.error('Audit log failed (non-blocking):', auditErr.message);
             }
 
             createNotification({
@@ -734,7 +792,7 @@ const register = async (req, res) => {
                     request: req,
                 });
             } catch (auditErr) {
-                console.error('Audit log failed (non-blocking):', auditErr.message);
+                logger.error('Audit log failed (non-blocking):', auditErr.message);
             }
 
             createNotification({
@@ -776,11 +834,10 @@ const register = async (req, res) => {
 
         return res.status(400).json({ error: true, message: 'Unhandled signup flow.' });
     } catch (error) {
-        console.error('Registration error:', error);
+        logger.error('Registration error:', error);
         return res.status(500).json({
             error: true,
             message: 'Error creating account.',
-            details: error.message,
         });
     }
 };
@@ -865,7 +922,10 @@ function duplicateFieldName({ email, phone, employeeId }) {
 // BULK REGISTER CONTROLLER
 // ============================================================
 const bulkRegister = async (req, res) => {
-    const { users, defaultPassword, turnstileToken } = req.body;
+    const { users, defaultPassword, turnstileToken } = req.body || {};
+    // Strict booleans: only the literal `true` enables these flags.
+    const dryRun = req.body?.dryRun === true;
+    const rollbackOnError = req.body?.rollbackOnError === true;
     const hasAdminSecret = Boolean(req.headers['x-admin-secret']);
 
     // ── Turnstile gate ─────────────────────────────────
@@ -918,7 +978,7 @@ const bulkRegister = async (req, res) => {
             ],
         }).select('email phone employeeId').lean();
     } catch (dbErr) {
-        console.error(' DB duplicate-check error:', dbErr.message);
+        logger.error(' DB duplicate-check error:', dbErr.message);
         return res.status(500).json({ error: true, message: 'Database error during duplicate check.' });
     }
 
@@ -954,7 +1014,8 @@ const bulkRegister = async (req, res) => {
         }
 
         const rawCollegeKey = String(data.collegeId || data.collegeName || '').toLowerCase().trim();
-        const matchedCol = collegeMap.get(rawCollegeKey) || activeColleges[0];
+        // No silent fallback: an unrecognised / inactive college is a per-row error.
+        const matchedCol = collegeMap.get(rawCollegeKey);
 
         if (!matchedCol) {
             skippedRows.push({ index, row: data, reason: `College "${data.collegeName || data.collegeId}" not recognized or inactive.` });
@@ -963,7 +1024,8 @@ const bulkRegister = async (req, res) => {
 
         let hashedPassword;
         try {
-            hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
+            // Skip the (expensive) bcrypt work on dry runs — nothing is persisted.
+            hashedPassword = dryRun ? '' : await bcrypt.hash(password, BCRYPT_ROUNDS);
         } catch (hashErr) {
             duplicates.push({ index, row: data, reason: `Password hashing failed: ${hashErr.message}` });
             continue;
@@ -996,6 +1058,41 @@ const bulkRegister = async (req, res) => {
         existingEmployeeIds.add(empIdStr);
     }
 
+    const failedRows = () => [
+        ...skippedRows.map(({ index, row, reason }) => ({ index, email: row.email, reason })),
+        ...duplicates.map(({ index, row, reason }) => ({ index, email: row.email, reason })),
+    ];
+
+    // ── rollbackOnError: any bad row aborts the whole batch, nothing is written ──
+    if (rollbackOnError && skippedRows.length + duplicates.length > 0) {
+        return res.status(422).json({
+            error: true,
+            message: 'One or more rows failed validation. No users were created (rollbackOnError).',
+            summary: {
+                totalReceived: users.length,
+                totalCreated: 0,
+                totalSkipped: skippedRows.length + duplicates.length,
+                rolledBack: true,
+            },
+            created: [],
+            failed: failedRows(),
+        });
+    }
+
+    // ── dryRun: report what WOULD happen, write nothing ──
+    if (dryRun) {
+        return res.status(200).json({
+            error: false,
+            dryRun: true,
+            summary: {
+                totalReceived: users.length,
+                wouldCreate: toInsert.length,
+                totalSkipped: skippedRows.length + duplicates.length,
+            },
+            failed: failedRows(),
+        });
+    }
+
     // ── Atomic bulk insert ─────────────────────────────
     let inserted = [];
     const dbErrors = [];
@@ -1022,10 +1119,10 @@ const bulkRegister = async (req, res) => {
         } catch (bulkErr) {
             dbErrors.push({
                 row: null,
-                reason: `Bulk insert failed: ${bulkErr.message || 'unknown error'}. No users were created.`,
+                reason: 'Bulk insert failed. No users were created.',
             });
             inserted = [];
-            console.error(' Bulk write rolled back:', bulkErr.message);
+            logger.error(' Bulk write rolled back:', bulkErr.message);
         }
     }
 
@@ -1044,22 +1141,56 @@ const bulkRegister = async (req, res) => {
 
     // ── Fire summary email to requesting admin (non-blocking) ──
     try {
-        const requester = await User.findById(getUserId(req) || req.adminId).select('email fullName').lean();
-        if (requester?.email) {
-            emailService.sendBulkRegistrationSummary({
-                to: requester.email,
-                adminName: requester.fullName,
-                totalCreated,
-                totalFailed: skippedRows.length + duplicates.length + dbErrors.length,
-                totalSkipped: skippedRows.length,
-                failedList: [
-                    ...skippedRows.map(({ row, reason }) => ({ email: row.email, reason })),
-                    ...duplicates.map(({ row, reason }) => ({ email: row.email, reason })),
-                ],
-            }).catch(() => {});
+        const requesterId = getUserId(req) || req.adminId;
+        if (requesterId && mongoose.isValidObjectId(requesterId)) {
+            const requester = await User.findById(requesterId).select('email fullName').lean();
+            if (requester?.email) {
+                emailService.sendBulkRegistrationSummary({
+                    to: requester.email,
+                    adminName: requester.fullName,
+                    totalCreated,
+                    totalFailed: skippedRows.length + duplicates.length + dbErrors.length,
+                    totalSkipped: skippedRows.length,
+                    failedList: [
+                        ...skippedRows.map(({ row, reason }) => ({ email: row.email, reason })),
+                        ...duplicates.map(({ row, reason }) => ({ email: row.email, reason })),
+                    ],
+                }).catch(() => {});
+            }
         }
     } catch (e) {
-        console.error(' Bulk summary email failed (non-blocking):', e.message);
+        logger.error(' Bulk summary email failed (non-blocking):', e.message);
+    }
+
+    try {
+        let auditUserId = getUserId(req) || req.adminId;
+
+        if (!auditUserId || !mongoose.isValidObjectId(auditUserId)) {
+            const adminUser = await User.findOne({
+                role: { $in: ['super_admin', 'admin'] }
+            })
+                .select('_id')
+                .lean();
+
+            // Bulk-register can be authenticated only with X-Admin-Secret,
+            // so there may be no logged-in admin user.
+            auditUserId =
+                adminUser?._id ||
+                new mongoose.Types.ObjectId();
+        }
+
+        await logAudit({
+            userId: auditUserId,
+            action: 'BULK_REGISTER',
+            resource:
+                `BulkRegister:created=${totalCreated}:failed=${skippedRows.length + duplicates.length + dbErrors.length}`,
+            request: req,
+        });
+    } catch (auditErr) {
+        logger.error(
+            'Bulk register audit log failed (non-blocking):',
+            auditErr.message
+        );
     }
 
     return res.status(207).json({
@@ -1079,7 +1210,7 @@ const bulkRegister = async (req, res) => {
 // ============================================================
 const createAdmin = async (req, res) => {
     try {
-        const { name, email, password, collegeId } = req.body;
+        const { name, email, password, collegeId } = req.body || {};
 
         if (!name || !email || !password) {
             return res.status(400).json({ error: true, message: 'Name, email, and password are required.' });
@@ -1100,17 +1231,30 @@ const createAdmin = async (req, res) => {
         let effectiveCollegeName = 'N/A';
 
         if (collegeId) {
-            const foundCollege = await College.findById(collegeId);
-            if (foundCollege) {
-                effectiveCollegeId = foundCollege._id;
-                effectiveCollegeName = foundCollege.name;
+            const foundCollege = await College.findOne({ _id: collegeId, isActive: true });
+            if (!foundCollege) {
+                return res.status(400).json({ error: true, message: 'Invalid or inactive college.' });
             }
+            effectiveCollegeId = foundCollege._id;
+            effectiveCollegeName = foundCollege.name;
         }
         if (!effectiveCollegeId) {
-            const fallback = await College.findOne({ isActive: true }).sort({ createdAt: 1 });
-            if (fallback) {
-                effectiveCollegeId = fallback._id;
-                effectiveCollegeName = fallback.name;
+            const activeColleges = await College.find({ isActive: true })
+                .select('_id name')
+                .sort({ createdAt: 1 })
+                .limit(2)
+                .lean();
+
+            if (activeColleges.length > 1) {
+                return res.status(400).json({
+                    error: true,
+                    message: 'collegeId is required when multiple active colleges exist.',
+                });
+            }
+
+            if (activeColleges.length === 1) {
+                effectiveCollegeId = activeColleges[0]._id;
+                effectiveCollegeName = activeColleges[0].name;
             }
         }
 
@@ -1154,8 +1298,8 @@ const createAdmin = async (req, res) => {
             user: adminResponse,
         });
     } catch (err) {
-        console.error(' Create admin error:', err.message);
-        return res.status(500).json({ error: true, message: 'Error creating admin account.', details: err.message });
+        logger.error(' Create admin error:', err.message);
+        return res.status(500).json({ error: true, message: 'Error creating admin account.' });
     }
 };
 
@@ -1194,14 +1338,14 @@ const verifyEmail = async (req, res) => {
 
         return res.json({ error: false, message: 'Email verified successfully.' });
     } catch (err) {
-        console.error(' verifyEmail error:', err);
+        logger.error(' verifyEmail error:', err);
         return res.status(500).json({ error: true, message: 'Server error.' });
     }
 };
 
 const resendVerificationEmail = async (req, res) => {
     try {
-        const { email } = req.body;
+        const { email } = req.body || {};
         if (!email || typeof email !== 'string') {
             return res.status(400).json({ error: true, message: 'Email is required.' });
         }
@@ -1226,7 +1370,7 @@ const resendVerificationEmail = async (req, res) => {
 
         return res.json({ error: false, message: 'If that email exists, a verification link has been sent.' });
     } catch (err) {
-        console.error(' resendVerificationEmail error:', err);
+        logger.error(' resendVerificationEmail error:', err);
         return res.status(500).json({ error: true, message: 'Server error.' });
     }
 };
@@ -1263,7 +1407,7 @@ const requestAffiliation = async (req, res) => {
             });
         }
 
-        const { collegeId } = req.body;
+        const { collegeId } = req.body || {};
         if (!collegeId) {
             return res.status(400).json({ error: true, message: 'collegeId is required.' });
         }
@@ -1311,7 +1455,7 @@ const requestAffiliation = async (req, res) => {
                     };
                 }
             } catch (ocrErr) {
-                console.error('OCR processing error (non-blocking):', ocrErr.message);
+                logger.error('OCR processing error (non-blocking):', ocrErr.message);
             }
         }
 
@@ -1337,7 +1481,7 @@ const requestAffiliation = async (req, res) => {
                 request: req,
             });
         } catch (auditErr) {
-            console.error('Audit log failed (non-blocking):', auditErr.message);
+            logger.error('Audit log failed (non-blocking):', auditErr.message);
         }
 
         // OCRLog record (if OCR ran)
@@ -1359,7 +1503,7 @@ const requestAffiliation = async (req, res) => {
                     imageUrl: uploadResult.secure_url,
                 });
             } catch (logErr) {
-                console.error('OCR log save failed (non-blocking):', logErr.message);
+                logger.error('OCR log save failed (non-blocking):', logErr.message);
             }
         }
 
@@ -1381,7 +1525,7 @@ const requestAffiliation = async (req, res) => {
                 }).catch(() => {});
             }
         } catch (notifErr) {
-            console.error('Admin notification dispatch failed (non-blocking):', notifErr.message);
+            logger.error('Admin notification dispatch failed (non-blocking):', notifErr.message);
         }
 
         return res.json({
@@ -1391,8 +1535,8 @@ const requestAffiliation = async (req, res) => {
             accountState: 'pending_approval',
         });
     } catch (err) {
-        console.error('requestAffiliation error:', err);
-        return res.status(500).json({ error: true, message: 'Server error.', details: err.message });
+        logger.error('requestAffiliation error:', err);
+        return res.status(500).json({ error: true, message: 'Server error.' });
     }
 };
 
@@ -1419,7 +1563,7 @@ const upgradeToTeacher = async (req, res) => {
             });
         }
 
-        const { signupIntent, collegeId } = req.body;
+        const { signupIntent, collegeId } = req.body || {};
 
         if (!['affiliated', 'independent'].includes(signupIntent)) {
             return res.status(400).json({
@@ -1451,7 +1595,7 @@ const upgradeToTeacher = async (req, res) => {
                     request: req,
                 });
             } catch (auditErr) {
-                console.error('Audit log failed (non-blocking):', auditErr.message);
+                logger.error('Audit log failed (non-blocking):', auditErr.message);
             }
 
             createNotification({
@@ -1515,7 +1659,7 @@ const upgradeToTeacher = async (req, res) => {
                     };
                 }
             } catch (ocrErr) {
-                console.error('OCR processing error (non-blocking):', ocrErr.message);
+                logger.error('OCR processing error (non-blocking):', ocrErr.message);
             }
         }
 
@@ -1524,7 +1668,10 @@ const upgradeToTeacher = async (req, res) => {
         user.collegeName = matchedCollege.name;
         user.collegeApprovalStatus = 'pending';
         user.idVerification = idVerification;
-        if (uploadResult) user.collegeIdPhoto = uploadResult.secure_url;
+        if (uploadResult) {
+            user.collegeIdPhoto = uploadResult.secure_url;
+            user.collegeIdPhotoPublicId = uploadResult.public_id;
+        }
         if (!user.position) user.position = 'Other';
         if (!user.department) user.department = 'Not specified';
         if (!user.stream) user.stream = 'Other';
@@ -1543,7 +1690,7 @@ const upgradeToTeacher = async (req, res) => {
                 request: req,
             });
         } catch (auditErr) {
-            console.error('Audit log failed (non-blocking):', auditErr.message);
+            logger.error('Audit log failed (non-blocking):', auditErr.message);
         }
 
         if (uploadResult) {
@@ -1564,7 +1711,7 @@ const upgradeToTeacher = async (req, res) => {
                     imageUrl: uploadResult.secure_url,
                 });
             } catch (logErr) {
-                console.error('OCR log save failed (non-blocking):', logErr.message);
+                logger.error('OCR log save failed (non-blocking):', logErr.message);
             }
         }
 
@@ -1585,7 +1732,7 @@ const upgradeToTeacher = async (req, res) => {
                 }).catch(() => {});
             }
         } catch (notifErr) {
-            console.error('Admin notification dispatch failed (non-blocking):', notifErr.message);
+            logger.error('Admin notification dispatch failed (non-blocking):', notifErr.message);
         }
 
         return res.json({
@@ -1595,8 +1742,8 @@ const upgradeToTeacher = async (req, res) => {
             accountState: 'pending_approval',
         });
     } catch (err) {
-        console.error('upgradeToTeacher error:', err);
-        return res.status(500).json({ error: true, message: 'Server error.', details: err.message });
+        logger.error('upgradeToTeacher error:', err);
+        return res.status(500).json({ error: true, message: 'Server error.' });
     }
 };
 
@@ -1650,6 +1797,306 @@ const getBulkFormat = (req, res) => {
     });
 };
 
+// ============================================================
+// FORGOT & RESET PASSWORD (C1)
+// ============================================================
+const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body || {};
+        if (!email || typeof email !== 'string' || !validator.isEmail(email)) {
+            return res.status(400).json({ error: true, message: 'Valid email is required.' });
+        }
+
+        const user = await User.findOne({ email: email.toLowerCase().trim() });
+        if (!user) {
+            // Do not leak whether user exists
+            return res.json({
+                error: false,
+                message: 'If an account with that email exists, password reset instructions have been sent.',
+            });
+        }
+
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+        user.passwordResetToken = hashedToken;
+        user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+        await user.save({ validateBeforeSave: false });
+
+        emailService.sendPasswordResetEmail({
+            to: user.email,
+            fullName: user.fullName || user.userName,
+            resetToken: rawToken,
+        }).catch((err) => {
+            logger.error('Password reset email failed (non-blocking):', err.message);
+        });
+
+        await logAudit({
+            userId: user._id,
+            action: 'FORGOT_PASSWORD',
+            resource: `User:${user._id}`,
+            request: req,
+        });
+
+        return res.json({
+            error: false,
+            message: 'If an account with that email exists, password reset instructions have been sent.',
+        });
+    } catch (err) {
+        logger.error('forgotPassword error:', err);
+        return res.status(500).json({ error: true, message: 'Server error processing password reset.' });
+    }
+};
+
+const resetPassword = async (req, res) => {
+    try {
+        const { token } = req.params;
+        const { password } = req.body || {};
+
+        if (!token || typeof token !== 'string') {
+            return res.status(400).json({ error: true, message: 'Reset token is required.' });
+        }
+
+        if (!password || !isStrongPassword(password)) {
+            return res.status(400).json({ error: true, message: PASSWORD_ERROR_MESSAGE });
+        }
+
+        const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+        const user = await User.findOne({
+            passwordResetToken: hashedToken,
+            passwordResetExpires: { $gt: new Date() },
+        }).select('+passwordResetToken +passwordResetExpires');
+
+        if (!user) {
+            return res.status(400).json({
+                error: true,
+                message: 'Invalid or expired password reset link. Please request a new one.',
+            });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
+        user.password = hashedPassword;
+        user.passwordChangedAt = new Date();
+        user.passwordResetToken = null;
+        user.passwordResetExpires = null;
+        user.refreshTokenHash = null;
+        user.refreshTokenExpiresAt = null;
+
+        await user.save({ validateBeforeSave: false });
+
+        await logAudit({
+            userId: user._id,
+            action: 'RESET_PASSWORD',
+            resource: `User:${user._id}`,
+            request: req,
+        });
+
+        return res.json({
+            error: false,
+            message: 'Password reset successful. You can now log in with your new password.',
+        });
+    } catch (err) {
+        logger.error('resetPassword error:', err);
+        return res.status(500).json({ error: true, message: 'Server error resetting password.' });
+    }
+};
+
+// ============================================================
+// REFRESH TOKEN & SESSION REVOCATION (C2)
+// ============================================================
+const refreshToken = async (req, res) => {
+    try {
+        const tokenFromCookie = req.cookies?.refreshToken;
+        const tokenFromBody = req.body?.refreshToken;
+
+        const token = tokenFromCookie || tokenFromBody;
+
+        // Browser requests use the HttpOnly cookie and do not receive
+        // credentials in the JSON response.
+        // API/test clients that explicitly send the token in the body
+        // receive the rotated tokens in the response body.
+        const returnTokensInBody =
+            !tokenFromCookie &&
+            typeof tokenFromBody === 'string';
+
+        if (!token || typeof token !== 'string') {
+            return res.status(401).json({
+                error: true,
+                message: 'Refresh token required.'
+            });
+        }
+
+        const hashed = crypto
+            .createHash('sha256')
+            .update(token)
+            .digest('hex');
+
+        // Atomic token rotation prevents two concurrent requests from
+        // successfully rotating the same refresh token.
+        const newRawRefresh = crypto
+            .randomBytes(40)
+            .toString('hex');
+
+        const newHash = crypto
+            .createHash('sha256')
+            .update(newRawRefresh)
+            .digest('hex');
+
+        const newRefreshExpiry = new Date(
+            Date.now() + 7 * 24 * 60 * 60 * 1000
+        );
+
+        const user = await User.findOneAndUpdate(
+            {
+                refreshTokenHash: hashed,
+                refreshTokenExpiresAt: {
+                    $gt: new Date()
+                },
+                isBlocked: {
+                    $ne: true
+                },
+            },
+            {
+                $set: {
+                    refreshTokenHash: newHash,
+                    refreshTokenExpiresAt: newRefreshExpiry,
+                },
+            },
+            {
+                new: true,
+                runValidators: false
+            }
+        ).select(
+            '+refreshTokenHash +refreshTokenExpiresAt'
+        );
+
+        if (!user) {
+            return res.status(401).json({
+                error: true,
+                message: 'Invalid or expired refresh token.'
+            });
+        }
+
+        const accessToken = jwt.sign(
+            {
+                userId: user._id
+            },
+            process.env.ACCESS_TOKEN_SECRET,
+            {
+                expiresIn: '24h'
+            }
+        );
+
+        res.cookie(
+            'accessToken',
+            accessToken,
+            {
+                httpOnly: true,
+                secure:
+                    process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge:
+                    24 * 60 * 60 * 1000,
+            }
+        );
+
+        res.cookie(
+            'refreshToken',
+            newRawRefresh,
+            {
+                httpOnly: true,
+                secure:
+                    process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge:
+                    7 * 24 * 60 * 60 * 1000,
+                path: '/auth',
+            }
+        );
+
+        await logAudit({
+            userId: user._id,
+            action: 'REFRESH_TOKEN',
+            resource: `User:${user._id}`,
+            request: req,
+        });
+
+        const response = {
+            error: false,
+            message: 'Token refreshed successfully.',
+        };
+
+        if (returnTokensInBody) {
+            response.accessToken = accessToken;
+            response.refreshToken = newRawRefresh;
+        }
+
+        return res.json(response);
+    } catch (err) {
+        logger.error(
+            'refreshToken error:',
+            err
+        );
+
+        return res.status(500).json({
+            error: true,
+            message:
+                'Server error refreshing token.'
+        });
+    }
+};
+const revokeAllSessions = async (req, res) => {
+    try {
+        const userId = req.user?.userId;
+        if (!userId) {
+            return res.status(401).json({ error: true, message: 'Unauthenticated.' });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: true, message: 'User not found.' });
+        }
+
+        user.passwordChangedAt = new Date();
+        user.refreshTokenHash = null;
+        user.refreshTokenExpiresAt = null;
+        await user.save({ validateBeforeSave: false });
+
+        const currentToken = req.cookies?.accessToken || req.headers.authorization?.split(' ')[1];
+        if (currentToken) {
+            await revoke(currentToken);
+        }
+
+        res.clearCookie('accessToken', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+        });
+        res.clearCookie('refreshToken', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/auth',
+        });
+
+        await logAudit({
+            userId: user._id,
+            action: 'REVOKE_ALL_SESSIONS',
+            resource: `User:${user._id}`,
+            request: req,
+        });
+
+        return res.json({
+            error: false,
+            message: 'All active sessions have been revoked. Please log in again.',
+        });
+    } catch (err) {
+        logger.error('revokeAllSessions error:', err);
+        return res.status(500).json({ error: true, message: 'Server error revoking sessions.' });
+    }
+};
+
 module.exports = {
     login,
     register,
@@ -1661,4 +2108,8 @@ module.exports = {
     getBulkFormat,
     requestAffiliation,
     upgradeToTeacher,
+    forgotPassword,
+    resetPassword,
+    refreshToken,
+    revokeAllSessions,
 };

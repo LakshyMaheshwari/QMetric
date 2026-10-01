@@ -8,13 +8,17 @@ const createError = require('http-errors');
 const express     = require('express');
 const path        = require('node:path');
 const cookieParser = require('cookie-parser');
-const morgan      = require('morgan');
+const pinoHttp    = require('pino-http');
+const logger      = require('./config/logger');
+const crypto      = require('node:crypto');
 const cors        = require('cors');
 const mongoose    = require('mongoose');
 const rateLimit   = require('express-rate-limit');
 const helmet      = require('helmet');
 const setupSwagger = require('./config/swagger');
 const { csrfWithBearerSkip } = require('./middleware/csrf');
+const { RedisStore } = require('rate-limit-redis');
+const { connectRedis, closeRedis, getRedisClient, isRedisConfigured } = require('./config/redis');
 
 const fileRouter  = require('./routes/file');
 const usersRouter = require('./routes/auth');
@@ -23,9 +27,31 @@ const superAdminRouter = require('./routes/superAdmin');
 const collegeAdminRouter = require('./routes/collegeAdmin');
 const reviewerRouter = require('./routes/reviewer');
 const teacherRouter = require('./routes/teacher');
+const studentRouter = require('./routes/student');
 const devAuthRouter = require('./routes/devAuth');
 
+const createRateLimitStore = (prefix) => {
+  const client = getRedisClient();
+  if (!client) return undefined;
+  return new RedisStore({
+    prefix,
+    sendCommand: (...args) => client.sendCommand(args),
+  });
+};
+
 const app = express();
+
+// ─── Reverse proxy ────────────────────────────────────────────────────────────
+// Behind Render/Railway/Fly/Nginx, req.ip is the proxy's address unless Express
+// is told to trust X-Forwarded-For. Without this, every user shares ONE rate-limit
+// bucket. Set TRUST_PROXY to the number of proxy hops (usually 1), or leave unset
+// to default to 1 in production and off elsewhere.
+if (process.env.TRUST_PROXY) {
+  const hops = Number(process.env.TRUST_PROXY);
+  app.set('trust proxy', Number.isNaN(hops) ? process.env.TRUST_PROXY : hops);
+} else if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 // ─── Security Headers ──────────────────────────────────────────────────
 app.use(helmet({
@@ -90,22 +116,46 @@ if (process.env.FRONTEND_URL && !allowedOrigins.includes(process.env.FRONTEND_UR
 
 app.use(cors({
   origin: allowedOrigins,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   credentials: true,
 }));
 
 // ─── Logging ───────────────────────────────────────────────────────────
-app.use(morgan('dev'));
+app.use(pinoHttp({
+  logger,
+  genReqId: (req) => req.headers['x-request-id'] || crypto.randomUUID(),
+  customProps: (req) => ({ requestId: req.id }),
+  customSuccessMessage: () => 'request completed',
+  customErrorMessage:   () => 'request failed',
+  serializers: {
+    req: (req) => ({ id: req.id, method: req.method, url: req.url }),
+    res: (res) => ({ statusCode: res.statusCode }),
+  },
+}));
+
+// Stamp X-Request-ID on every response early — before any controller runs.
+// pinoHttp's customSuccessMessage / customErrorMessage fire AFTER the response
+// is sent, so calling res.setHeader() there causes "Cannot set headers after
+// they are sent to the client". This middleware runs at the right time.
+app.use((req, res, next) => {
+  if (req.id) res.setHeader('X-Request-ID', req.id);
+  next();
+});
 
 // ─── Body parsers & static ────────────────────────────────────────────────────
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Size limits prevent memory-exhaustion DoS via oversized JSON payloads.
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ limit: '5mb', extended: true }));
+app.use((req, res, next) => {
+    if (!req.body) req.body = {};
+    next();
+});
 app.use(cookieParser());
 
 // ─── Dev Auth Bypass (never mounts in production) ──────────────
 if (process.env.NODE_ENV !== 'production' && process.env.ENABLE_DEV_AUTH === 'true') {
     app.use('/dev', devAuthRouter);
-    console.log('⚠️  Dev auth ENABLED — POST /dev/login with { email }');
+    logger.info('⚠️  Dev auth ENABLED — POST /dev/login with { email }');
 }
 
 // ─── CSRF Protection ──────────────────────────────────────────────────────────
@@ -118,29 +168,49 @@ app.use(express.static(path.join(__dirname, 'public')));
 setupSwagger(app);
 
 // ─── Rate Limiters ────────────────────────────────────────────────────────────
-// ⚠️ RATE LIMITING IS IN-MEMORY (per-process)
-// These counters live inside this Node.js process. If you ever run multiple
-// backend instances behind a load balancer, each instance keeps its own
-// counter, and an attacker gets (max × instance_count) attempts.
-//
-// Before scaling horizontally:
-//   1. npm install rate-limit-redis redis
-//   2. Add REDIS_URL to .env
-//   3. Replace each limiter's store with new RedisStore({ ... })
-//   See: https://www.npmjs.com/package/rate-limit-redis
-//
-// Single-instance deployments: no action needed.
+// Use Redis when REDIS_URL is configured; otherwise keep the in-memory fallback
+// for local/single-instance deployments.
 
-// Auth: 10 attempts per 15 minutes per IP (generous for login + register)
-const authLimiter = rateLimit({
+// Login / password change: only FAILED attempts count, so a campus NAT full of
+// teachers logging in successfully doesn't lock everyone out.
+const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 15,
+  skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     error: true,
-    message: 'Too many requests from this IP. Please wait 15 minutes before trying again.',
+    message: 'Too many failed attempts from this IP. Please wait 15 minutes before trying again.',
   },
+  ...(isRedisConfigured() ? { store: createRateLimitStore('qmetric:rl:login:') } : {}),
+});
+
+// Everything else under /auth (profile reads, colleges list, logout...).
+// Its own instance, so it does not share a bucket with the admin/teacher routes.
+const authGeneralLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: true,
+    message: 'Too many requests from this IP. Please slow down.',
+  },
+  ...(isRedisConfigured() ? { store: createRateLimitStore('qmetric:rl:auth:') } : {}),
+});
+
+// Account creation / verification-email resend: every request counts.
+const signupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: true,
+    message: 'Too many sign-up requests from this IP. Please try again later.',
+  },
+  ...(isRedisConfigured() ? { store: createRateLimitStore('qmetric:rl:signup:') } : {}),
 });
 
 // General limiter for protected admin/reviewer/teacher routes
@@ -153,6 +223,7 @@ const generalLimiter = rateLimit({
     error: true,
     message: 'Too many requests from this IP. Please slow down.',
   },
+  ...(isRedisConfigured() ? { store: createRateLimitStore('qmetric:rl:general:') } : {}),
 });
 
 // Upload: 20 uploads per hour per IP
@@ -165,6 +236,7 @@ const uploadLimiter = rateLimit({
     error: true,
     message: 'Upload limit reached. You can upload up to 20 files per hour.',
   },
+  ...(isRedisConfigured() ? { store: createRateLimitStore('qmetric:rl:upload:') } : {}),
 });
 
 // Bulk register: 3 attempts per hour (admin-only but still protect it)
@@ -184,26 +256,48 @@ const bulkLimiter = rateLimit({
     if (req.method !== 'POST') return true;               // read requests are fine
     return false;                                         // rate-limit only the POST
   },
+  ...(isRedisConfigured() ? { store: createRateLimitStore('qmetric:rl:bulk:') } : {}),
 });
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/upload', uploadLimiter, fileRouter);
-app.use('/auth',   authLimiter, bulkLimiter, usersRouter);
+// Scope strict limits to credential endpoints only. Reads like GET /auth/profile,
+app.use('/auth/login',               loginLimiter);
+app.use('/auth/password',            loginLimiter);
+app.use('/auth/create-account',      signupLimiter);
+app.use('/auth/resend-verification', signupLimiter);
+app.use('/auth/forgot-password',     signupLimiter);
+app.use('/auth/reset-password',      loginLimiter);
+app.use('/auth',   authGeneralLimiter, bulkLimiter, usersRouter);
 app.use('/college-admin', generalLimiter, collegeAdminRouter);
 app.use('/admin',                 generalLimiter, adminRouter);
 app.use('/super-admin',           generalLimiter, superAdminRouter);
 app.use('/reviewer',              generalLimiter, reviewerRouter);
 app.use('/teacher',               generalLimiter, teacherRouter);
+app.use('/student',               generalLimiter, studentRouter);
 app.use('/notifications', generalLimiter, notificationsRouter);
 
 // ─── Health check (responds even if DB is not yet connected) ──────────────────
 const healthHandler = (req, res) => {
-  const dbState = mongoose.connection.readyState;
-  const dbStatus = ['disconnected', 'connected', 'connecting', 'disconnecting'][dbState];
-  res.json({ status: 'ok', db: dbStatus, uptime: process.uptime() });
+  res.json({ status: 'ok', uptime: process.uptime() });
 };
+
+const readinessHandler = (req, res) => {
+  const dbReady = mongoose.connection.readyState === 1;
+  const redisReady = !isRedisConfigured() || Boolean(getRedisClient()?.isReady);
+  const ready = dbReady && redisReady;
+  return res.status(ready ? 200 : 503).json({
+    status: ready ? 'ready' : 'not_ready',
+    db: dbReady ? 'connected' : 'not_connected',
+    redis: !isRedisConfigured() ? 'not_configured' : (redisReady ? 'connected' : 'not_connected'),
+    uptime: process.uptime(),
+  });
+};
+
 app.get('/health', healthHandler);
 app.get('/api/health', healthHandler);
+app.get('/ready', readinessHandler);
+app.get('/api/ready', readinessHandler);
 
 // ─── 404 handler ──────────────────────────────────────────────────────────────
 app.use((req, res, next) => {
@@ -240,22 +334,61 @@ app.use((err, req, res, next) => {
     });
   }
 
-  console.error('🔴 Unhandled error:', err);
-  const isDev = process.env.NODE_ENV !== 'production';
+  logger.error({ err, requestId: req.id }, 'Unhandled error');
+  // Never send stack traces to a client — dev or prod. Full error is in
+  // the server log; the client gets a safe, generic message.
   res.status(err.status || 500).json({
     error: true,
-    message: isDev ? err.message : 'An internal server error occurred.',
-    ...(isDev && { stack: err.stack }),
+    message: err.status && err.status < 500
+      ? err.message
+      : 'An internal server error occurred.',
   });
+});
+
+// ─── Process-level resilience handlers ─────────────────────────────────────────
+let httpServer = null;
+
+const shutdown = async (signal) => {
+  logger.info({ signal }, 'Shutdown requested');
+
+  const forceExit = setTimeout(() => {
+    logger.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+  forceExit.unref();
+
+  try {
+    if (httpServer) {
+      await new Promise((resolve) => httpServer.close(resolve));
+    }
+    await mongoose.connection.close(false);
+    await closeRedis();
+    clearTimeout(forceExit);
+    process.exit(0);
+  } catch (err) {
+    logger.error({ err }, 'Graceful shutdown failed');
+    process.exit(1);
+  }
+};
+
+process.once('SIGTERM', () => shutdown('SIGTERM'));
+process.once('SIGINT', () => shutdown('SIGINT'));
+
+process.on('unhandledRejection', (reason) => {
+  logger.error({ err: reason }, 'Unhandled promise rejection');
+  if (process.env.NODE_ENV !== 'test') shutdown('unhandledRejection');
+});
+
+process.on('uncaughtException', (err) => {
+  logger.fatal({ err }, 'Uncaught exception');
+  if (process.env.NODE_ENV !== 'test') {
+    shutdown('uncaughtException');
+  }
 });
 
 // ─── Start server (skip during Jest — tests use in-memory MongoDB) ───────────
 if (process.env.NODE_ENV !== 'test') {
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => {
-    console.log(`✅ Server running on port: ${PORT}`);
-    console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  });
 
   // ─── Mongo connection with exponential backoff ────────────────
   const MONGO_RETRIES = 5;
@@ -265,29 +398,43 @@ if (process.env.NODE_ENV !== 'test') {
     try {
       await mongoose.connect(process.env.MONGO_URI, {
         serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
       });
-      console.log('✅ Connected to MongoDB');
+      logger.info('Connected to MongoDB');
     } catch (err) {
-      console.error(`❌ MongoDB connection attempt ${attempt}/${MONGO_RETRIES} failed:`, err.message);
+      logger.error({ attempt, maxRetries: MONGO_RETRIES, err }, 'MongoDB connection attempt failed');
       if (attempt >= MONGO_RETRIES) {
-        console.error('💥 Exhausted all MongoDB connection retries. Exiting.');
+        logger.fatal('Exhausted all MongoDB connection retries. Exiting.');
         process.exit(1);
       }
       const delay = MONGO_BASE_DELAY_MS * Math.pow(2, attempt - 1);
-      console.warn(`⏳ Retrying in ${delay / 1000}s...`);
+      logger.warn({ delayMs: delay }, 'Retrying MongoDB connection');
       await new Promise((r) => setTimeout(r, delay));
       return connectMongo(attempt + 1);
     }
   }
 
-  connectMongo();
-
   mongoose.connection.on('disconnected', () => {
-    console.warn('⚠️  MongoDB disconnected — Mongoose will attempt to reconnect');
+    logger.warn('MongoDB disconnected — Mongoose will attempt to reconnect');
   });
   mongoose.connection.on('reconnected', () => {
-    console.log('✅ MongoDB reconnected');
+    logger.info('MongoDB reconnected');
   });
+
+  (async () => {
+    try {
+      await connectRedis();
+      httpServer = app.listen(PORT, () => {
+        logger.info({ port: PORT }, 'Server started');
+        logger.info({ health: '/health', readiness: '/ready' }, 'Health endpoints available');
+      });
+      connectMongo();
+    } catch (err) {
+      logger.fatal({ err }, 'Redis connection failed during startup');
+      process.exit(1);
+    }
+  })();
 }
 
 module.exports = app;

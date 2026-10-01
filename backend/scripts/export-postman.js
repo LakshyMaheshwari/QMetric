@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+const logger = require('../config/logger');
+
 /**
  * scripts/export-postman.js
  *
@@ -40,7 +42,7 @@ async function fetchOpenApiSpec(port) {
       if (res.ok) {
         const data = await res.json();
         if (data && (data.openapi || data.swagger)) {
-          console.log(`✅ Successfully fetched OpenAPI spec from ${url}`);
+          logger.info(`✅ Successfully fetched OpenAPI spec from ${url}`);
           return data;
         }
       }
@@ -143,7 +145,7 @@ function generateLocalSpec() {
     apis: [routesPattern],
   };
 
-  console.log('ℹ️  Compiled OpenAPI spec locally from routes/*.js via swagger-jsdoc');
+  logger.info('ℹ️  Compiled OpenAPI spec locally from routes/*.js via swagger-jsdoc');
   return swaggerJsDoc(options);
 }
 
@@ -408,7 +410,7 @@ function convertOpenApiToPostman(spec) {
 }
 
 async function main() {
-  console.log('🚀 Starting Postman Collection export for QMetric API...');
+  logger.info('🚀 Starting Postman Collection export for QMetric API...');
 
   let spec = await fetchOpenApiSpec(PORT);
   if (!spec) {
@@ -416,7 +418,7 @@ async function main() {
   }
 
   if (!spec || !spec.paths || Object.keys(spec.paths).length === 0) {
-    console.error('❌ Failed to obtain valid OpenAPI specification.');
+    logger.error('❌ Failed to obtain valid OpenAPI specification.');
     process.exit(1);
   }
 
@@ -424,7 +426,7 @@ async function main() {
     (acc, methods) => acc + Object.keys(methods).filter(m => !['parameters', '$ref', 'summary', 'description'].includes(m)).length,
     0
   );
-  console.log(`📊 Found ${endpointCount} endpoints across ${Object.keys(spec.paths).length} paths`);
+  logger.info(`📊 Found ${endpointCount} endpoints across ${Object.keys(spec.paths).length} paths`);
 
   const collection = convertOpenApiToPostman(spec);
 
@@ -436,15 +438,15 @@ async function main() {
   const outFile = path.join(outDir, 'QMetric.postman_collection.json');
   fs.writeFileSync(outFile, JSON.stringify(collection, null, 2), 'utf-8');
 
-  console.log(`✅ Postman Collection v2.1 successfully written to:`);
-  console.log(`   ${outFile}`);
-  console.log(`\n📁 Folder Breakdown:`);
+  logger.info(`✅ Postman Collection v2.1 successfully written to:`);
+  logger.info(`   ${outFile}`);
+  logger.info(`\n📁 Folder Breakdown:`);
   collection.item.forEach(folder => {
-    console.log(`   - ${folder.name} (${folder.item.length} requests)`);
+    logger.info(`   - ${folder.name} (${folder.item.length} requests)`);
   });
 }
 
 main().catch(err => {
-  console.error('❌ Export failed:', err);
+  logger.error('❌ Export failed:', err);
   process.exit(1);
 });

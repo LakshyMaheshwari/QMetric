@@ -1,3 +1,5 @@
+const logger = require('../config/logger');
+
 const os      = require('node:os');
 const path    = require('node:path');
 const fs      = require('node:fs');
@@ -22,9 +24,9 @@ const uploadDir = path.join(os.tmpdir(), 'qmetric-uploads');
 if (!fs.existsSync(uploadDir)) {
   try {
     fs.mkdirSync(uploadDir, { recursive: true });
-    console.log('✅ Upload directory created at:', uploadDir);
+    logger.info('✅ Upload directory created at:', uploadDir);
   } catch (err) {
-    console.error('❌ Failed to create upload directory:', err.message);
+    logger.error('❌ Failed to create upload directory:', err.message);
   }
 }
 
@@ -44,7 +46,7 @@ const storage = multer.diskStorage({
 });
 
 // Allowed file types
-const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.doc', '.txt', '.xlsx', '.xls', '.csv'];
+const ALLOWED_EXTENSIONS = ['.xlsx', '.xls', '.csv'];
 
 // ─── File size limit (S5693 — intentionally exceeds the 8 MB Sonar default) ──
 // QMetric accepts Excel/CSV question papers, which routinely exceed 8 MB

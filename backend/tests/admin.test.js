@@ -172,6 +172,24 @@ describe('Admin Endpoints', () => {
 
       expect(res.status).toBe(400);
     });
+
+    it('keeps college teacher count in sync when role changes', async () => {
+      const user = await createTestUser({
+        role: 'teacher',
+        email: 'counter-teacher@test.com',
+        collegeId: college._id,
+      });
+      await college.constructor.findByIdAndUpdate(college._id, { $set: { totalTeachers: 1 } });
+
+      const res = await request(app)
+        .put(`/admin/users/${user._id}/role`)
+        .set('Cookie', cookie)
+        .send({ role: 'reviewer' });
+
+      expect(res.status).toBe(200);
+      const updatedCollege = await college.constructor.findById(college._id).lean();
+      expect(updatedCollege.totalTeachers).toBe(0);
+    });
   });
 
   describe('PUT /admin/users/:id/block', () => {

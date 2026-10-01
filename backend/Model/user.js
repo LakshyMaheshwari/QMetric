@@ -8,6 +8,14 @@ const isAffiliatedTeacher = function () {
     return this.role === 'teacher' && !!this.collegeId;
 };
 
+const pendingIdVerificationSchema = new mongoose.Schema({
+    status: { type: String, default: null },
+    confidence: { type: Number, default: null },
+    extractedData: { type: mongoose.Schema.Types.Mixed, default: null },
+    matchedFields: { type: mongoose.Schema.Types.Mixed, default: null },
+    updatedAt: { type: Date, default: null },
+}, { _id: false, strict: true });
+
 const userSchema = new mongoose.Schema({
     // --- Core fields (required for ALL roles) ---
     userName: {
@@ -24,6 +32,8 @@ const userSchema = new mongoose.Schema({
         lowercase: true,
         trim: true
     },
+    // Set on password change; tokens issued before this instant are rejected.
+    passwordChangedAt: { type: Date, default: null },
     password: {
         type: String,
         required: true
@@ -110,6 +120,7 @@ const userSchema = new mongoose.Schema({
         default: ''
     },
     collegeIdPhoto: { type: String, required: false, default: '' },
+    collegeIdPhotoPublicId: { type: String, required: false, default: null },
 
     // --- OCR ID Verification (teachers only — admins skip this) ---
     idVerification: {
@@ -156,6 +167,30 @@ const userSchema = new mongoose.Schema({
         select: false,
     },
 
+    // --- Password reset ---
+    passwordResetToken: {
+        type: String,
+        default: null,
+        select: false,
+    },
+    passwordResetExpires: {
+        type: Date,
+        default: null,
+        select: false,
+    },
+
+    // --- Refresh token (hashed, single active token per user) ---
+    refreshTokenHash: {
+        type: String,
+        default: null,
+        select: false,
+    },
+    refreshTokenExpiresAt: {
+        type: Date,
+        default: null,
+        select: false,
+    },
+
     // --- College approval workflow (Phase A) ---
     collegeApprovalStatus: {
     type: String,
@@ -166,7 +201,7 @@ const userSchema = new mongoose.Schema({
     pendingAffiliationRequest: {
         collegeId:      { type: mongoose.Schema.Types.ObjectId, ref: 'College', default: null },
         requestedAt:    { type: Date, default: null },
-        idVerification: { type: Object, default: null },
+        idVerification: { type: pendingIdVerificationSchema, default: null },
     },
 
 }, { timestamps: true });
@@ -219,5 +254,8 @@ userSchema.index({ collegeId: 1 });
 userSchema.index({ employeeId: 1, collegeName: 1 });
 userSchema.index({ collegeId: 1, collegeApprovalStatus: 1 });
 userSchema.index({ role: 1 });
+userSchema.index({ createdAt: -1 });
+userSchema.index({ collegeId: 1, role: 1, isBlocked: 1 });
+userSchema.index({ collegeApprovalStatus: 1, createdAt: -1 });
 
 module.exports = mongoose.model('User', userSchema);

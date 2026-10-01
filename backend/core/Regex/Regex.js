@@ -16,7 +16,7 @@
 // function extractVerbsPython(text) {
 //     const result = spawnSync('python', ['extraction_logic.py', text], { encoding: 'utf-8' });
 //     if (result.error) {
-//         console.error('Python error:', result.error);
+//         logger.error('Python error:', result.error);
 //         return [];
 //     }
 //     return result.stdout.trim().split(',').filter(Boolean);
@@ -37,7 +37,7 @@
 //                 const questionText = row.question || row.Question || row.QUESTION || '';
 
 //                 if (!questionText) {
-//                     console.warn(`Missing question text for row: ${JSON.stringify(row)}`);
+//                     logger.warn(`Missing question text for row: ${JSON.stringify(row)}`);
 //                     return null; // Skip this row if no question text is found
 //                 }
 
@@ -139,7 +139,7 @@
 // function extractVerbsPython(text) {
 //     const result = spawnSync('python', ['extraction_logic.py', text], { encoding: 'utf-8' });
 //     if (result.error) {
-//         console.error('Python error:', result.error);
+//         logger.error('Python error:', result.error);
 //         return [];
 //     }
 //     return result.stdout.trim().split(',').filter(Boolean);
@@ -160,7 +160,7 @@
 //                 const questionText = row.question || row.Question || row.QUESTION || '';
 
 //                 if (!questionText) {
-//                     console.warn(`Missing question text for row: ${JSON.stringify(row)}`);
+//                     logger.warn(`Missing question text for row: ${JSON.stringify(row)}`);
 //                     return null; // Skip this row if no question text is found
 //                 }
 
@@ -258,7 +258,7 @@
 // // function extractVerbsPython(text) {
 // //     const result = spawnSync('python', ['extraction_logic.py', text], { encoding: 'utf-8' });
 // //     if (result.error) {
-// //         console.error('Python error:', result.error);
+// //         logger.error('Python error:', result.error);
 // //         return [];
 // //     }
 // //     return result.stdout.trim().split(',').filter(Boolean);
@@ -279,7 +279,7 @@
 //                 const questionText = row.question || row.Question || row.QUESTION || '';
 
 //                 if (!questionText) {
-//                     console.warn(`Missing question text for row: ${JSON.stringify(row)}`);
+//                     logger.warn(`Missing question text for row: ${JSON.stringify(row)}`);
 //                     return null;
 //                 }
 
@@ -346,7 +346,7 @@
 
 //     // If no Bloom verbs found, assign default level 6
 //     if (highestLevel === Infinity || highestLevel === 7) {
-//         console.warn(`Warning: No Bloom verbs found in: "${text.substring(0, 50)}..."`);
+//         logger.warn('Warning: No Bloom verbs found in question text');
 //         highestLevel = 6;
 //         highestVerb = "N/A";
 //     }
@@ -364,7 +364,7 @@
 //     const mappedLevel = bloomLevelMap[level];
 
 //     if (mappedLevel === undefined) {
-//         console.warn(`Warning: Bloom level "${level}" not found in bloomLevelMap, defaulting to 6`);
+//         logger.warn(`Warning: Bloom level "${level}" not found in bloomLevelMap, defaulting to 6`);
 //         return 6;
 //     }
 
@@ -398,6 +398,7 @@
  */
 
 const paperFields = require('../constants/paperFields');
+const logger = require('../../config/logger');
 const xlsx = require('xlsx');
 
 // ═══════════════════════════════════════════════════════════════════
@@ -420,29 +421,21 @@ exports.Structurize = (data, inputFile, bloomLevelMap) => {
         try {
             const workbook = xlsx.readFile(inputFile);
 
-            console.log('=== EXCEL PARSE DEBUG ===');
-            console.log('File:', inputFile);
-            console.log('All sheets:', workbook.SheetNames);
 
             if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-                console.log('❌ No sheets found in workbook');
                 return resolve([]);
             }
 
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
-            console.log('Using sheet:', sheetName);
 
             // ─── Step 1: Read raw grid to inspect structure ──────
             const rawGrid = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-            console.log('Raw rows:', rawGrid.length);
 
             if (rawGrid.length === 0) {
-                console.log('❌ Sheet is empty');
                 return resolve([]);
             }
 
-            console.log('First 3 raw rows:', JSON.stringify(rawGrid.slice(0, 3), null, 2));
 
             // ─── Step 2: Auto-detect header row ──────────────────
             // Look for a row containing a "question" column header
@@ -467,10 +460,9 @@ exports.Structurize = (data, inputFile, bloomLevelMap) => {
             }
 
             if (!headerFound) {
-                console.warn('⚠️ No "Question" column found in first 10 rows — using row 0 as header');
+                logger.warn('⚠️ No "Question" column found in first 10 rows — using row 0 as header');
             }
 
-            console.log('Header row index:', headerRowIndex);
 
             // ─── Step 3: Parse with detected header row ──────────
             const tableData = xlsx.utils.sheet_to_json(sheet, {
@@ -478,15 +470,11 @@ exports.Structurize = (data, inputFile, bloomLevelMap) => {
                 range: headerRowIndex,
             });
 
-            console.log('Parsed data rows:', tableData.length);
 
             if (tableData.length === 0) {
-                console.log('❌ No data rows after header');
                 return resolve([]);
             }
 
-            console.log('Detected column keys:', Object.keys(tableData[0]));
-            console.log('First parsed row:', JSON.stringify(tableData[0], null, 2));
 
             // ─── Step 4: Case/space-insensitive cell lookup ──────
             const getCell = (row, ...possibleNames) => {
@@ -510,7 +498,7 @@ exports.Structurize = (data, inputFile, bloomLevelMap) => {
                     ).trim();
 
                     if (!questionText) {
-                        console.warn(`Row ${idx + 1}: no question text — skipping`);
+                        logger.warn(`Row ${idx + 1}: no question text — skipping`);
                         return null;
                     }
 
@@ -545,12 +533,10 @@ exports.Structurize = (data, inputFile, bloomLevelMap) => {
                 })
                 .filter((row) => row !== null);
 
-            console.log('✅ Final question count:', StructurizedData.length);
-            console.log('=========================');
 
             resolve(StructurizedData);
         } catch (error) {
-            console.error('❌ Structurize error:', error);
+            logger.error('❌ Structurize error:', error);
             reject(new Error(`Error processing the file: ${error.message}`));
         }
     });
@@ -593,7 +579,7 @@ exports.FindBloomLevelsInText = (text, bloomLevelMap) => {
 
     // If no Bloom verbs found, assign default level 6
     if (highestLevel === Infinity || highestLevel === 7) {
-        console.warn(`Warning: No Bloom verbs found in: "${String(text).substring(0, 50)}..."`);
+        logger.warn('Warning: No Bloom verbs found in question text');
         highestLevel = 6;
         highestVerb = "N/A";
     }
@@ -610,7 +596,7 @@ function getBloomLevelIndex(level, bloomLevelMap) {
     const mappedLevel = bloomLevelMap[level];
 
     if (mappedLevel === undefined) {
-        console.warn(`Warning: Bloom level "${level}" not found in bloomLevelMap, defaulting to 6`);
+        logger.warn(`Warning: Bloom level "${level}" not found in bloomLevelMap, defaulting to 6`);
         return 6;
     }
 

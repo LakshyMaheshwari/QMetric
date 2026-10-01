@@ -1,4 +1,8 @@
+const logger = require('../config/logger');
+
+const mongoose = require('mongoose');
 const AuditLog = require('../Model/AuditLog');
+const { AUDIT_ACTION_VALUES } = require('./auditActions');
 
 /**
  * Log an audit entry (never throws — failures are swallowed)
@@ -12,10 +16,14 @@ async function logAudit({
   error = null,
 }) {
   try {
-    if (!userId) {
-      // Skip logging if we don't know who did it
-      console.warn('logAudit: no userId provided, skipping');
+    if (!userId || !mongoose.isValidObjectId(userId)) {
+      // Skip logging if we don't know who did it or if userId is invalid
+      logger.warn(`logAudit: missing or invalid userId "${userId}", skipping`);
       return;
+    }
+
+    if (!AUDIT_ACTION_VALUES.includes(action)) {
+      logger.warn(`logAudit: unregistered action "${action}" — add it to utils/auditActions.js`);
     }
 
     await AuditLog.create({
@@ -35,7 +43,7 @@ async function logAudit({
     });
   } catch (err) {
     // Never crash the main operation because of audit logging
-    console.error('Failed to write audit log:', err.message);
+    logger.error('Failed to write audit log:', err.message);
   }
 }
 

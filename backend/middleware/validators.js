@@ -94,6 +94,14 @@ const validateCreateUser = [
     .withMessage(`Invalid role. Must be one of: ${ASSIGNABLE_ROLES.join(', ')}`),
 ];
 
+
+const validateBlockUpdate = [
+  body('isBlocked')
+    .exists().withMessage('isBlocked is required')
+    .isBoolean().withMessage('isBlocked must be a boolean')
+    .toBoolean(),
+];
+
 const validatePagination = [
   query('page')
     .optional()
@@ -223,6 +231,7 @@ module.exports = {
   validateRegister,
   validateCreateUser,
   validatePagination,
+  validateBlockUpdate,
   validateMongoId,
   validatePaperId,
   validatePaperIdParam,

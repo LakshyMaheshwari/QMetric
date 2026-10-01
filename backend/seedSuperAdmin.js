@@ -1,3 +1,5 @@
+const logger = require('./config/logger');
+
 require('dotenv').config();
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
@@ -6,7 +8,7 @@ const User = require('./Model/user');
 const seedSuperAdmin = async () => {
   try {
     await mongoose.connect(process.env.MONGO_URI);
-    console.log('Connected to MongoDB');
+    logger.info('Connected to MongoDB');
 
     const email = process.env.SEED_SUPER_ADMIN_EMAIL || 'change-me-in-production';
     const rawPassword = process.env.SEED_SUPER_ADMIN_PASSWORD || 'change-me-in-production';
@@ -16,16 +18,16 @@ const seedSuperAdmin = async () => {
     // Check if super admin exists
     const existing = await User.findOne({ role: 'super_admin' });
     if (existing) {
-      console.log(`Found existing super admin (${existing.email}). Updating to detach from any college...`);
+      logger.info(`Found existing super admin (${existing.email}). Updating to detach from any college...`);
       existing.collegeId = null;
       existing.collegeName = '';
       existing.password = hashedPassword;
       await existing.save();
 
-      console.log('✅ Super Admin updated successfully!');
-      console.log('📧 Email:', existing.email);
-      console.log('🔑 Password:', rawPassword);
-      console.log('🌍 Role: Super Admin (collegeId: null - manages ALL colleges)');
+      logger.info('✅ Super Admin updated successfully!');
+      logger.info('📧 Email:', existing.email);
+      logger.info('🔑 Password:', rawPassword);
+      logger.info('🌍 Role: Super Admin (collegeId: null - manages ALL colleges)');
       process.exit(0);
     }
 
@@ -42,14 +44,14 @@ const seedSuperAdmin = async () => {
     });
 
     await admin.save();
-    console.log('✅ Super Admin created successfully!');
-    console.log(`📧 Email: ${email}`);
-    console.log(`🔑 Password: ${rawPassword}`);
-    console.log('🌍 Role: Super Admin (collegeId: null - manages ALL colleges)');
+    logger.info('✅ Super Admin created successfully!');
+    logger.info(`📧 Email: ${email}`);
+    logger.info(`🔑 Password: ${rawPassword}`);
+    logger.info('🌍 Role: Super Admin (collegeId: null - manages ALL colleges)');
 
     process.exit(0);
   } catch (error) {
-    console.error('Error seeding super admin:', error);
+    logger.error('Error seeding super admin:', error);
     process.exit(1);
   }
 };

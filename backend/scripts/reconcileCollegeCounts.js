@@ -1,3 +1,5 @@
+const logger = require('../config/logger');
+
 require('dotenv').config({ path: require('node:path').resolve(__dirname, '../.env') });
 const mongoose = require('mongoose');
 const College = require('../Model/College');
@@ -19,7 +21,7 @@ async function reconcile({ dryRun = false } = {}) {
 
     const stored = college.totalTeachers ?? 0;
     if (stored !== actualTeachers) {
-      console.log(
+      logger.info(
         `[DRIFT] ${college.name} (${college._id}): stored=${stored} actual=${actualTeachers}`
       );
       if (!dryRun) {
@@ -32,7 +34,7 @@ async function reconcile({ dryRun = false } = {}) {
     }
   }
 
-  console.log(
+  logger.info(
     `\nReconciliation ${dryRun ? '(dry-run) ' : ''}complete. ` +
     `Scanned: ${colleges.length}, drift fixed: ${corrected}`
   );
@@ -43,7 +45,7 @@ async function reconcile({ dryRun = false } = {}) {
 if (require.main === module) {
   const dryRun = process.argv.includes('--dry-run');
   reconcile({ dryRun }).catch((err) => {
-    console.error('Reconciliation failed:', err);
+    logger.error('Reconciliation failed:', err);
     process.exit(1);
   });
 }

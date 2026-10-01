@@ -1,3 +1,5 @@
+const logger = require('../config/logger');
+
 const mongoose = require('mongoose');
 
 let _supported = null;
@@ -19,7 +21,7 @@ async function detectTransactionSupport() {
     const hello = await mongoose.connection.db.admin().command({ hello: 1 });
     _supported = Boolean(hello.setName || hello.msg === 'isdbgrid');
   } catch (err) {
-    console.warn(
+    logger.warn(
       '[withTransaction] Failed to detect topology: ' + err.message +
       ' — falling back to non-atomic writes.'
     );

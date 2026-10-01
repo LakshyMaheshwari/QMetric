@@ -1,9 +1,11 @@
 const mongoose = require('mongoose');
+const logger = require('../config/logger');
 const Paper = require('../Model/PaperInfo');
 const User = require('../Model/user');
 const { paginate, getPaginationMeta } = require('../utils/pagination');
 const { getUserId, getUserRole, getCollegeId, isTeacher, isReviewer, isAdmin, isSuperAdmin } = require('../utils/currentUser');
 const { createNotification } = require('./notificationController');
+const { logAudit } = require('../utils/auditLog');
 
 /**
  * Convert a string ID to an ObjectId for use inside an aggregation $match.
@@ -26,17 +28,21 @@ exports.getMyPapers = async (req, res) => {
     const { status } = req.query;
     const { skip, limit, page } = paginate(req, 20, 100);
 
+    // Default-deny scoping: every branch narrows the query, and the final
+    // `else` (students, unknown roles, reviewers without a college) can only
+    // ever see their OWN papers. Never leave `query` empty for a non-super_admin.
     const query = {};
     if (isTeacher(req)) {
       query.userId = userId;
-    } else if (isReviewer(req)) {
-      if (getCollegeId(req)) {
-        query.collegeId = getCollegeId(req);
-      } else {
-        query.userId = userId;
-      }
     } else if (isSuperAdmin(req)) {
-      if (req.query.collegeId) query.collegeId = req.query.collegeId;
+      // NOTE: must be checked before isReviewer() — isReviewer() also matches super_admin.
+      if (req.query.collegeId && mongoose.isValidObjectId(req.query.collegeId)) {
+        query.collegeId = req.query.collegeId;
+      }
+    } else if (isReviewer(req) && getCollegeId(req)) {
+      query.collegeId = getCollegeId(req);
+    } else {
+      query.userId = userId;
     }
 
     if (status && status !== 'all') {
@@ -87,7 +93,7 @@ exports.getMyPapers = async (req, res) => {
       pagination: getPaginationMeta(total, page, limit),
     });
   } catch (error) {
-    console.error('Error fetching papers:', error);
+    logger.error('Error fetching papers:', error);
     res.status(500).json({ error: true, message: 'Server error fetching papers' });
   }
 };
@@ -98,11 +104,14 @@ exports.getPaperDetails = async (req, res) => {
     const { id } = req.params;
     const userId = getUserId(req);
 
+    // Default-deny scoping (see getMyPapers). Only super_admin is unscoped.
     const query = { _id: id };
-    if (isTeacher(req)) {
-      query.userId = userId;
-    } else if ((isReviewer(req) || isAdmin(req)) && getCollegeId(req)) {
+    if (isSuperAdmin(req)) {
+      // unscoped by design
+    } else if (!isTeacher(req) && (isReviewer(req) || isAdmin(req)) && getCollegeId(req)) {
       query.$or = [{ userId }, { collegeId: getCollegeId(req) }];
+    } else {
+      query.userId = userId;
     }
 
     const paper = await Paper.findOne(query)
@@ -115,7 +124,7 @@ exports.getPaperDetails = async (req, res) => {
 
     res.json({ error: false, paper });
   } catch (error) {
-    console.error('Error fetching paper details:', error);
+    logger.error('Error fetching paper details:', error);
     res.status(500).json({ error: true, message: 'Server error fetching paper details' });
   }
 };
@@ -126,22 +135,25 @@ exports.submitPaperForReview = async (req, res) => {
     const { id } = req.params;
     const userId = getUserId(req);
 
-    const paper = await Paper.findOne({ _id: id, userId });
+    // Atomic check-and-set: only drafts and papers sent back for revision can be
+    // (re)submitted, and two concurrent submits cannot both win.
+    const paper = await Paper.findOneAndUpdate(
+      { _id: id, userId, reviewStatus: { $in: ['draft', 'needs_revision'] } },
+      { $set: { reviewStatus: 'pending', submittedAt: new Date() } },
+      { new: true }
+    );
 
     if (!paper) {
-      return res.status(404).json({ error: true, message: 'Paper not found' });
-    }
-
-    if (paper.reviewStatus !== 'draft') {
+      // Distinguish "doesn't exist / not yours" from "wrong state"
+      const existing = await Paper.findOne({ _id: id, userId }).select('reviewStatus').lean();
+      if (!existing) {
+        return res.status(404).json({ error: true, message: 'Paper not found' });
+      }
       return res.status(400).json({
         error: true,
-        message: `Cannot submit paper with status: ${paper.reviewStatus}. Only draft papers can be submitted.`,
+        message: `Cannot submit paper with status: ${existing.reviewStatus}. Only draft or needs_revision papers can be submitted.`,
       });
     }
-
-    paper.reviewStatus = 'pending';
-    paper.submittedAt = new Date();
-    await paper.save();
 
     // ── Notify all reviewers/admins in this college (fire-and-forget) ──
     if (paper.collegeId) {
@@ -168,7 +180,7 @@ exports.submitPaperForReview = async (req, res) => {
           }
         })
         .catch((err) =>
-          console.error('[notification.paperSubmitted]', err.message)
+          logger.error('[notification.paperSubmitted]', err.message)
         );
     }
 
@@ -178,8 +190,8 @@ exports.submitPaperForReview = async (req, res) => {
       paper,
     });
   } catch (err) {
-    console.error('Submit error:', err);
-    res.status(500).json({ error: true, message: err.message });
+    logger.error('Submit error:', err);
+    res.status(500).json({ error: true, message: 'Server error submitting paper' });
   }
 };
 
@@ -227,8 +239,8 @@ exports.updatePaper = async (req, res) => {
     await paper.save();
     res.json({ error: false, message: 'Paper updated successfully', paper });
   } catch (err) {
-    console.error('Update paper error:', err);
-    res.status(500).json({ error: true, message: err.message });
+    logger.error('Update paper error:', err);
+    res.status(500).json({ error: true, message: 'Server error updating paper' });
   }
 };
 
@@ -268,12 +280,21 @@ exports.deletePaper = async (req, res) => {
       });
     }
 
+    if (paper.cloudinaryPublicId) {
+      try {
+        const cloudinary = require('../config/cloudinary');
+        await cloudinary.uploader.destroy(paper.cloudinaryPublicId);
+      } catch (cloudErr) {
+        logger.warn('Cloudinary paper delete failed (non-blocking):', cloudErr.message);
+      }
+    }
+
     await Paper.findByIdAndDelete(paper._id);
 
     res.json({ error: false, message: 'Paper deleted successfully' });
   } catch (err) {
-    console.error('Delete error:', err);
-    res.status(500).json({ error: true, message: err.message });
+    logger.error('Delete error:', err);
+    res.status(500).json({ error: true, message: 'Server error deleting paper' });
   }
 };
 
@@ -317,11 +338,10 @@ exports.resendPaperReviewEmail = async (req, res) => {
     const teacherName = paper['Course Teacher'] || '';
     const questionCount = (paper['Collected Data']?.[0]?.QuestionData || []).length;
 
-    let sentCount = 0;
-    for (const r of reviewers) {
-      if (!r.email) continue;
-      emailService
-        .sendReviewerAssignedEmail({
+    const emailResults = await Promise.allSettled(
+      reviewers
+        .filter((r) => r.email)
+        .map((r) => emailService.sendReviewerAssignedEmail({
           to: r.email,
           reviewerName: r.fullName,
           paperTitle: courseName,
@@ -329,10 +349,11 @@ exports.resendPaperReviewEmail = async (req, res) => {
           teacherName,
           questionCount,
           paperId: paper._id,
-        })
-        .catch(() => {});
-      sentCount++;
-    }
+        }))
+    );
+    const sentCount = emailResults.filter(
+      (result) => result.status === 'fulfilled' && result.value?.success !== false
+    ).length;
 
     try {
       await logAudit({
@@ -343,7 +364,7 @@ exports.resendPaperReviewEmail = async (req, res) => {
         request: req,
       });
     } catch (auditErr) {
-      console.error('Audit log failed (non-blocking):', auditErr.message);
+      logger.error('Audit log failed (non-blocking):', auditErr.message);
     }
 
     return res.json({
@@ -352,7 +373,7 @@ exports.resendPaperReviewEmail = async (req, res) => {
       sentCount,
     });
   } catch (err) {
-    console.error('resendPaperReviewEmail error:', err);
-    res.status(500).json({ error: true, message: err.message });
+    logger.error('resendPaperReviewEmail error:', err);
+    res.status(500).json({ error: true, message: 'Server error resending review email' });
   }
 };

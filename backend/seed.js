@@ -1,3 +1,5 @@
+const logger = require('./config/logger');
+
 /**
  * Seed Script for Test Users
  * 
@@ -149,7 +151,7 @@ async function seedUsers() {
       useUnifiedTopology: true,
     });
 
-    console.log('✅ Connected to MongoDB');
+    logger.info('✅ Connected to MongoDB');
 
     // Seed each test user
     for (const userData of testUsers) {
@@ -165,21 +167,21 @@ async function seedUsers() {
         });
 
         await newUser.save();
-        console.log(`✅ User ${userData.email} created successfully`);
+        logger.info(`✅ User ${userData.email} created successfully`);
       } else {
-        console.log(`⚠️ User ${userData.email} already exists - skipping`);
+        logger.info(`⚠️ User ${userData.email} already exists - skipping`);
       }
     }
 
-    console.log('\nSeeding complete!');
-    console.log('\nTest Accounts:');
+    logger.info('\nSeeding complete!');
+    logger.info('\nTest Accounts:');
     testUsers.forEach(user => {
-      console.log(`  - Email: ${user.email}`);
+      logger.info(`  - Email: ${user.email}`);
     });
 
     process.exit(0);
   } catch (error) {
-    console.error('❌ Error seeding users:', error.message);
+    logger.error('❌ Error seeding users:', error.message);
     process.exit(1);
   }
 }

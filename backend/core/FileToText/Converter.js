@@ -1,4 +1,5 @@
 const fs        = require('node:fs');
+const logger = require('../../config/logger');
 const pdf       = require('pdf-parse');
 const mammoth   = require('mammoth');
 const csv       = require('csv-parser');
@@ -23,7 +24,7 @@ async function convertWordToText(inputFilePath, outputTextFilePath) {
         fs.writeFileSync(outputTextFilePath, text);
         return text;
     } catch (error) {
-        console.error('Error converting Word document to text:', error);
+        logger.error('Error converting Word document to text:', error);
         throw error;
     }
 }

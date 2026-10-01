@@ -1,8 +1,10 @@
+const logger = require('../config/logger');
+
 const nodemailer = require('nodemailer');
 
 // ─── Startup warning (fires once, at module load) ─────────────────
 if (!process.env.SMTP_HOST) {
-  console.warn(
+  logger.warn(
     '[mailer] SMTP not configured — email notifications are DISABLED (console fallback active)'
   );
 }
@@ -28,7 +30,7 @@ function getTransporter() {
     // Dev / no-SMTP fallback — logs the email instead of sending it
     transporter = {
       sendMail: async (mailOptions) => {
-        console.log('📧 [Email Notification Simulated]:', {
+        logger.info('📧 [Email Notification Simulated]:', {
           to: mailOptions.to,
           subject: mailOptions.subject,
         });
@@ -58,7 +60,7 @@ async function sendReviewStatusEmail({ to, courseName, reviewStatus, comments })
       text,
     });
   } catch (error) {
-    console.error('Failed to send review status email:', error.message);
+    logger.error('Failed to send review status email:', error.message);
   }
 }
 

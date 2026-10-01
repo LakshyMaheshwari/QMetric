@@ -1,4 +1,5 @@
 const Paper = require('../Model/PaperInfo');
+const logger = require('../config/logger');
 const User = require('../Model/user');
 const College = require('../Model/College');
 const paperFields = require('../core/constants/paperFields');
@@ -159,7 +160,7 @@ exports.getCollegePapers = async (req, res) => {
       pagination: getPaginationMeta(total, page, limit),
     });
   } catch (error) {
-    console.error('Error fetching reviewer papers:', error);
+    logger.error('Error fetching reviewer papers:', error);
     res.status(500).json({ error: true, message: 'Server error' });
   }
 };
@@ -192,7 +193,7 @@ exports.getPaperDetails = async (req, res) => {
       paper: formatPaper(paper),
     });
   } catch (error) {
-    console.error('Error fetching paper details:', error);
+    logger.error('Error fetching paper details:', error);
     res.status(500).json({ error: true, message: 'Server error' });
   }
 };
@@ -201,7 +202,7 @@ exports.getPaperDetails = async (req, res) => {
 exports.reviewPaper = async (req, res) => {
   try {
     const { id } = req.params;
-    const { action, comments } = req.body;
+    const { action, comments } = req.body || {};
     const reviewerId = getUserId(req);
 
     if (!['approved', 'rejected', 'needs_revision'].includes(action)) {
@@ -221,35 +222,66 @@ exports.reviewPaper = async (req, res) => {
       conditions.push(baseQuery);
     }
 
-    const paper = await Paper.findOne(conditions.length > 1 ? { $and: conditions } : conditions[0]);
+    let paper = await Paper.findOne(conditions.length > 1 ? { $and: conditions } : conditions[0]);
     if (!paper) {
       return res.status(404).json({ error: true, message: 'Paper not found in your college' });
     }
 
     const previousReviewStatus = paper.reviewStatus || 'pending';
 
-    // Update paper review fields
-    paper.reviewStatus = action;
-    paper.reviewedBy = reviewerId;
-    paper.reviewComments = comments || '';
-    paper.reviewedAt = new Date();
+    // State-machine guard: only submitted papers can be reviewed.
+    if (previousReviewStatus !== 'pending') {
+      return res.status(400).json({
+        error: true,
+        message: `Cannot review a paper with status: ${previousReviewStatus}. Only pending papers can be reviewed.`,
+      });
+    }
 
+    // Conflict-of-interest guard: nobody reviews their own paper.
+    if (String(paper.userId) === String(reviewerId)) {
+      return res.status(403).json({
+        error: true,
+        message: 'You cannot review your own paper.',
+      });
+    }
+
+    // Atomic check-and-set: if another reviewer got there first (status is no
+    // longer 'pending'), this matches nothing and we return 409 instead of
+    // silently overwriting their decision.
+    const now = new Date();
+    const setFields = {
+      reviewStatus: action,
+      reviewedBy: reviewerId,
+      reviewComments: comments || '',
+      reviewedAt: now,
+    };
     if (!paper.collegeId && collegeId) {
-      paper.collegeId = collegeId;
+      setFields.collegeId = collegeId;
     }
 
-    if (!Array.isArray(paper.reviewHistory)) {
-      paper.reviewHistory = [];
+    const updated = await Paper.findOneAndUpdate(
+      { _id: paper._id, reviewStatus: 'pending' },
+      {
+        $set: setFields,
+        $push: {
+          reviewHistory: {
+            reviewerId,
+            action,
+            comments: comments || '',
+            timestamp: now,
+          },
+        },
+      },
+      { new: true }
+    );
+    if (!updated) {
+      return res.status(409).json({
+        error: true,
+        message: 'This paper was already reviewed by someone else. Refresh and try again.',
+      });
     }
-
-    paper.reviewHistory.push({
-      reviewerId,
-      action,
-      comments: comments || '',
-      timestamp: new Date(),
-    });
-
-    await paper.save();
+    // Use the freshly-updated document for everything below (populate, response).
+    paper = updated;
 
     await logAudit({
       userId: reviewerId,
@@ -286,7 +318,7 @@ exports.reviewPaper = async (req, res) => {
         message: `"${paper['Course Name'] || 'Untitled'}" was ${action.replace('_', ' ')} by ${paper.reviewedBy?.fullName || 'a reviewer'}.`,
         relatedDocId: paper._id,
         actionUrl: `/teacher/papers/${paper._id}`,
-      }).catch(() => {}); // fire-and-forget
+      }).catch((err) => logger.error('In-app notification dispatch error:', err.message));
     }
 
     // Notify author asynchronously if email is available
@@ -297,7 +329,7 @@ exports.reviewPaper = async (req, res) => {
         courseName: paper[paperFields.COURSE_NAME] || paper.courseName || 'Untitled',
         reviewStatus: action,
         comments,
-      }).catch((err) => console.error('Notification dispatch error:', err.message));
+      }).catch((err) => logger.error('Notification dispatch error:', err.message));
     }
 
     res.json({
@@ -313,7 +345,7 @@ exports.reviewPaper = async (req, res) => {
       request: req,
       error,
     });
-    console.error('Error reviewing paper:', error);
+    logger.error('Error reviewing paper:', error);
     res.status(500).json({ error: true, message: 'Server error' });
   }
 };
@@ -366,7 +398,7 @@ exports.getReviewStats = async (req, res) => {
       ...formattedStats,
     });
   } catch (error) {
-    console.error('Error fetching review stats:', error);
+    logger.error('Error fetching review stats:', error);
     res.status(500).json({ error: true, message: 'Server error' });
   }
 };
@@ -392,7 +424,7 @@ exports.getPendingCount = async (req, res) => {
 
     res.json({ error: false, pending: count });
   } catch (error) {
-    console.error('Error fetching pending count:', error);
+    logger.error('Error fetching pending count:', error);
     res.status(500).json({ error: true, message: 'Server error' });
   }
 };
@@ -411,23 +443,36 @@ async function getBloomRecommendations(req, res) {
             return res.status(400).json({ error: true, message: 'Invalid paper ID' });
         }
 
+        // `Collected Data` contains a space, so use the object form of select().
         const paper = await PaperInfo.findById(id)
-            .select('collegeId BloomRecommendations')
+            .select({
+                collegeId: 1,
+                BloomRecommendations: 1,
+                [paperFields.COLLECTED_DATA]: 1,
+            })
             .lean();
 
         if (!paper) {
             return res.status(404).json({ error: true, message: 'Paper not found' });
         }
 
-        // Authorization: super_admin bypasses; everyone else must match college
+        // Authorization: ONLY super_admin bypasses; everyone else (incl. college
+        // admins) must match the paper's college. isAdmin() is true for both
+        // admin and super_admin, so it must not be used here.
         if (
-            !isAdmin(req) &&
-            String(paper.collegeId) !== String(getCollegeId(req))
+            !isSuperAdmin(req) &&
+            (!paper.collegeId || String(paper.collegeId) !== String(getCollegeId(req)))
         ) {
             return res.status(403).json({ error: true, message: 'Forbidden' });
         }
 
-        if (!paper.BloomRecommendations) {
+        // The upload pipeline stores recommendations inside Collected Data[0]
+        // (top-level fields are not in the PaperInfo schema and are dropped on save).
+        const bloomData =
+            paper.BloomRecommendations ||
+            paper[paperFields.COLLECTED_DATA]?.[0]?.BloomRecommendations;
+
+        if (!bloomData) {
             return res.status(404).json({
                 error: true,
                 message:
@@ -438,7 +483,7 @@ async function getBloomRecommendations(req, res) {
         const {
             recommendations = [],
             bloomLevelOverview = {},
-        } = paper.BloomRecommendations;
+        } = bloomData;
 
         // Aggregate by expected level (1..6)
         const byLevel = {};
@@ -485,7 +530,7 @@ async function getBloomRecommendations(req, res) {
             },
         });
     } catch (err) {
-        console.error('[reviewer.getBloomRecommendations]', err);
+        logger.error('[reviewer.getBloomRecommendations]', err);
         return res.status(500).json({ error: true, message: 'Internal server error' });
     }
 }
@@ -571,8 +616,8 @@ exports.resendDecisionEmail = async (req, res) => {
       message: `Decision email resent to ${authorEmail}.`,
     });
   } catch (err) {
-    console.error('resendDecisionEmail error:', err);
-    res.status(500).json({ error: true, message: err.message });
+    logger.error('resendDecisionEmail error:', err);
+    res.status(500).json({ error: true, message: 'Server error resending decision email' });
   }
 };
 

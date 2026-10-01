@@ -1,6 +1,7 @@
 'use strict';
 
 const mongoose = require('mongoose');
+const logger = require('../config/logger');
 const OCRLog = require('../Model/OCRLog');
 const User = require('../Model/user');
 const { logAudit } = require('../utils/auditLog');
@@ -63,7 +64,7 @@ async function listOcrLogs(req, res) {
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (err) {
-    console.error('[ocrLog.listOcrLogs]', err);
+    logger.error('[ocrLog.listOcrLogs]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -97,7 +98,7 @@ async function getOcrStats(req, res) {
       },
     });
   } catch (err) {
-    console.error('[ocrLog.getOcrStats]', err);
+    logger.error('[ocrLog.getOcrStats]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -129,7 +130,7 @@ async function getOcrLog(req, res) {
 
     return res.status(200).json({ error: false, ocrLog: log });
   } catch (err) {
-    console.error('[ocrLog.getOcrLog]', err);
+    logger.error('[ocrLog.getOcrLog]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -190,7 +191,7 @@ async function verifyOcrLog(req, res) {
 
     return res.status(200).json({ error: false, ocrLog: updated, message: `Status set to ${status}` });
   } catch (err) {
-    console.error('[ocrLog.verifyOcrLog]', err);
+    logger.error('[ocrLog.verifyOcrLog]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -259,7 +260,7 @@ async function rejectOcrLog(req, res) {
       message: 'OCR log rejected',
     });
   } catch (err) {
-    console.error('[ocrLog.rejectOcrLog]', err);
+    logger.error('[ocrLog.rejectOcrLog]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }

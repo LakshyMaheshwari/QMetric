@@ -1,3 +1,5 @@
+const logger = require('../../config/logger');
+
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 require('dotenv').config();
@@ -7,7 +9,7 @@ const { withTransaction } = require('./utils/withTransaction');
 
 async function createTestCollegeAdmin() {
   await mongoose.connect(process.env.MONGO_URI);
-  console.log('Connected to MongoDB');
+  logger.info('Connected to MongoDB');
 
   // Find or create sample college
   let college = await College.findOne({ code: 'WCE001' });
@@ -20,9 +22,9 @@ async function createTestCollegeAdmin() {
       address: 'Vishrambag, Sangli',
       isActive: true,
     });
-    console.log('Created college:', college.name);
+    logger.info('Created college:', college.name);
   } else {
-    console.log('Using college:', college.name, '(', college.code, ')');
+    logger.info('Using college:', college.name, '(', college.code, ')');
   }
 
   const email = process.env.TEST_ADMIN_EMAIL || 'collegeadmin@wce.ac.in';
@@ -39,7 +41,7 @@ async function createTestCollegeAdmin() {
     adminUser.collegeName = college.name;
     adminUser.isBlocked = false;
     await adminUser.save();
-    console.log('Updated existing college admin:', email);
+    logger.info('Updated existing college admin:', email);
   } else {
     adminUser = new User({
       userName: 'WCE Admin',
@@ -57,14 +59,14 @@ async function createTestCollegeAdmin() {
       idVerification: { status: 'not_applicable' },
     });
     await adminUser.save();
-    console.log('Created new college admin:', email);
+    logger.info('Created new college admin:', email);
   }
 
   // Ensure this admin is in College.adminIds
   if (!college.adminIds.includes(adminUser._id)) {
     college.adminIds.push(adminUser._id);
     await college.save();
-    console.log('Added admin reference to college adminIds');
+    logger.info('Added admin reference to college adminIds');
   }
 
   // ── Create sample teacher (atomic: user + counter) ─────────
@@ -107,17 +109,17 @@ async function createTestCollegeAdmin() {
       );
     });
 
-    console.log('Created sample teacher for WCE:', sampleTeacherEmail);
+    logger.info('Created sample teacher for WCE:', sampleTeacherEmail);
   }
 
-  console.log('\n=======================================');
-  console.log('   COLLEGE ADMIN CREDENTIALS CREATED   ');
-  console.log('=======================================');
-  console.log('Email:    ' + email);
-  console.log('Password: ' + rawPassword);
-  console.log('Role:     ' + adminUser.role);
-  console.log('College:  ' + college.name + ' (' + college.code + ')');
-  console.log('=======================================\n');
+  logger.info('\n=======================================');
+  logger.info('   COLLEGE ADMIN CREDENTIALS CREATED   ');
+  logger.info('=======================================');
+  logger.info('Email:    ' + email);
+  logger.info('Password: ' + rawPassword);
+  logger.info('Role:     ' + adminUser.role);
+  logger.info('College:  ' + college.name + ' (' + college.code + ')');
+  logger.info('=======================================\n');
 
   await mongoose.disconnect();
 }

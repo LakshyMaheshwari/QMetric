@@ -8,6 +8,8 @@ const {
   validatePagination,
   validateSearchOnly,
   validateCollegeId,
+  validateMongoId,
+  validateBlockUpdate,
   validateCollege,
   handleValidationErrors,
 } = require('../middleware/validators');
@@ -54,6 +56,13 @@ router.delete(
 
 // Audit logs
 router.get('/audit-logs', superAdminController.getAuditLogs);
+
+// Global user management (super_admin only)
+router.get('/users', validatePagination, handleValidationErrors, superAdminController.getAllUsers);
+router.get('/users/:id', ...validateMongoId('id'), handleValidationErrors, superAdminController.getUserById);
+router.put('/users/:id/role', ...validateMongoId('id'), handleValidationErrors, superAdminController.updateUserRole);
+router.put('/users/:id/block', ...validateMongoId('id'), validateBlockUpdate, handleValidationErrors, superAdminController.toggleUserBlock);
+router.delete('/users/:id', ...validateMongoId('id'), handleValidationErrors, superAdminController.deleteUser);
 
 /* -------------------------------------------------------------------------- */
 /* LearnedVerb management (super_admin only)                                  */
@@ -177,7 +186,7 @@ router.post('/learned-verbs/bulk-import', learnedVerbController.bulkImportVerbs)
  *       200: { description: Updated }
  *       404: { description: Not found }
  */
-router.put('/learned-verbs/:verbId', learnedVerbController.updateLearnedVerb);
+router.put('/learned-verbs/:verbId', ...validateMongoId('verbId'), handleValidationErrors, learnedVerbController.updateLearnedVerb);
 
 /**
  * @swagger
@@ -194,7 +203,7 @@ router.put('/learned-verbs/:verbId', learnedVerbController.updateLearnedVerb);
  *       200: { description: Deleted }
  *       404: { description: Not found }
  */
-router.delete('/learned-verbs/:verbId', learnedVerbController.deleteLearnedVerb);
+router.delete('/learned-verbs/:verbId', ...validateMongoId('verbId'), handleValidationErrors, learnedVerbController.deleteLearnedVerb);
 /**
  * @swagger
  * /super-admin/email/test:

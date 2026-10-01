@@ -1,3 +1,5 @@
+const logger = require('../config/logger');
+
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
@@ -6,9 +8,11 @@ const userController = require('../controllers/userController');
 const collegeController = require('../controllers/collegeController');
 const authenticateToken = require('../core/auth/utilities');
 const upload = require('../config/multer');
+const { validateImageSignature } = upload;
 const adminAuth = require('../middleware/adminAuth');
 const { validateLogin, validateRegister, handleValidationErrors } = require('../middleware/validators');
 const { revoke } = require('../utils/tokenBlacklist');
+const User = require('../Model/user');
 
 /**
  * @swagger
@@ -63,6 +67,9 @@ router.get('/profile', authenticateToken, userController.getProfile);
  *             schema: { $ref: '#/components/schemas/Error' }
  */
 router.put('/profile', authenticateToken, userController.updateProfile);
+
+// Authenticated password change (rate-limited in index.js via /auth/password)
+router.put('/password', authenticateToken, userController.changePassword);
 
 /**
  * @swagger
@@ -168,6 +175,7 @@ router.post('/login', validateLogin, handleValidationErrors, authController.logi
 router.post(
   '/create-account',
   upload.single('collegeIdPhoto'),
+  validateImageSignature,
   validateRegister,
   handleValidationErrors,
   authController.register
@@ -211,6 +219,55 @@ router.get('/verify-email/:token', authController.verifyEmail);
  *       200: { description: Link sent if account exists }
  */
 router.post('/resend-verification', authController.resendVerificationEmail);
+
+/**
+ * @swagger
+ * /auth/forgot-password:
+ *   post:
+ *     summary: Request password reset link via email
+ *     tags: [Auth]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email: { type: string, format: email }
+ *     responses:
+ *       200: { description: Reset email sent if user exists }
+ *       400: { description: Invalid email format }
+ */
+router.post('/forgot-password', authController.forgotPassword);
+
+/**
+ * @swagger
+ * /auth/reset-password/{token}:
+ *   post:
+ *     summary: Reset password using received token
+ *     tags: [Auth]
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [password]
+ *             properties:
+ *               password: { type: string, minLength: 8 }
+ *     responses:
+ *       200: { description: Password reset successfully }
+ *       400: { description: Invalid or expired token / weak password }
+ */
+router.post('/reset-password/:token', authController.resetPassword);
 
 /**
  * @swagger
@@ -323,32 +380,92 @@ router.post('/logout', async (req, res) => {
       req.cookies?.accessToken ||
       req.headers.authorization?.split(' ')[1];
 
-    if (token) {
-      // Decode (not verify) so we can read the exp claim — this lets the
-      // blacklist entry auto-expire when the token would have expired anyway.
-      // jwt.decode returns null on malformed input rather than throwing, so
-      // the only realistic failure is an unexpected runtime error here.
-      const decoded = jwt.decode(token);
-      if (decoded?.exp) {
-        revoke(token, decoded.exp);
-      } else {
-        // No exp claim — fall back to the default TTL (72h, matches token lifetime)
-        revoke(token);
+    if (token && typeof token === 'string') {
+      try {
+        const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+        await revoke(token, decoded.exp);
+        if (decoded?.userId) {
+          await User.findOneAndUpdate(
+            { _id: decoded.userId },
+            { $set: { refreshTokenHash: null, refreshTokenExpiresAt: null } }
+          );
+        }
+      } catch (tokenErr) {
+        // Logout remains idempotent for expired/invalid access tokens.
       }
     }
 
+    const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+    if (typeof refreshToken === 'string' && refreshToken) {
+      const crypto = require('node:crypto');
+      const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+      await User.updateOne(
+        { refreshTokenHash },
+        { $set: { refreshTokenHash: null, refreshTokenExpiresAt: null } }
+      );
+    }
+
+    const sameSite = process.env.COOKIE_SAME_SITE || 'lax';
+    const secure = process.env.NODE_ENV === 'production';
+
     res.clearCookie('accessToken', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure,
+      sameSite,
+    });
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure,
+      sameSite,
+      path: '/auth',
     });
 
     return res.json({ error: false, message: 'Logged out successfully' });
   } catch (err) {
-    console.error('Logout error:', err.message);
+    logger.error('Logout error:', err.message);
     return res.status(500).json({ error: true, message: 'Logout failed' });
   }
 });
+
+/**
+ * @swagger
+ * /auth/refresh:
+ *   post:
+ *     summary: Refresh access token using refresh token cookie or body
+ *     tags: [Auth]
+ *     security: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               refreshToken: { type: string }
+ *     responses:
+ *       200:
+ *         description: New access and refresh tokens issued
+ *       401:
+ *         description: Invalid or expired refresh token
+ */
+router.post('/refresh', authController.refreshToken);
+
+/**
+ * @swagger
+ * /auth/revoke-all-sessions:
+ *   post:
+ *     summary: Revoke all active sessions and refresh tokens across devices
+ *     tags: [Auth]
+ *     security:
+ *       - BearerAuth: []
+ *       - CookieAuth: []
+ *     responses:
+ *       200:
+ *         description: All sessions revoked
+ *       401:
+ *         description: Unauthenticated
+ */
+router.post('/revoke-all-sessions', authenticateToken, authController.revokeAllSessions);
 
 /**
  * @swagger
@@ -375,6 +492,7 @@ router.post(
   '/profile/request-affiliation',
   authenticateToken,
   upload.single('collegeIdPhoto'),
+  validateImageSignature,
   authController.requestAffiliation
 );
 
@@ -403,6 +521,7 @@ router.post(
   '/profile/upgrade-to-teacher',
   authenticateToken,
   upload.single('collegeIdPhoto'),
+  validateImageSignature,
   authController.upgradeToTeacher
 );
 

@@ -49,7 +49,15 @@ if (process.env.NODE_ENV === 'test') {
 
   const csrfWithBearerSkip = (req, res, next) => {
     const authHeader = req.headers && req.headers.authorization;
-    if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+    // Bearer-token clients (no cookie) are not CSRF-able, so they skip the check.
+    // But if the browser ALSO sent the auth cookie, the cookie is what
+    // authenticates the request (see authenticateToken), so CSRF must still apply.
+    const hasAuthCookie = Boolean(req.cookies && req.cookies.accessToken);
+    if (
+      typeof authHeader === 'string' &&
+      authHeader.startsWith('Bearer ') &&
+      !hasAuthCookie
+    ) {
       return next();
     }
     return doubleCsrfProtection(req, res, next);

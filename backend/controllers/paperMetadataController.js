@@ -1,6 +1,7 @@
 'use strict';
 
 const mongoose = require('mongoose');
+const logger = require('../config/logger');
 const PaperInfo = require('../Model/PaperInfo');
 
 // Canonical maps — lowercased raw values → display value
@@ -87,17 +88,14 @@ async function getPaperMetadata(req, res) {
       return res.status(400).json({ error: true, message: 'Invalid paper ID' });
     }
 
-    const paper = await PaperInfo.findById(id).lean();
+    const paperQuery =
+      req.user.role === 'super_admin'
+        ? { _id: id }
+        : { _id: id, collegeId: req.user.collegeId };
+
+    const paper = await PaperInfo.findOne(paperQuery).lean();
     if (!paper) {
       return res.status(404).json({ error: true, message: 'Paper not found' });
-    }
-
-    if (
-      req.user.role !== 'super_admin' &&
-      paper.collegeId &&
-      String(paper.collegeId) !== String(req.user.collegeId)
-    ) {
-      return res.status(403).json({ error: true, message: 'Forbidden' });
     }
 
     const questions = extractQuestions(paper);
@@ -149,7 +147,7 @@ async function getPaperMetadata(req, res) {
       modules: moduleCounts,
     });
   } catch (err) {
-    console.error('[paperMetadata.getPaperMetadata]', err);
+    logger.error('[paperMetadata.getPaperMetadata]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
@@ -168,12 +166,35 @@ async function getMetadataAnalytics(req, res) {
     const match = { collegeId: new mongoose.Types.ObjectId(collegeId) };
     if (startDate || endDate) {
       match.createdAt = {};
-      if (startDate) match.createdAt.$gte = new Date(startDate);
-      if (endDate) match.createdAt.$lte = new Date(endDate);
+
+      if (startDate) {
+        const parsedStart = new Date(startDate);
+        if (Number.isNaN(parsedStart.getTime())) {
+          return res.status(400).json({ error: true, message: 'Invalid startDate.' });
+        }
+        match.createdAt.$gte = parsedStart;
+      }
+
+      if (endDate) {
+        const parsedEnd = new Date(endDate);
+        if (Number.isNaN(parsedEnd.getTime())) {
+          return res.status(400).json({ error: true, message: 'Invalid endDate.' });
+        }
+
+        // A date-only endDate means the entire day. Use an exclusive next-day
+        // boundary so papers created later that day are included.
+        if (/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+          parsedEnd.setUTCHours(0, 0, 0, 0);
+          parsedEnd.setUTCDate(parsedEnd.getUTCDate() + 1);
+          match.createdAt.$lt = parsedEnd;
+        } else {
+          match.createdAt.$lt = parsedEnd;
+        }
+      }
     }
     if (branch) match.Branch = branch;
 
-    const papers = await PaperInfo.find(match).select('"Collected Data"').lean();
+    const papers = await PaperInfo.find(match).select({ 'Collected Data': 1 }).lean();
 
     const agg = {
       totalPapers: papers.length,
@@ -210,7 +231,7 @@ async function getMetadataAnalytics(req, res) {
       },
     });
   } catch (err) {
-    console.error('[paperMetadata.getMetadataAnalytics]', err);
+    logger.error('[paperMetadata.getMetadataAnalytics]', err);
     return res.status(500).json({ error: true, message: 'Internal server error' });
   }
 }
