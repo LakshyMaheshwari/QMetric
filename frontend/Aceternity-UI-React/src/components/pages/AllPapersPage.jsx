@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
 import Navbar from '../Navbar';
 import './AllPapersPage.css';
 
@@ -10,6 +11,13 @@ export default function AllPapersPage() {
   const [error, setError] = useState(null);
   const [toast, setToast] = useState({ text: '', type: '' }); // 'success' | 'error'
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const isStudent = user?.role === 'student';
+  const isTeacher = user?.role === 'teacher';
+  const isAffiliatedTeacher = isTeacher && Boolean(user?.collegeId);
+  const isIndependentTeacher = isTeacher && !user?.collegeId;
+  const canDeletePaper = ['teacher', 'admin', 'super_admin'].includes(user?.role);
 
   const showToast = (text, type = 'success') => {
     setToast({ text, type });
@@ -20,9 +28,10 @@ export default function AllPapersPage() {
     const fetchPapers = async () => {
       try {
         setLoading(true);
-        const response = await apiClient.get('/teacher/papers');
+        const endpoint = isStudent ? '/student/papers' : '/teacher/papers';
+        const response = await apiClient.get(endpoint, { params: { limit: 100, page: 1 } });
 
-        const papersList = response.data.papers || [];
+        const papersList = response.data?.papers || [];
         setPapers(Array.isArray(papersList) ? papersList : []);
         setError(null);
       } catch (err) {
@@ -35,7 +44,7 @@ export default function AllPapersPage() {
     };
 
     fetchPapers();
-  }, []);
+  }, [isStudent]);
 
   const handleSubmitForReview = async (paperId) => {
     try {
@@ -106,9 +115,13 @@ export default function AllPapersPage() {
                   <td>{paper.courseCode || paper['Course Code'] || '—'}</td>
                   <td>{new Date(paper.createdAt).toLocaleDateString()}</td>
                   <td>
-                    <span className={`status ${paper.reviewStatus}`}>
-                      {paper.reviewStatus || 'unknown'}
-                    </span>
+                    {isStudent || isIndependentTeacher ? (
+                      <span className="status">OK</span>
+                    ) : (
+                      <span className={`status ${paper.reviewStatus}`}>
+                        {paper.reviewStatus || 'unknown'}
+                      </span>
+                    )}
                   </td>
                   <td>{paper.qualityScore || '—'}</td>
                   <td className="actions">
@@ -119,7 +132,7 @@ export default function AllPapersPage() {
                       View
                     </button>
 
-                    {paper.reviewStatus === 'draft' && (
+                    {isAffiliatedTeacher && paper.reviewStatus === 'draft' && (
                       <button
                         className="btn-submit"
                         onClick={() => handleSubmitForReview(paper._id)}
@@ -128,12 +141,16 @@ export default function AllPapersPage() {
                       </button>
                     )}
 
-                    <button
-                      className="btn-delete"
-                      onClick={() => handleDeletePaper(paper._id)}
-                    >
-                      Delete
-                    </button>
+                    {isStudent || isIndependentTeacher ? (
+                      <span className="btn-view">OK</span>
+                    ) : canDeletePaper ? (
+                      <button
+                        className="btn-delete"
+                        onClick={() => handleDeletePaper(paper._id)}
+                      >
+                        Delete
+                      </button>
+                    ) : null}
                   </td>
                 </tr>
               ))}

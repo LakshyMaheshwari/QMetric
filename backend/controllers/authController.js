@@ -859,7 +859,7 @@ const REQUIRED_FIELDS = [
     'collegeName', 'position', 'employeeId', 'department', 'stream',
 ];
 
-const VALID_POSITIONS = ['Professor', 'Associate Professor', 'Assistant Professor', 'Lecturer', 'HoD', 'Other'];
+const VALID_POSITIONS = ['Professor', 'Senior Professor', 'Associate Professor', 'Assistant Professor', 'Senior Lecturer', 'Lecturer', 'HoD', 'Dean', 'Director', 'Principal', 'Vice Principal', 'Academic Coordinator', 'Visiting Faculty', 'Research Faculty', 'Teaching Assistant', 'Other'];
 const VALID_STREAMS = ['Engineering', 'Management', 'Science', 'Commerce', 'Arts', 'Law', 'Medicine', 'Other'];
 const PHONE_RE = /^\d{10}$/;
 const VALID_BULK_ROLES = ['teacher', 'reviewer'];
@@ -1675,10 +1675,16 @@ const upgradeToTeacher = async (req, res) => {
         }
 
         user.role = 'teacher';
-        user.collegeId = matchedCollege._id;
-        user.collegeName = matchedCollege.name;
+        user.collegeId = null;
+        user.collegeName = '';
         user.collegeApprovalStatus = 'pending';
         user.idVerification = idVerification;
+
+        user.pendingAffiliationRequest = {
+            collegeId: matchedCollege._id,
+            requestedAt: new Date(),
+            idVerification,
+        };
         if (uploadResult) {
             user.collegeIdPhoto = uploadResult.secure_url;
             user.collegeIdPhotoPublicId = uploadResult.public_id;
@@ -1795,7 +1801,7 @@ const getBulkFormat = (req, res) => {
                 { name: 'phone',      type: 'string', required: true,  example: '9876543210',           constraints: 'exactly 10 digits' },
                 { name: 'role',       type: 'string', required: false, example: 'teacher',              constraints: 'teacher | reviewer (default: teacher)' },
                 { name: 'collegeId',  type: 'string', required: false, example: '65a3...',              constraints: 'Mongo ObjectId of active college' },
-                { name: 'position',   type: 'string', required: false, example: 'Assistant Professor', constraints: 'Professor | Associate Professor | Assistant Professor | Lecturer | HoD | Other' },
+                { name: 'position',   type: 'string', required: false, example: 'Assistant Professor', constraints: 'Professor | Senior Professor | Associate Professor | Assistant Professor | Senior Lecturer | Lecturer | HoD | Dean | Director | Principal | Vice Principal | Academic Coordinator | Visiting Faculty | Research Faculty | Teaching Assistant | Other' },
                 { name: 'employeeId', type: 'string', required: false, example: 'EMP001',               constraints: 'unique per system' },
                 { name: 'department', type: 'string', required: false, example: 'Computer Science',    constraints: 'free text' },
                 { name: 'stream',     type: 'string', required: false, example: 'Engineering',          constraints: 'Engineering | Management | Science | Commerce | Arts | Law | Medicine | Other' },

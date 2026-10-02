@@ -77,13 +77,26 @@ export function AuthProvider({ children }) {
   }, []);
 
   // React to auth changes across tabs or components
-  useEffect(() => {
-    const handleChange = () => {
+useEffect(() => {
+  const handleChange = () => {
+    setUser(readStoredUser());
+  };
+
+  window.addEventListener('authStateChanged', handleChange);
+
+  const handleStorage = (event) => {
+    if (event.key === STORAGE_KEY_USER) {
       setUser(readStoredUser());
-    };
-    window.addEventListener('authStateChanged', handleChange);
-    return () => window.removeEventListener('authStateChanged', handleChange);
-  }, []);
+    }
+  };
+
+  window.addEventListener('storage', handleStorage);
+
+  return () => {
+    window.removeEventListener('authStateChanged', handleChange);
+    window.removeEventListener('storage', handleStorage);
+  };
+}, []);
 
   // Handle forced logout from authExpired event (401 response)
   useEffect(() => {

@@ -7,6 +7,7 @@ import { DashboardSkeleton } from '../SkeletonLoader';
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
+  const isIndependentTeacher = user?.role === 'teacher' && !user?.collegeId;
   const navigate = useNavigate();
 
   const [papers, setPapers] = useState([]);
@@ -103,7 +104,7 @@ export default function TeacherDashboard() {
             </div>
             <div>
               <h1 className="text-2xl font-extrabold text-white">My Papers</h1>
-              <p className="text-gray-400 text-sm">Track review status of your uploaded papers</p>
+              <p className="text-gray-400 text-sm">{isIndependentTeacher ? 'Track your uploaded papers and analysis' : 'Track review status of your uploaded papers'}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -128,27 +129,31 @@ export default function TeacherDashboard() {
 
         {/* Stats Grid */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+          <div className={`grid gap-4 mb-8 ${isIndependentTeacher ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-2 md:grid-cols-5'}`}>
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col">
               <span className="text-gray-400 text-sm font-medium mb-1">Total Papers</span>
               <span className="text-2xl font-bold text-white">{stats.total || 0}</span>
             </div>
-            <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-2xl p-5 flex flex-col">
-              <span className="text-yellow-500 text-sm font-medium mb-1 flex items-center gap-1"><Clock className="w-4 h-4"/> Pending</span>
-              <span className="text-2xl font-bold text-yellow-400">{stats.pending || 0}</span>
-            </div>
-            <div className="bg-green-500/5 border border-green-500/10 rounded-2xl p-5 flex flex-col">
-              <span className="text-green-500 text-sm font-medium mb-1 flex items-center gap-1"><CheckCircle className="w-4 h-4"/> Approved</span>
-              <span className="text-2xl font-bold text-green-400">{stats.approved || 0}</span>
-            </div>
-            <div className="bg-red-500/5 border border-red-500/10 rounded-2xl p-5 flex flex-col">
-              <span className="text-red-500 text-sm font-medium mb-1 flex items-center gap-1"><XCircle className="w-4 h-4"/> Rejected</span>
-              <span className="text-2xl font-bold text-red-400">{stats.rejected || 0}</span>
-            </div>
-            <div className="bg-orange-500/5 border border-orange-500/10 rounded-2xl p-5 flex flex-col">
-              <span className="text-orange-500 text-sm font-medium mb-1 flex items-center gap-1"><AlertCircle className="w-4 h-4"/> Needs Rev.</span>
-              <span className="text-2xl font-bold text-orange-400">{stats.needsRevision || 0}</span>
-            </div>
+            {!isIndependentTeacher && (
+              <>
+                <div className="bg-yellow-500/5 border border-yellow-500/10 rounded-2xl p-5 flex flex-col">
+                  <span className="text-yellow-500 text-sm font-medium mb-1 flex items-center gap-1"><Clock className="w-4 h-4"/> Pending</span>
+                  <span className="text-2xl font-bold text-yellow-400">{stats.pending || 0}</span>
+                </div>
+                <div className="bg-green-500/5 border border-green-500/10 rounded-2xl p-5 flex flex-col">
+                  <span className="text-green-500 text-sm font-medium mb-1 flex items-center gap-1"><CheckCircle className="w-4 h-4"/> Approved</span>
+                  <span className="text-2xl font-bold text-green-400">{stats.approved || 0}</span>
+                </div>
+                <div className="bg-red-500/5 border border-red-500/10 rounded-2xl p-5 flex flex-col">
+                  <span className="text-red-500 text-sm font-medium mb-1 flex items-center gap-1"><XCircle className="w-4 h-4"/> Rejected</span>
+                  <span className="text-2xl font-bold text-red-400">{stats.rejected || 0}</span>
+                </div>
+                <div className="bg-orange-500/5 border border-orange-500/10 rounded-2xl p-5 flex flex-col">
+                  <span className="text-orange-500 text-sm font-medium mb-1 flex items-center gap-1"><AlertCircle className="w-4 h-4"/> Needs Rev.</span>
+                  <span className="text-2xl font-bold text-orange-400">{stats.needsRevision || 0}</span>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -167,20 +172,22 @@ export default function TeacherDashboard() {
               className="w-full bg-gray-900 border border-gray-700 text-white pl-9 pr-4 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-500"
             />
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="bg-gray-900 border border-gray-700 text-white px-4 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
-          >
-            <option value="all">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="needs_revision">Needs Revision</option>
-          </select>
+          {!isIndependentTeacher && (
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="bg-gray-900 border border-gray-700 text-white px-4 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
+            >
+              <option value="all">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="needs_revision">Needs Revision</option>
+            </select>
+          )}
         </div>
 
         {/* Papers Table */}
@@ -192,14 +199,14 @@ export default function TeacherDashboard() {
                   <th className="px-6 py-4 font-semibold">Course Details</th>
                   <th className="px-6 py-4 font-semibold text-center">Quality Score</th>
                   <th className="px-6 py-4 font-semibold">Status</th>
-                  <th className="px-6 py-4 font-semibold">Reviewer</th>
+                  {!isIndependentTeacher && <th className="px-6 py-4 font-semibold">Reviewer</th>}
                   <th className="px-6 py-4 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800/50">
                 {paginatedPapers.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={isIndependentTeacher ? 4 : 5} className="px-6 py-12 text-center text-gray-500">
                       <FileSearch className="w-12 h-12 mx-auto mb-3 opacity-20" />
                       {searchQuery
                         ? `No papers matching "${searchQuery}"`
@@ -230,11 +237,18 @@ export default function TeacherDashboard() {
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${status.bg} ${status.color} ${status.border}`}>
-                            <StatusIcon className="w-3.5 h-3.5" />
-                            {status.label}
-                          </span>
+                          {isIndependentTeacher ? (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border border-gray-700 bg-gray-800 text-gray-300">
+                              OK
+                            </span>
+                          ) : (
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${status.bg} ${status.color} ${status.border}`}>
+                              <StatusIcon className="w-3.5 h-3.5" />
+                              {status.label}
+                            </span>
+                          )}
                         </td>
+                        {!isIndependentTeacher && (
                         <td className="px-6 py-4">
                           {paper.reviewedBy ? (
                             <div className="flex flex-col">
@@ -243,6 +257,7 @@ export default function TeacherDashboard() {
                             </div>
                           ) : <span className="text-gray-600">-</span>}
                         </td>
+                        )}
                         <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => openPaperDetails(paper)}
@@ -299,7 +314,7 @@ export default function TeacherDashboard() {
           <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-400" /> Paper Review Details
+                <FileText className="w-5 h-5 text-blue-400" /> {isIndependentTeacher ? 'Paper Details' : 'Paper Review Details'}
               </h3>
               <button onClick={() => setShowDetailsModal(false)} className="text-gray-400 hover:text-white transition-colors">
                 <X className="w-6 h-6" />
@@ -327,7 +342,7 @@ export default function TeacherDashboard() {
                 </div>
               </div>
 
-              {/* Review Status */}
+              {!isIndependentTeacher && (
               <div>
                 <h4 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">Current Status</h4>
                 <div className={`p-4 rounded-xl border ${getStatusBadge(selectedPaper.reviewStatus).bg} ${getStatusBadge(selectedPaper.reviewStatus).border}`}>
@@ -344,9 +359,10 @@ export default function TeacherDashboard() {
                   )}
                 </div>
               </div>
+              )}
 
               {/* Review Comments */}
-              {selectedPaper.reviewComments && (
+              {!isIndependentTeacher && selectedPaper.reviewComments && (
                 <div>
                   <h4 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">Latest Comments</h4>
                   <div className="bg-gray-800/50 border border-gray-700 p-4 rounded-xl text-gray-300 whitespace-pre-wrap">
@@ -356,7 +372,7 @@ export default function TeacherDashboard() {
               )}
 
               {/* Review History */}
-              {selectedPaper.reviewHistory && selectedPaper.reviewHistory.length > 0 && (
+              {!isIndependentTeacher && selectedPaper.reviewHistory && selectedPaper.reviewHistory.length > 0 && (
                 <div>
                   <h4 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">History</h4>
                   <div className="space-y-3">

@@ -8,6 +8,7 @@ import {
   Award
 } from 'lucide-react';
 import { DashboardSkeleton } from '../SkeletonLoader';
+import PendingTeachersPanel from './PendingTeachersPanel';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createCollegeUserSchema } from '../../schemas/validationSchemas';
@@ -211,6 +212,8 @@ export default function CollegeAdminDashboard() {
             </button>
           </div>
         )}
+
+        <PendingTeachersPanel />
 
         {/* Stats Grid */}
         {stats && (

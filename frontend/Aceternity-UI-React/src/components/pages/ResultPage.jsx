@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { AlertCircle, Download, BookOpen, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import BloomsAnalysisChart from './report/BloomAnalysisChart';
 import ModuleAnalysisChart from './report/ModuleAnalysisChart';
@@ -22,6 +23,62 @@ function describeArc(cx, cy, r, startAngle, endAngle) {
   const end = polarToCartesian(cx, cy, r, startAngle);
   const largeArcFlag = (endAngle - startAngle) <= 180 ? '0' : '1';
   return `M ${start.x} ${start.y} A ${r} ${r} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
+}
+
+function normalizeSequenceConfig(rawSequence) {
+  if (!rawSequence) return { COs: {}, ModuleHours: {} };
+
+  // Current backend saves Sequence as [{ COs, ModuleHours }] because
+  // PaperInfo.Sequence is declared as an array-of-Mixed.
+  if (
+    Array.isArray(rawSequence) &&
+    rawSequence.length === 1 &&
+    rawSequence[0] &&
+    (rawSequence[0].COs || rawSequence[0].ModuleHours)
+  ) {
+    return {
+      COs: rawSequence[0].COs || {},
+      ModuleHours: rawSequence[0].ModuleHours || {},
+    };
+  }
+
+  // Also support older papers that stored the original flat Sequence array:
+  // [{ name: 'CO1', type: 'CO', ... }, { name: 'Module1', type: 'Module', ... }]
+  if (Array.isArray(rawSequence)) {
+    const config = { COs: {}, ModuleHours: {} };
+
+    rawSequence.forEach((item) => {
+      if (!item || typeof item !== 'object') return;
+
+      const match = String(item.name || '').match(/\d+/);
+      if (!match) return;
+
+      const number = match[0];
+
+      if (item.type === 'CO') {
+        const blooms = Array.isArray(item.blooms)
+          ? item.blooms.filter((b) => typeof b === 'string')
+          : typeof item.blooms === 'string'
+            ? [item.blooms]
+            : [];
+
+        config.COs[`CO${number}`] = {
+          weight: Number(item.weight) || 0,
+          blooms,
+        };
+      } else if (item.type === 'Module') {
+        config.ModuleHours[`M${number}`] = Number(item.hours) || 0;
+      }
+    });
+
+    return config;
+  }
+
+  // Support a plain object as well.
+  return {
+    COs: rawSequence.COs || {},
+    ModuleHours: rawSequence.ModuleHours || {},
+  };
 }
 
 const Gauge = ({ value = 0, size = 220 }) => {
@@ -122,8 +179,11 @@ const ResultPage = () => {
   const [error, setError] = useState(null);
   const [toast, setToast] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [showVisualization, setShowVisualization] = useState(false);
   const chartsRef = useRef(null);
+
+  const { user } = useAuth();
 
   const showToast = (message, type = 'error') => {
     setToast({ message, type });
@@ -556,8 +616,8 @@ const ResultPage = () => {
       const moduleData = collectedData?.ModuleData || [];
       const coData = collectedData?.COData || {};
       const finalScore = collectedData?.FinalScore || 0;
-      const blommLevelMap = data?.blommLevelMap || {};
-      const sequence = data?.Sequence || [];
+      const bloomLevelMap = data?.bloomLevelMap || {};
+      const sequence = normalizeSequenceConfig(data?.Sequence);
       const coRecommendationsRaw = collectedData?.CORecommendations || [];
       const moduleRecommendationsRaw = collectedData?.ModuleRecommendations || [];
 
@@ -574,8 +634,8 @@ const ResultPage = () => {
       const lowerQuestions = questionRecommendations.filter(q => q.remark === 'Lower than Expected Blooms Level').length;
       const matchPercentage = totalQuestions > 0 ? (matchingQuestions / totalQuestions * 100).toFixed(1) : 0;
 
-      const coRows = Object.keys(sequence[0]?.COs || {}).map(co => {
-        const coDataItem = sequence[0].COs[co];
+      const coRows = Object.keys(sequence?.COs || {}).map(co => {
+        const coDataItem = sequence.COs[co];
         return `
           <tr>
             <td class="text-center">${co}</td>
@@ -585,8 +645,8 @@ const ResultPage = () => {
         `;
       }).join('');
 
-      const moduleRows = Object.keys(sequence[0]?.ModuleHours || {}).map(module => {
-        const hours = sequence[0].ModuleHours[module];
+      const moduleRows = Object.keys(sequence?.ModuleHours || {}).map(module => {
+        const hours = sequence.ModuleHours[module];
         return `
           <tr>
             <td class="text-center">${module}</td>
@@ -595,10 +655,10 @@ const ResultPage = () => {
         `;
       }).join('');
 
-      const bloomLevelMapRows = Object.keys(blommLevelMap).map(level => `
+      const bloomLevelMapRows = Object.keys(bloomLevelMap).map(level => `
         <tr>
           <td>${level}</td>
-          <td class="text-center">${blommLevelMap[level]}</td>
+          <td class="text-center">${bloomLevelMap[level]}</td>
         </tr>
       `).join('');
 
@@ -1583,10 +1643,32 @@ const ResultPage = () => {
   const finalScore = collectedData?.FinalScore || 0;
   const questionData = collectedData?.QuestionData || [];
   const bloomsData = collectedData?.BloomsData || {};
-  const moduleData = collectedData?.ModuleData || [];
   const coData = collectedData?.COData || {};
-  const sequence = data?.Sequence || [];
-  const blommLevelMap = data?.blommLevelMap || {};
+
+  const sequence = normalizeSequenceConfig(data?.Sequence);
+  const bloomLevelMap = data?.bloomLevelMap || {};
+
+  // Current evaluations include ModuleData directly. For older papers where
+  // ModuleData is missing/empty, derive the same expected/actual structure from
+  // Sequence.ModuleHours and the stored question marks.
+  const storedModuleData = Array.isArray(collectedData?.ModuleData)
+    ? collectedData.ModuleData
+    : [];
+  const moduleHours = sequence?.ModuleHours || {};
+  const fallbackModuleData = Object.keys(moduleHours).map((moduleKey) => {
+    const moduleNumber = Number.parseFloat(String(moduleKey).match(/\d+(?:\.\d+)?/)?.[0] || '0');
+    const hours = Number(moduleHours[moduleKey]) || 0;
+    const totalHours = Object.values(moduleHours).reduce((sum, value) => sum + (Number(value) || 0), 0);
+    const actual = questionData.reduce((sum, question) => {
+      const questionModule = Number.parseFloat(String(question.Module || '').match(/\d+(?:\.\d+)?/)?.[0] || '0');
+      return questionModule === moduleNumber ? sum + (Number(question.Marks) || 0) : sum;
+    }, 0);
+    return {
+      expected: totalHours > 0 ? (hours / totalHours) * 100 : 0,
+      actual,
+    };
+  });
+  const moduleData = storedModuleData.length > 0 ? storedModuleData : fallbackModuleData;
   const questionRecommendations = collectedData?.QuestionRecommendations || [];
   const coRecommendationsRaw = collectedData?.CORecommendations || [];
   const moduleRecommendationsRaw = collectedData?.ModuleRecommendations || [];
@@ -1599,6 +1681,31 @@ const ResultPage = () => {
   const higherQuestions = questionRecommendations.filter(q => q.remark === 'Higher than Expected Blooms Level').length;
   const lowerQuestions = questionRecommendations.filter(q => q.remark === 'Lower than Expected Blooms Level').length;
   const matchPercentage = totalQuestions > 0 ? (matchingQuestions / totalQuestions * 100).toFixed(1) : 0;
+
+  const isTeacher = user?.role === 'teacher';
+  const isAffiliatedTeacher = isTeacher && Boolean(user?.collegeId);
+  const reviewStatus = data?.reviewStatus || 'draft';
+  const canSubmitForReview = isAffiliatedTeacher && ['draft', 'needs_revision'].includes(reviewStatus);
+  const showPlainOk = !isAffiliatedTeacher;
+
+  const handleSubmitForReview = async () => {
+    if (!canSubmitForReview || isSubmittingReview) return;
+
+    try {
+      setIsSubmittingReview(true);
+      const response = await apiClient.put(`/teacher/papers/${paperId}/submit`);
+      if (response.data?.paper) {
+        setData(response.data.paper);
+      } else {
+        setData((previous) => previous ? { ...previous, reviewStatus: 'pending' } : previous);
+      }
+      showToast('Paper submitted for review successfully.', 'success');
+    } catch (err) {
+      showToast(err.response?.data?.message || err.message || 'Failed to submit paper for review.');
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
 
   const getScoreRemark = (score) => {
     if (score >= 80) {
@@ -1675,6 +1782,19 @@ const ResultPage = () => {
               <p className="text-gray-500 text-sm">Course Outcome &amp; Cognitive Level Evaluation</p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center">
+              {canSubmitForReview ? (
+                <button
+                  onClick={handleSubmitForReview}
+                  disabled={isSubmittingReview}
+                  className="flex items-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 py-2.5 px-5 rounded-xl border border-green-200 transition-colors text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isSubmittingReview ? 'Submitting…' : 'Submit for Review'}
+                </button>
+              ) : showPlainOk ? (
+                <span className="flex items-center gap-2 bg-gray-100 text-gray-700 py-2.5 px-5 rounded-xl border border-gray-200 text-sm font-medium">
+                  OK
+                </span>
+              ) : null}
               <button
                 onClick={openAppendix}
                 className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 px-5 rounded-xl border border-gray-200 transition-colors text-sm font-medium"
@@ -1793,8 +1913,8 @@ const ResultPage = () => {
                       <Th center>Outcome</Th><Th center>Weight</Th><Th center>Target Level</Th>
                     </tr></thead>
                     <tbody className="divide-y divide-gray-50">
-                      {Object.keys(sequence[0]?.COs || {}).map(co => {
-                        const d = sequence[0].COs[co];
+                      {Object.keys(sequence?.COs || {}).map(co => {
+                        const d = sequence.COs[co];
                         return (
                           <tr key={co} className="hover:bg-slate-50 transition-colors">
                             <Td center><span className="px-2 py-0.5 bg-blue-50 border border-blue-100 text-blue-700 rounded-md font-semibold text-xs">{co}</span></Td>
@@ -1815,10 +1935,10 @@ const ResultPage = () => {
                       <Th center>Module</Th><Th center>Hours</Th>
                     </tr></thead>
                     <tbody className="divide-y divide-gray-50">
-                      {Object.keys(sequence[0]?.ModuleHours || {}).map(mod => (
+                      {Object.keys(sequence?.ModuleHours || {}).map(mod => (
                         <tr key={mod} className="hover:bg-slate-50 transition-colors">
                           <Td center><span className="px-2 py-0.5 bg-purple-50 border border-purple-100 text-purple-700 rounded-md font-semibold text-xs">{mod}</span></Td>
-                          <Td center>{sequence[0].ModuleHours[mod] || 0}</Td>
+                          <Td center>{sequence.ModuleHours[mod] || 0}</Td>
                         </tr>
                       ))}
                     </tbody>
@@ -1833,10 +1953,10 @@ const ResultPage = () => {
                       <Th>Cognitive Level</Th><Th center>Value</Th>
                     </tr></thead>
                     <tbody className="divide-y divide-gray-50">
-                      {Object.keys(blommLevelMap).map(level => (
+                      {Object.keys(bloomLevelMap).map(level => (
                         <tr key={level} className="hover:bg-slate-50 transition-colors">
                           <Td>{level}</Td>
-                          <Td center>{blommLevelMap[level]}</Td>
+                          <Td center>{bloomLevelMap[level]}</Td>
                         </tr>
                       ))}
                     </tbody>

@@ -71,7 +71,7 @@ const apiClient = axios.create({
   baseURL: API_BASE_URL || 'http://localhost:5000',
   withCredentials: true,
   timeout: 30000,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { Accept: 'application/json' },
 });
 
 // ─── Read CSRF token from cookie ─────────────────────────────
@@ -126,6 +126,32 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// ─── Auth refresh ────────────────────────────────────────────
+let refreshPromise = null;
+
+function isPublicAuthRequest(url = '') {
+  return [
+    '/auth/login',
+    '/auth/refresh',
+    '/auth/create-account',
+    '/auth/forgot-password',
+    '/auth/reset-password/',
+    '/auth/resend-verification',
+  ].some((path) => url.startsWith(path));
+}
+
+function refreshAccessToken() {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = apiClient
+    .post('/auth/refresh')
+    .finally(() => {
+      refreshPromise = null;
+    });
+
+  return refreshPromise;
+}
+
 // ─── Response interceptor ────────────────────────────────────
 apiClient.interceptors.response.use(
   (response) => response,
@@ -133,6 +159,7 @@ apiClient.interceptors.response.use(
     const status = error.response?.status;
     const message = (error.response?.data?.message || '').toLowerCase();
     const original = error.config;
+    const originalUrl = original?.url || '';
 
     // Auto-recover from a stale/missing CSRF cookie exactly once.
     if (
@@ -142,13 +169,36 @@ apiClient.interceptors.response.use(
       !original._csrfRetry
     ) {
       original._csrfRetry = true;
+
       try {
         await ensureCsrfToken({ force: true });
+
         const token = getCsrfTokenFromCookie();
-        if (token) original.headers['x-csrf-token'] = token;
+        if (token) {
+          original.headers['x-csrf-token'] = token;
+        }
+
         return apiClient(original);
       } catch (_) {
-        // fall through to normal error handling
+        // Continue to normal error handling.
+      }
+    }
+
+    // Access token expired → rotate refresh token once and retry
+    // the original request. Skip login/refresh/public auth requests.
+    if (
+      status === 401 &&
+      original &&
+      !original._authRetry &&
+      !isPublicAuthRequest(originalUrl)
+    ) {
+      original._authRetry = true;
+
+      try {
+        await refreshAccessToken();
+        return apiClient(original);
+      } catch (_) {
+        // Refresh token is invalid/expired/revoked.
       }
     }
 

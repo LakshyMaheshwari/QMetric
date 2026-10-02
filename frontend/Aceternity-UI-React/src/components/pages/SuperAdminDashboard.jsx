@@ -204,6 +204,9 @@ export default function SuperAdminDashboard() {
             <button onClick={fetchData} disabled={loading} className="p-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl border border-zinc-700 transition-colors">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-400' : ''}`} />
             </button>
+            <button onClick={() => navigate('/super-admin/college-applications')} className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white font-medium text-sm rounded-xl border border-zinc-700 transition-all">
+              College Applications
+            </button>
             <button onClick={() => setShowModal(true)} className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium text-sm rounded-xl shadow-lg hover:shadow-blue-500/25 transition-all flex items-center gap-2">
               <Plus className="w-4 h-4" /> Add College
             </button>

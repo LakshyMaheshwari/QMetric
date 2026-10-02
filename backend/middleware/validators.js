@@ -58,7 +58,7 @@ const validateRegister = [
       const role = req.body.role || 'teacher';
       if (role === 'student') return true;
       if (!value) throw new Error('Position is required for teachers');
-      const allowed = ['Professor', 'Associate Professor', 'Assistant Professor', 'Lecturer', 'HoD', 'Other'];
+      const allowed = ['Professor', 'Senior Professor', 'Associate Professor', 'Assistant Professor', 'Senior Lecturer', 'Lecturer', 'HoD', 'Dean', 'Director', 'Principal', 'Vice Principal', 'Academic Coordinator', 'Visiting Faculty', 'Research Faculty', 'Teaching Assistant', 'Other'];
       if (!allowed.includes(value)) throw new Error('Invalid position');
       return true;
     }),

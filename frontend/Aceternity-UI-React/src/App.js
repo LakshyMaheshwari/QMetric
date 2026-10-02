@@ -11,6 +11,7 @@ import "animate.css";
 import UserDashboard from "./components/pages/UserDashboard";
 import CreditsPage from "./components/pages/Creditspage";
 import RegisterPage from "./components/pages/RegisterPage";
+import CollegeRegistrationPage from "./components/pages/CollegeRegistrationPage";
 import ProfilePage from "./components/pages/ProfilePage";
 import AdminDashboard from "./components/pages/AdminDashboard";
 import CollegeAdminDashboard from "./components/pages/CollegeAdminDashboard";
@@ -20,6 +21,7 @@ import CollegeDetailPage from "./components/pages/CollegeDetailPage";
 import ReviewerDashboard from "./components/pages/ReviewerDashboard";
 import TeacherDashboard from "./components/pages/TeacherDashboard";
 import TeamPage from "./components/pages/TeamPage";
+import CollegeApplications from "./components/pages/CollegeApplications";
 import AllPapersPage from './components/pages/AllPapersPage';
 import NotFound from "./components/pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -41,6 +43,7 @@ function App() {
           <Route path="/credits" element={<CreditsPage />} />
           <Route path="/team" element={<TeamPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/register-college" element={<CollegeRegistrationPage />} />
 
           {/* Protected - Any authenticated user */}
           <Route path="/profile" element={
@@ -50,18 +53,18 @@ function App() {
             <ProtectedRoute><UserDashboard /></ProtectedRoute>
           } />
 
-          {/* Teacher-only routes */}
+              {/* Paper routes — roles allowed by the backend upload/view feature matrix */}
           <Route path="/upload" element={
-            <ProtectedRoute requiredRole="teacher"><UploadPage /></ProtectedRoute>
+            <ProtectedRoute requiredRole={['student', 'teacher', 'reviewer', 'admin', 'super_admin']}><UploadPage /></ProtectedRoute>
           } />
           <Route path="/result/:paperId" element={
-            <ProtectedRoute requiredRole={['teacher', 'reviewer', 'admin', 'super_admin']}><ResultPage /></ProtectedRoute>
+            <ProtectedRoute requiredRole={['student', 'teacher', 'reviewer', 'admin', 'super_admin']}><ResultPage /></ProtectedRoute>
           } />
           <Route path="/teacher" element={
             <ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>
           } />
           <Route path="/papers" element={
-            <ProtectedRoute requiredRole="teacher"><AllPapersPage /></ProtectedRoute>
+            <ProtectedRoute requiredRole={['student', 'teacher', 'reviewer', 'admin', 'super_admin']}><AllPapersPage /></ProtectedRoute>
           } />
 
           {/* Reviewer-only routes */}
@@ -86,6 +89,9 @@ function App() {
           } />
           <Route path="/super-admin/colleges/:id" element={
             <ProtectedRoute requiredRole="super_admin"><CollegeDetailPage /></ProtectedRoute>
+          } />
+          <Route path="/super-admin/college-applications" element={
+            <ProtectedRoute requiredRole="super_admin"><CollegeApplications /></ProtectedRoute>
           } />
 
           {/* 404 fallback */}

@@ -8,6 +8,7 @@ import { ProfileSkeleton } from '../SkeletonLoader';
 import { useNavigate } from 'react-router-dom';
 import { profileSchema } from '../../schemas/validationSchemas';
 import FormInput from '../FormInput';
+import CollegeAffiliationPanel from './CollegeAffiliationPanel';
 
 export default function ProfilePage() {
   const { user, login } = useAuth();
@@ -191,6 +192,8 @@ export default function ProfilePage() {
             </form>
           </div>
         </div>
+
+        <CollegeAffiliationPanel />
       </div>
     </div>
   );

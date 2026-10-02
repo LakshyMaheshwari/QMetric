@@ -171,7 +171,12 @@ const UploadPage = () => {
       // Add course outcomes with backend structure
       ...courseOutcomes.map((co, index) => ({ name: `CO${index + 1}`, type: "CO", weight: parseFloat(co.weight), blooms: [co.blooms] })),
       // Add modules with backend structure
-      ...modules.map(module => ({ name: module.name, type: "Module", hours: parseFloat(module.hours) }))
+      ...modules.map((module, index) => ({
+        // Backend extracts the module number from this field (M1, M2, ...).
+        name: `Module ${index + 1}`,
+        type: "Module",
+        hours: parseFloat(module.hours),
+      }))
     ];
 
     // Prepare form data to send to the backend
@@ -181,9 +186,7 @@ const UploadPage = () => {
     formDataToSend.append("Sequence", JSON.stringify(transformedSequence));
 
     try {
-      const response = await apiClient.post('/upload/totext', formDataToSend, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      const response = await apiClient.post('/upload/totext', formDataToSend);
 
       const paperId = response.data?.data?._id || response.data?._id || response.data?.id;
 

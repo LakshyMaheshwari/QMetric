@@ -17,9 +17,11 @@ export default function UserDashboard() {
   const fetchPapers = async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get('/teacher/papers');
+      const isStudent = user?.role === 'student';
+      const papersEndpoint = isStudent ? '/student/papers' : '/teacher/papers';
+      const statsEndpoint = isStudent ? '/student/stats' : null;
+      const response = await apiClient.get(papersEndpoint, { params: { limit: 5, page: 1 } });
 
-      // Correct data shape: {papers: [papers]}, {data: [papers]}, or just [papers]
       const papersList = response.data?.papers || response.data?.data || (Array.isArray(response.data) ? response.data : []);
 
       // Now it's actually an array we can slice
@@ -30,8 +32,11 @@ export default function UserDashboard() {
       setRecentPapers(recentFive);
       if (response.data?.stats?.total !== undefined) {
         setStats({ totalPapers: response.data.stats.total });
+      } else if (statsEndpoint) {
+        const statsResponse = await apiClient.get(statsEndpoint);
+        setStats({ totalPapers: statsResponse.data?.stats?.totalPapers || 0 });
       } else {
-        setStats({ totalPapers: Array.isArray(papersList) ? papersList.length : 0 });
+        setStats({ totalPapers: response.data?.pagination?.total || (Array.isArray(papersList) ? papersList.length : 0) });
       }
     } catch (error) {
       console.error('Failed to fetch papers:', error);
@@ -56,8 +61,11 @@ export default function UserDashboard() {
   }, [user, navigate]);
 
   useEffect(() => {
+    // These roles have dedicated dashboards; avoid an unnecessary
+    // /teacher/papers request before the redirect runs.
+    if (['reviewer', 'admin', 'super_admin'].includes(user?.role)) return;
     fetchPapers();
-  }, []);
+  }, [user]);
 
   const handleLogout = () => {
     authLogout();
@@ -68,7 +76,7 @@ export default function UserDashboard() {
     { icon: <Upload className="w-6 h-6" />, title: 'Upload New Paper', description: 'Analyze a new question paper', action: () => navigate('/upload'), color: 'from-blue-500 to-purple-600', glow: 'shadow-blue-500/30' },
     { icon: <BookOpen className="w-6 h-6" />, title: 'View All Papers', description: 'Browse your paper collection', action: () => navigate('/papers'), color: 'from-teal-500 to-emerald-600', glow: 'shadow-teal-500/30' },
     { icon: <BarChart3 className="w-6 h-6" />, title: 'Analytics', description: 'View detailed analytics', action: () => { if (recentPapers.length > 0 && recentPapers[0]._id) { navigate(`/result/${recentPapers[0]._id}`); } else { navigate('/papers'); } }, color: 'from-orange-500 to-red-600', glow: 'shadow-orange-500/30' },
-    { icon: <FileText className="w-6 h-6" />, title: 'Total Papers', description: `${stats.totalPapers} paper${stats.totalPapers !== 1 ? 's' : ''} uploaded`, action: () => navigate('/papers'), color: 'from-indigo-500 to-blue-600', glow: 'shadow-indigo-500/30' },
+    { icon: <FileText className="w-6 h-6" />, title: user?.role === 'student' ? 'Become a Teacher' : 'Total Papers', description: user?.role === 'student' ? 'Choose independent or college-affiliated teacher access' : `${stats.totalPapers} paper${stats.totalPapers !== 1 ? 's' : ''} uploaded`, action: () => navigate(user?.role === 'student' ? '/profile' : '/papers'), color: 'from-indigo-500 to-blue-600', glow: 'shadow-indigo-500/30' },
   ];
 
   if (loading) {

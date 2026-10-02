@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const authController = require('../controllers/authController');
 const userController = require('../controllers/userController');
 const collegeController = require('../controllers/collegeController');
+const collegeApplicationController = require('../controllers/collegeApplicationController');
 const authenticateToken = require('../core/auth/utilities');
 const upload = require('../config/multer');
 const { validateImageSignature } = upload;
@@ -319,6 +320,46 @@ router.post('/bulk-register', adminAuth, authController.bulkRegister);
  *                   items: { $ref: '#/components/schemas/College' }
  */
 router.get('/colleges', collegeController.getActiveColleges);
+
+
+/**
+ * @swagger
+ * /auth/college-applications:
+ *   post:
+ *     summary: Submit a public college/exam-cell registration request
+ *     tags: [Auth]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [collegeName, collegeCode, contactName, contactEmail, contactPhone, password]
+ *     responses:
+ *       201: { description: Application submitted }
+ *       400: { description: Validation error }
+ *       409: { description: Duplicate application or existing college/user }
+ */
+router.post('/college-applications', collegeApplicationController.submitCollegeApplication);
+
+/**
+ * @swagger
+ * /auth/college-applications/{id}:
+ *   get:
+ *     summary: Check public college application status
+ *     tags: [Auth]
+ *     security: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Application status }
+ *       404: { description: Application not found }
+ */
+router.get('/college-applications/:id', collegeApplicationController.getPublicApplicationStatus);
 
 /**
  * @swagger
