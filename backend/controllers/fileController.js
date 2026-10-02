@@ -161,6 +161,7 @@ const saveToDB = async (userId, Sequence, FormData, filePath, collegeId = null) 
 
         const coWeights = {};
         const moduleHours = {};
+        const moduleNames = {};
         const coDetails = {};
 
         // â”€â”€â”€ Step 2: Extract COs and Modules â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -190,7 +191,10 @@ const saveToDB = async (userId, Sequence, FormData, filePath, collegeId = null) 
                 coWeights[coKey] = weight;
                 coDetails[coKey] = { weight, blooms };
             } else if (item.type === 'Module') {
-                moduleHours[`M${number}`] = Number.parseFloat(item.hours || 0);
+                const moduleKey = `M${number}`;
+
+                moduleHours[moduleKey] = Number.parseFloat(item.hours || 0);
+                moduleNames[moduleKey] = String(item.moduleName || item.name || '').trim();
             }
         });
 
@@ -232,7 +236,8 @@ const saveToDB = async (userId, Sequence, FormData, filePath, collegeId = null) 
             "Course Teacher": formData[paperFields.COURSE_TEACHER],
             Sequence: {
                 COs: coDetails,
-                ModuleHours: moduleHours
+                ModuleHours: moduleHours,
+                ModuleNames: moduleNames
             },
             bloomLevelMap: bloomLevelMap,
             qualityScore: evaluationResult.FinalScore || 0,
@@ -255,7 +260,11 @@ const saveToDB = async (userId, Sequence, FormData, filePath, collegeId = null) 
             success: true,
             data: {
                 "Collected Data": [evaluationResult],
-                Sequence: { COs: coDetails, ModuleHours: moduleHours },
+                Sequence: {
+                    COs: coDetails,
+                    ModuleHours: moduleHours,
+                    ModuleNames: moduleNames
+                },
                 bloomLevelMap: bloomLevelMap,
                 _id: paper._id,
                 BloomRecommendations: evaluationResult.BloomRecommendations || null,

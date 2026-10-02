@@ -176,7 +176,7 @@ export default function CollegeRegistrationPage() {
               <h2 className="text-lg font-semibold text-white mb-3">Initial Admin Login</h2>
               <p className="text-xs text-neutral-500 mb-3">This password is stored securely and will be used for the college admin account if the application is approved.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input className={inputClass} type="password" placeholder="Password *" value={form.password} onChange={(e) => updateField('password', e.target.value)} />
+                <input className={inputClass} type="password" placeholder="Create Password *" value={form.password} onChange={(e) => updateField('password', e.target.value)} />
                 <input className={inputClass} type="password" placeholder="Confirm Password *" value={form.confirmPassword} onChange={(e) => updateField('confirmPassword', e.target.value)} />
               </div>
             </div>

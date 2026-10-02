@@ -26,14 +26,10 @@ const ReviewerDashboard = () => {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, pages: 1 });
 
-  // Guard: allow only reviewer or admin (super_admin has own dashboard)
+  // Guard: allow reviewer, admin, or super_admin
   useEffect(() => {
-    if (user) {
-      if (user.role === 'super_admin') {
-        navigate('/super-admin');
-      } else if (!['reviewer', 'admin'].includes(user.role)) {
-        navigate('/dashboard');
-      }
+    if (user && !['reviewer', 'admin', 'super_admin'].includes(user.role)) {
+      navigate('/dashboard');
     }
   }, [user, navigate]);
 
@@ -351,9 +347,43 @@ const ReviewerDashboard = () => {
                     const courseCode = paper.courseCode || paper['Course Code'] || '';
                     const teacherName = paper.userId?.fullName || paper.userId?.userName || paper['Course Teacher'] || 'Unknown';
                     const department = paper.userId?.department || paper.branch || paper['Branch'] || '';
-                    const questionsCount = paper.questionsCount || (Array.isArray(paper.questions) ? paper.questions.length : 0);
-                    const qualityScore = paper.qualityScore || 75;
-                    const isPending = !paper.reviewStatus || paper.reviewStatus === 'pending';
+                    const getQuestionsCount = (paper) => {
+  const collectedDataQuestions = Array.isArray(paper?.questions)
+    ? paper.questions.flatMap((item) =>
+        Array.isArray(item?.QuestionData)
+          ? item.QuestionData
+          : []
+      )
+    : [];
+
+  if (collectedDataQuestions.length > 0) {
+    return collectedDataQuestions.length;
+  }
+
+  if (Array.isArray(paper?.questions)) {
+    return paper.questions.length;
+  }
+
+  const rawQuestions =
+    paper?.['Collected Data']?.[0]?.QuestionData;
+
+  return Array.isArray(rawQuestions)
+    ? rawQuestions.length
+    : 0;
+};
+
+const questionsCount =
+  getQuestionsCount(paper);
+
+const qualityScore = Number(
+  paper?.qualityScore ??
+    paper?.['Collected Data']?.[0]?.FinalScore ??
+    0
+);
+
+const isPending =
+  !paper.reviewStatus ||
+  paper.reviewStatus === 'pending';
 
                     return (
                       <tr
@@ -454,7 +484,7 @@ const ReviewerDashboard = () => {
                             ) : (
                               <>
                                 <span>👁️</span>
-                                <span>View / Edit</span>
+                                <span>View</span>
                               </>
                             )}
                           </button>

@@ -422,7 +422,7 @@ exports.getPendingCount = async (req, res) => {
     const query = mergeQuery(baseQuery, pendingCond);
     const count = await Paper.countDocuments(query);
 
-    res.json({ error: false, pending: count });
+    res.json({ error: false, pending: count, count });
   } catch (error) {
     logger.error('Error fetching pending count:', error);
     res.status(500).json({ error: true, message: 'Server error' });

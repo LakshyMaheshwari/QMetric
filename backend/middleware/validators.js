@@ -172,6 +172,30 @@ const validateCollege = [
     .isLength({ max: 50 }).withMessage('State name too long'),
 ];
 
+const validateCollegeUpdate = [
+  body('name')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 100 }).withMessage('College name must be 2-100 characters'),
+  body('code')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 20 }).withMessage('College code must be 2-20 characters')
+    .matches(/^[A-Z0-9]+$/).withMessage('College code must be uppercase alphanumeric'),
+  body('address')
+    .optional()
+    .trim()
+    .isLength({ max: 200 }).withMessage('Address too long'),
+  body('city')
+    .optional()
+    .trim()
+    .isLength({ max: 50 }).withMessage('City name too long'),
+  body('state')
+    .optional()
+    .trim()
+    .isLength({ max: 50 }).withMessage('State name too long'),
+];
+
 // ---------------------------------------------------------------------------
 // validateQuestionIndex
 //   Reads questionIndex from body (POST) or path (GET/PUT/DELETE).
@@ -241,5 +265,6 @@ module.exports = {
   validateSearchOnly,
   validateRoleUpdate,
   validateCollege,
+  validateCollegeUpdate,
   validateQuestionIndex,
 };

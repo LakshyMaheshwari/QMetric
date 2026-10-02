@@ -1,7 +1,7 @@
 const { doubleCsrf } = require('csrf-csrf');
 
-// Skip CSRF in test environment
-if (process.env.NODE_ENV === 'test') {
+// Skip CSRF in test environment or dev mode with dev auth enabled
+if (process.env.NODE_ENV === 'test' || (process.env.ENABLE_DEV_AUTH === 'true' && process.env.NODE_ENV !== 'production')) {
   module.exports = {
     generateCsrfToken: () => 'test-csrf-token',
     doubleCsrfProtection: (req, res, next) => next(),

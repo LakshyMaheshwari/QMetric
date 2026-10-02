@@ -51,9 +51,7 @@ export default function UserDashboard() {
   const fetchDashboardData = fetchPapers;
 
   useEffect(() => {
-    if (user?.role === 'reviewer') {
-      navigate('/reviewer', { replace: true });
-    } else if (user?.role === 'super_admin') {
+    if (user?.role === 'super_admin') {
       navigate('/super-admin', { replace: true });
     } else if (user?.role === 'admin') {
       navigate('/college-admin', { replace: true });

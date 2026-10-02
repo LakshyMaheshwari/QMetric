@@ -45,14 +45,10 @@ export default function CollegeAdminDashboard() {
     },
   });
 
-  // Guard: allow only admin (super_admin has own dashboard)
+  // Guard: allow admin or super_admin
   useEffect(() => {
-    if (user) {
-      if (user.role === 'super_admin') {
-        navigate('/super-admin');
-      } else if (user.role !== 'admin') {
-        navigate('/dashboard');
-      }
+    if (user && !['admin', 'super_admin'].includes(user.role)) {
+      navigate('/dashboard');
     }
   }, [user, navigate]);
 

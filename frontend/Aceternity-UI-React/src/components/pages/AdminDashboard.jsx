@@ -149,11 +149,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (!user) { navigate('/'); return; }
-    if (user.role === 'super_admin') {
-      navigate('/super-admin');
-      return;
-    }
-    if (user.role !== 'admin') {
+    if (!['admin', 'super_admin'].includes(user.role)) {
       navigate('/dashboard');
       return;
     }

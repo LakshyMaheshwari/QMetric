@@ -162,6 +162,9 @@ setupSwagger(app);
 // Redis is used when REDIS_URL is configured; otherwise express-rate-limit's
 // in-memory store remains available for local/single-instance deployments.
 function createLimiter(name, options) {
+  if (process.env.ENABLE_DEV_AUTH === 'true' && process.env.NODE_ENV !== 'production') {
+    return (req, res, next) => next();
+  }
   if (!isRedisEnabled()) return rateLimit(options);
   return rateLimit({
     ...options,

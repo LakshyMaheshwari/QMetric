@@ -12,6 +12,7 @@ const {
   validateMongoId,
   validateBlockUpdate,
   validateCollege,
+  validateCollegeUpdate,
   handleValidationErrors,
 } = require('../middleware/validators');
 
@@ -44,7 +45,7 @@ router.get(
 router.put(
   '/colleges/:id',
   validateCollegeId,
-  validateCollege,
+  validateCollegeUpdate,
   handleValidationErrors,
   superAdminController.updateCollege
 );
