@@ -1,13 +1,25 @@
 .env
+!.env.example
 .env.local
 .env.*.local
+.env.*
 node_modules/
 dist/
 build/
+/backend/dist
+/frontend/Aceternity-UI-React/dist
+/frontend/Aceternity-UI-React/build
 .DS_Store
+Thumbs.db
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
 # Playwright
 /test-results/
@@ -15,3 +27,16 @@ build/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+qmetric_playwright_suite/test-results/
+qmetric_playwright_suite/playwright-report/
+
+# Coverage
+/coverage
+/backend/coverage
+
+# Generated/local artifacts
+backend/test-results.json
+.kilo/
+
+# CSV test data (optional — keep fixtures)
+# *.csv
