@@ -237,6 +237,7 @@
 //Version 2
 //v2
 //v2
+const mongoose = require('mongoose');
 const paperFields = require('../constants/paperFields');
 const { classifyPaper, aggregateInsights } = require('../nlp/verbClassifier');
 const LearnedVerb = require('../../Model/LearnedVerb');
@@ -331,7 +332,7 @@ function obtainD(QHBTL, COBTL, returnRemark = false) {
  *                                for that paper are loaded and applied before scoring.
  */
 exports.Evaluate = async (SequenceData, pre_data, Module_Hrs, bloomLevelMap, options = {}) => {
-    const { paperId = null } = options || {};
+    const { paperId = null, collegeId = null } = options || {};
 
     const ModuleWeights = [];
     let checkModule = true;
@@ -537,23 +538,53 @@ exports.Evaluate = async (SequenceData, pre_data, Module_Hrs, bloomLevelMap, opt
 
 
     // ─── Learning Domain Insights ─────────────────────────────
-    let learnedCache = {};
-    try {
-        const learned = await LearnedVerb.find().lean();
-        learned.forEach((l) => {
-            learnedCache[l.verb] = {
-                domain: l.domain,
-                level: l.level,
-                confidence: l.confidence,
-            };
-        });
-    } catch (e) {
-        console.warn('LearnedVerb cache load failed:', e.message);
+// Global learned mappings apply everywhere.
+// College-specific mappings override global mappings.
+let learnedCache = {};
+
+try {
+    const globalLearned = await LearnedVerb.find({
+        collegeId: null,
+    }).lean();
+
+    const collegeLearned =
+        collegeId && mongoose.Types.ObjectId.isValid(String(collegeId))
+            ? await LearnedVerb.find({ collegeId }).lean()
+            : [];
+
+    // Load global mappings first.
+    for (const l of globalLearned) {
+        learnedCache[l.verb] = {
+            domain: l.domain,
+            level: l.level,
+            confidence: l.confidence,
+            collegeId: null,
+        };
     }
 
-    const questionTexts = SequenceData.map((q) => q.Question || q[paperFields.QUESTION_NO] || q.text || '');
-    const domainClassifications = classifyPaper(questionTexts, learnedCache);
-    const DomainInsights = aggregateInsights(domainClassifications);
+    // College-specific mappings always override global mappings.
+    for (const l of collegeLearned) {
+        learnedCache[l.verb] = {
+            domain: l.domain,
+            level: l.level,
+            confidence: l.confidence,
+            collegeId: l.collegeId,
+        };
+    }
+} catch (e) {
+    console.warn('LearnedVerb cache load failed:', e.message);
+}
+
+const questionTexts = SequenceData.map(
+    (q) => q.Question || q[paperFields.QUESTION_NO] || q.text || ''
+);
+
+const domainClassifications = classifyPaper(
+    questionTexts,
+    learnedCache
+);
+
+const DomainInsights = aggregateInsights(domainClassifications);
 
     // ─── Corrections summary ──────────────────────────────────
     const correctionsSummary = {

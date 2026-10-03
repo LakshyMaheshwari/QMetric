@@ -196,5 +196,24 @@ describe('Learning Domain Classifier — 5-Layer Vote Model', () => {
       expect(insights.overall.affective.count).toBe(0);
       expect(insights.overall.psychomotor.count).toBe(0);
     });
+
+    test('detects multiple coordinated instructional verbs and flags review', () => {
+  const r = classify(
+    'Compare TCP and UDP and evaluate their security.'
+  );
+
+  expect(r.signals.detectedVerbs).toEqual(
+    expect.arrayContaining([
+      'compare',
+      'evaluate',
+    ])
+  );
+
+  expect(
+    r.signals.multipleInstructionVerbs
+  ).toBe(true);
+
+  expect(r.needsReview).toBe(true);
+});
   });
 });

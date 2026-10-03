@@ -8,7 +8,7 @@
  *   - Dave (1970), Harrow (1972) — Alternative Psychomotor
  *   - Fink (2003/2013) — Significant Learning
  *
- * Coverage: ~500 unique verbs across 3 domains, 18 levels
+ * Coverage: 479 dictionary entries (455 unique canonical verbs) across 3 domains, 18 levels
  *
  * Domain + Level mapping:
  *   Cognitive:   C1–C6  →  domain: 'cognitive',   level: 1–6
