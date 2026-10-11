@@ -9,4 +9,7 @@ m.connect(process.env.MONGO_URI || process.env.MONGODB_URI)
     console.log(r);
     process.exit(0);
   })
-  .catch((e) => { console.error(e.message); process.exit(1); });
+  .catch((e) => {
+    console.error(e.message);
+    process.exit(1);
+  });

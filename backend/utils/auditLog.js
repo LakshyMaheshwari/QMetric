@@ -6,15 +6,7 @@ const logger = require('../config/logger');
 /**
  * Log an audit entry (never throws — failures are swallowed)
  */
-async function logAudit({
-  userId,
-  actorType = 'user',
-  action,
-  resource,
-  changes = {},
-  request = null,
-  error = null,
-}) {
+async function logAudit({ userId, actorType = 'user', action, resource, changes = {}, request = null, error = null }) {
   try {
     if (actorType === 'user' && (!userId || !mongoose.isValidObjectId(userId))) {
       // User-attributed audit entries require a valid Mongo user id.
@@ -39,12 +31,9 @@ async function logAudit({
       newValue: changes.newValue || null,
       changes: changes.fields || [],
       status: error ? 'FAILED' : 'SUCCESS',
-      ipAddress:
-        request?.ip ||
-        request?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() ||
-        'unknown',
+      ipAddress: request?.ip || request?.headers?.['x-forwarded-for']?.split(',')[0]?.trim() || 'unknown',
       userAgent: request?.headers?.['user-agent'] || 'unknown',
-      error: error?.message || null,
+      error: error?.message || null
     };
 
     if (userId && mongoose.isValidObjectId(userId)) {

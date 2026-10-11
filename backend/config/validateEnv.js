@@ -7,12 +7,10 @@ const REQUIRED = [
   'ADMIN_SECRET_KEY',
   'TURNSTILE_SECRET_KEY',
   'FRONTEND_URL',
-  'CLOUDINARY_URL',
+  'CLOUDINARY_URL'
 ];
 
-const RECOMMENDED = [
-  'PORT',
-];
+const RECOMMENDED = ['PORT'];
 
 function validateEnv() {
   const missing = REQUIRED.filter((k) => !process.env[k]);
@@ -33,7 +31,7 @@ function validateEnv() {
     logger.error('\n❌ Placeholder values detected in:');
     sus.forEach((k) => logger.error(`   - ${k}`));
     logger.error('\n   Generate real secrets:\n');
-    logger.error('   node -e "logger.info(require(\'crypto\').randomBytes(32).toString(\'hex\'))"\n');
+    logger.error("   node -e \"logger.info(require('crypto').randomBytes(32).toString('hex'))\"\n");
     process.exit(1);
   }
 
@@ -41,20 +39,23 @@ function validateEnv() {
   // the dev-auth bypass could mount — a silent production misconfiguration.
   const VALID_NODE_ENVS = ['development', 'test', 'production'];
   if (!VALID_NODE_ENVS.includes(process.env.NODE_ENV)) {
-    logger.error(`\n❌ NODE_ENV must be one of: ${VALID_NODE_ENVS.join(', ')} (got: ${process.env.NODE_ENV || 'unset'})\n`);
+    logger.error(
+      `\n❌ NODE_ENV must be one of: ${VALID_NODE_ENVS.join(', ')} (got: ${process.env.NODE_ENV || 'unset'})\n`
+    );
     process.exit(1);
   }
 
   const isProd = process.env.NODE_ENV === 'production';
 
   // Reject the literal values shipped in .env.example
-  const EXAMPLE_VALUES = [
-    'your_jwt_secret_key_here',
-    'replace-with-64-char-random-hex-string',
-  ];
+  const EXAMPLE_VALUES = ['your_jwt_secret_key_here', 'replace-with-64-char-random-hex-string'];
   const SECRET_KEYS = ['ACCESS_TOKEN_SECRET', 'CSRF_SECRET', 'ADMIN_SECRET_KEY'];
   const exampleHits = SECRET_KEYS.filter((k) =>
-    EXAMPLE_VALUES.includes(String(process.env[k] || '').trim().toLowerCase())
+    EXAMPLE_VALUES.includes(
+      String(process.env[k] || '')
+        .trim()
+        .toLowerCase()
+    )
   );
   if (exampleHits.length > 0) {
     logger.error('\n❌ .env.example values detected in:', exampleHits.join(', '));

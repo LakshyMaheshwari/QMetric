@@ -2,11 +2,7 @@
 
 const nlp = require('compromise');
 
-const {
-  CORE_VERBS,
-  AMBIGUOUS_VERBS,
-  getLevelName,
-} = require('../core/nlp/verbDictionary');
+const { CORE_VERBS, AMBIGUOUS_VERBS, getLevelName } = require('../core/nlp/verbDictionary');
 
 const mongoose = require('mongoose');
 const logger = require('../config/logger');
@@ -25,7 +21,7 @@ const DEFAULT_PAGE_LIMIT = 50;
 const DOMAIN_LEVEL_LIMITS = {
   cognitive: 6,
   affective: 5,
-  psychomotor: 7,
+  psychomotor: 7
 };
 
 const NON_INSTRUCTIONAL_VERBS = new Set([
@@ -51,7 +47,7 @@ const NON_INSTRUCTIONAL_VERBS = new Set([
   'shall',
   'should',
   'will',
-  'would',
+  'would'
 ]);
 
 function getDomainLevelMax(domain) {
@@ -75,23 +71,14 @@ function getUserId(user) {
 }
 
 function parsePagination(query) {
-  const page = Math.max(
-    1,
-    Number.parseInt(query.page, 10) || 1
-  );
+  const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
 
-  const limit = Math.min(
-    MAX_PAGE_LIMIT,
-    Math.max(
-      1,
-      Number.parseInt(query.limit, 10) || DEFAULT_PAGE_LIMIT
-    )
-  );
+  const limit = Math.min(MAX_PAGE_LIMIT, Math.max(1, Number.parseInt(query.limit, 10) || DEFAULT_PAGE_LIMIT));
 
   return {
     page,
     limit,
-    skip: (page - 1) * limit,
+    skip: (page - 1) * limit
   };
 }
 
@@ -111,27 +98,13 @@ function extractVerbsFromText(text) {
   }
 
   try {
-    const detected = nlp(source)
-      .verbs()
-      .toInfinitive()
-      .out('array');
+    const detected = nlp(source).verbs().toInfinitive().out('array');
 
     return [
-      ...new Set(
-        detected
-          .map(normalizeVerb)
-          .filter(
-            (verb) =>
-              verb.length >= 2 &&
-              !NON_INSTRUCTIONAL_VERBS.has(verb)
-          )
-      ),
+      ...new Set(detected.map(normalizeVerb).filter((verb) => verb.length >= 2 && !NON_INSTRUCTIONAL_VERBS.has(verb)))
     ];
   } catch (err) {
-    logger.warn(
-      { err },
-      '[learnedVerb.extractVerbsFromText] NLP extraction failed'
-    );
+    logger.warn({ err }, '[learnedVerb.extractVerbsFromText] NLP extraction failed');
 
     return [];
   }
@@ -140,69 +113,32 @@ function extractVerbsFromText(text) {
 function validateVerbInput(body) {
   const errors = [];
 
-  const {
-    verb,
-    domain,
-    level,
-    confidence,
-    context,
-  } = body || {};
+  const { verb, domain, level, confidence, context } = body || {};
 
-  if (
-    !verb ||
-    typeof verb !== 'string' ||
-    verb.trim().length < 1 ||
-    verb.trim().length > MAX_VERB_LENGTH
-  ) {
-    errors.push(
-      `verb must be a string of length 1-${MAX_VERB_LENGTH}`
-    );
+  if (!verb || typeof verb !== 'string' || verb.trim().length < 1 || verb.trim().length > MAX_VERB_LENGTH) {
+    errors.push(`verb must be a string of length 1-${MAX_VERB_LENGTH}`);
   }
 
   if (!VALID_DOMAINS.includes(domain)) {
-    errors.push(
-      `domain must be one of: ${VALID_DOMAINS.join(', ')}`
-    );
+    errors.push(`domain must be one of: ${VALID_DOMAINS.join(', ')}`);
   }
 
   const lvl = Number(level);
   const maxForDomain = getDomainLevelMax(domain);
 
-  if (
-    !Number.isInteger(lvl) ||
-    !maxForDomain ||
-    lvl < MIN_LEVEL ||
-    lvl > Math.min(MAX_LEVEL, maxForDomain)
-  ) {
-    const rangeText = maxForDomain
-      ? `${MIN_LEVEL}-${maxForDomain}`
-      : `${MIN_LEVEL}-${MAX_LEVEL}`;
+  if (!Number.isInteger(lvl) || !maxForDomain || lvl < MIN_LEVEL || lvl > Math.min(MAX_LEVEL, maxForDomain)) {
+    const rangeText = maxForDomain ? `${MIN_LEVEL}-${maxForDomain}` : `${MIN_LEVEL}-${MAX_LEVEL}`;
 
-    errors.push(
-      `level must be an integer between ${rangeText} for ${
-        domain || 'the selected domain'
-      }`
-    );
+    errors.push(`level must be an integer between ${rangeText} for ${domain || 'the selected domain'}`);
   }
 
-  const conf =
-    confidence === undefined ||
-    confidence === null ||
-    confidence === ''
-      ? 0.95
-      : Number(confidence);
+  const conf = confidence === undefined || confidence === null || confidence === '' ? 0.95 : Number(confidence);
 
   if (Number.isNaN(conf) || conf < 0 || conf > 1) {
-    errors.push(
-      'confidence must be a number between 0 and 1'
-    );
+    errors.push('confidence must be a number between 0 and 1');
   }
 
-  if (
-    context !== undefined &&
-    context !== null &&
-    typeof context !== 'string'
-  ) {
+  if (context !== undefined && context !== null && typeof context !== 'string') {
     errors.push('context must be a string');
   }
 
@@ -218,31 +154,24 @@ function validateVerbInput(body) {
       verb: cleanedVerb,
       domain,
       level: lvl,
-      levelName:
-        getLevelName(domain, lvl) || '',
+      levelName: getLevelName(domain, lvl) || '',
       confidence: conf,
-      context:
-        typeof context === 'string'
-          ? context.trim()
-          : '',
-    },
+      context: typeof context === 'string' ? context.trim() : ''
+    }
   };
 }
 
 function resolveCollegeId(req, requestedCollegeId) {
-  const collegeId =
-    requestedCollegeId !== undefined
-      ? requestedCollegeId
-      : req.user?.collegeId || null;
+  const collegeId = requestedCollegeId !== undefined ? requestedCollegeId : req.user?.collegeId || null;
 
   if (collegeId && !isObjectId(collegeId)) {
     return {
-      error: 'Invalid collegeId',
+      error: 'Invalid collegeId'
     };
   }
 
   return {
-    collegeId: collegeId || null,
+    collegeId: collegeId || null
   };
 }
 
@@ -257,32 +186,26 @@ async function createLearnedVerb(req, res) {
     if (!userId) {
       return res.status(401).json({
         error: true,
-        message: 'Unauthenticated',
+        message: 'Unauthenticated'
       });
     }
 
-    const {
-      errors,
-      cleaned,
-    } = validateVerbInput(req.body);
+    const { errors, cleaned } = validateVerbInput(req.body);
 
     if (errors.length) {
       return res.status(400).json({
         error: true,
         message: 'Validation failed',
-        details: errors,
+        details: errors
       });
     }
 
-    const resolved = resolveCollegeId(
-      req,
-      req.body?.collegeId
-    );
+    const resolved = resolveCollegeId(req, req.body?.collegeId);
 
     if (resolved.error) {
       return res.status(400).json({
         error: true,
-        message: resolved.error,
+        message: resolved.error
       });
     }
 
@@ -290,14 +213,13 @@ async function createLearnedVerb(req, res) {
 
     const existing = await LearnedVerb.findOne({
       verb: cleaned.verb,
-      collegeId,
+      collegeId
     });
 
     if (existing) {
       return res.status(409).json({
         error: true,
-        message:
-          `Verb "${cleaned.verb}" already exists for this college`,
+        message: `Verb "${cleaned.verb}" already exists for this college`
       });
     }
 
@@ -309,7 +231,7 @@ async function createLearnedVerb(req, res) {
       confidence: cleaned.confidence,
       context: cleaned.context,
       taughtBy: userId,
-      collegeId,
+      collegeId
     });
 
     await logAudit({
@@ -321,33 +243,29 @@ async function createLearnedVerb(req, res) {
           verb: cleaned.verb,
           domain: cleaned.domain,
           level: cleaned.level,
-          collegeId,
-        },
+          collegeId
+        }
       },
-      request: req,
+      request: req
     });
 
     return res.status(201).json({
       error: false,
-      learnedVerb: doc,
+      learnedVerb: doc
     });
   } catch (err) {
     if (err?.code === 11000) {
       return res.status(409).json({
         error: true,
-        message:
-          'This verb already exists for the selected college scope',
+        message: 'This verb already exists for the selected college scope'
       });
     }
 
-    logger.error(
-      { err },
-      '[learnedVerb.createLearnedVerb]'
-    );
+    logger.error({ err }, '[learnedVerb.createLearnedVerb]');
 
     return res.status(500).json({
       error: true,
-      message: 'Internal server error',
+      message: 'Internal server error'
     });
   }
 }
@@ -358,19 +276,9 @@ async function createLearnedVerb(req, res) {
 
 async function getLearnedVerbs(req, res) {
   try {
-    const {
-      search,
-      domain,
-      collegeId,
-      sortBy = 'usageCount',
-      order = 'desc',
-    } = req.query;
+    const { search, domain, collegeId, sortBy = 'usageCount', order = 'desc' } = req.query;
 
-    const {
-      page,
-      limit,
-      skip,
-    } = parsePagination(req.query);
+    const { page, limit, skip } = parsePagination(req.query);
 
     const query = {};
 
@@ -378,7 +286,7 @@ async function getLearnedVerbs(req, res) {
       if (!isObjectId(collegeId)) {
         return res.status(400).json({
           error: true,
-          message: 'Invalid collegeId',
+          message: 'Invalid collegeId'
         });
       }
 
@@ -389,18 +297,14 @@ async function getLearnedVerbs(req, res) {
       if (!VALID_DOMAINS.includes(domain)) {
         return res.status(400).json({
           error: true,
-          message: 'Invalid domain',
+          message: 'Invalid domain'
         });
       }
 
       query.domain = domain;
     }
 
-    if (
-      search &&
-      typeof search === 'string' &&
-      search.trim()
-    ) {
+    if (search && typeof search === 'string' && search.trim()) {
       const safe = search
         .trim()
         .slice(0, 50)
@@ -409,16 +313,9 @@ async function getLearnedVerbs(req, res) {
       query.verb = new RegExp(safe, 'i');
     }
 
-    const sortable = [
-      'usageCount',
-      'confidence',
-      'createdAt',
-      'verb',
-    ];
+    const sortable = ['usageCount', 'confidence', 'createdAt', 'verb'];
 
-    const sortField = sortable.includes(sortBy)
-      ? sortBy
-      : 'usageCount';
+    const sortField = sortable.includes(sortBy) ? sortBy : 'usageCount';
 
     const sortDir = order === 'asc' ? 1 : -1;
 
@@ -431,7 +328,7 @@ async function getLearnedVerbs(req, res) {
         .populate('collegeId', 'name code')
         .lean(),
 
-      LearnedVerb.countDocuments(query),
+      LearnedVerb.countDocuments(query)
     ]);
 
     return res.json({
@@ -442,18 +339,15 @@ async function getLearnedVerbs(req, res) {
         page,
         limit,
         total,
-        pages: Math.ceil(total / limit),
-      },
+        pages: Math.ceil(total / limit)
+      }
     });
   } catch (err) {
-    logger.error(
-      { err },
-      '[learnedVerb.getLearnedVerbs]'
-    );
+    logger.error({ err }, '[learnedVerb.getLearnedVerbs]');
 
     return res.status(500).json({
       error: true,
-      message: 'Internal server error',
+      message: 'Internal server error'
     });
   }
 }
@@ -470,14 +364,14 @@ async function updateLearnedVerb(req, res) {
     if (!userId) {
       return res.status(401).json({
         error: true,
-        message: 'Unauthenticated',
+        message: 'Unauthenticated'
       });
     }
 
     if (!isObjectId(verbId)) {
       return res.status(400).json({
         error: true,
-        message: 'Invalid verbId',
+        message: 'Invalid verbId'
       });
     }
 
@@ -486,47 +380,29 @@ async function updateLearnedVerb(req, res) {
     if (!doc) {
       return res.status(404).json({
         error: true,
-        message: 'Learned verb not found',
+        message: 'Learned verb not found'
       });
     }
 
-    const {
-      domain,
-      level,
-      confidence,
-      context,
-    } = req.body || {};
+    const { domain, level, confidence, context } = req.body || {};
 
-    const nextDomain =
-      domain !== undefined
-        ? domain
-        : doc.domain;
+    const nextDomain = domain !== undefined ? domain : doc.domain;
 
-    const nextLevel =
-      level !== undefined
-        ? Number(level)
-        : doc.level;
+    const nextLevel = level !== undefined ? Number(level) : doc.level;
 
     if (!VALID_DOMAINS.includes(nextDomain)) {
       return res.status(400).json({
         error: true,
-        message: 'Invalid domain',
+        message: 'Invalid domain'
       });
     }
 
-    const maxForDomain =
-      getDomainLevelMax(nextDomain);
+    const maxForDomain = getDomainLevelMax(nextDomain);
 
-    if (
-      !Number.isInteger(nextLevel) ||
-      nextLevel < MIN_LEVEL ||
-      nextLevel > maxForDomain
-    ) {
+    if (!Number.isInteger(nextLevel) || nextLevel < MIN_LEVEL || nextLevel > maxForDomain) {
       return res.status(400).json({
         error: true,
-        message:
-          `level must be an integer between ` +
-          `${MIN_LEVEL}-${maxForDomain} for ${nextDomain}`,
+        message: `level must be an integer between ` + `${MIN_LEVEL}-${maxForDomain} for ${nextDomain}`
       });
     }
 
@@ -536,29 +412,18 @@ async function updateLearnedVerb(req, res) {
       $set.domain = nextDomain;
     }
 
-    if (
-      level !== undefined ||
-      domain !== undefined
-    ) {
+    if (level !== undefined || domain !== undefined) {
       $set.level = nextLevel;
-      $set.levelName =
-        getLevelName(
-          nextDomain,
-          nextLevel
-        ) || '';
+      $set.levelName = getLevelName(nextDomain, nextLevel) || '';
     }
 
     if (confidence !== undefined) {
       const conf = Number(confidence);
 
-      if (
-        Number.isNaN(conf) ||
-        conf < 0 ||
-        conf > 1
-      ) {
+      if (Number.isNaN(conf) || conf < 0 || conf > 1) {
         return res.status(400).json({
           error: true,
-          message: 'confidence must be 0-1',
+          message: 'confidence must be 0-1'
         });
       }
 
@@ -571,20 +436,17 @@ async function updateLearnedVerb(req, res) {
       if (context !== null && typeof context !== 'string') {
         return res.status(400).json({
           error: true,
-          message: 'context must be a string',
+          message: 'context must be a string'
         });
       }
 
-      $set.context =
-        typeof context === 'string'
-          ? context.trim()
-          : '';
+      $set.context = typeof context === 'string' ? context.trim() : '';
     }
 
     if (Object.keys($set).length === 0) {
       return res.status(400).json({
         error: true,
-        message: 'No fields to update',
+        message: 'No fields to update'
       });
     }
 
@@ -593,7 +455,7 @@ async function updateLearnedVerb(req, res) {
       level: doc.level,
       levelName: doc.levelName,
       confidence: doc.confidence,
-      context: doc.context,
+      context: doc.context
     };
 
     Object.assign(doc, $set);
@@ -607,32 +469,28 @@ async function updateLearnedVerb(req, res) {
       changes: {
         oldValue,
         newValue: $set,
-        fields: Object.keys($set),
+        fields: Object.keys($set)
       },
-      request: req,
+      request: req
     });
 
     return res.json({
       error: false,
-      updated: doc,
+      updated: doc
     });
   } catch (err) {
     if (err?.code === 11000) {
       return res.status(409).json({
         error: true,
-        message:
-          'This verb already exists for the selected college scope',
+        message: 'This verb already exists for the selected college scope'
       });
     }
 
-    logger.error(
-      { err },
-      '[learnedVerb.updateLearnedVerb]'
-    );
+    logger.error({ err }, '[learnedVerb.updateLearnedVerb]');
 
     return res.status(500).json({
       error: true,
-      message: 'Internal server error',
+      message: 'Internal server error'
     });
   }
 }
@@ -649,14 +507,14 @@ async function deleteLearnedVerb(req, res) {
     if (!userId) {
       return res.status(401).json({
         error: true,
-        message: 'Unauthenticated',
+        message: 'Unauthenticated'
       });
     }
 
     if (!isObjectId(verbId)) {
       return res.status(400).json({
         error: true,
-        message: 'Invalid verbId',
+        message: 'Invalid verbId'
       });
     }
 
@@ -665,27 +523,25 @@ async function deleteLearnedVerb(req, res) {
     if (!doc) {
       return res.status(404).json({
         error: true,
-        message: 'Learned verb not found',
+        message: 'Learned verb not found'
       });
     }
 
-    const isTaughtByMe =
-      String(doc.taughtBy) === String(userId);
+    const isTaughtByMe = String(doc.taughtBy) === String(userId);
 
-    const isSuperAdmin =
-      req.user.role === 'super_admin';
+    const isSuperAdmin = req.user.role === 'super_admin';
 
     if (!isTaughtByMe && !isSuperAdmin) {
       return res.status(403).json({
         error: true,
-        message: 'Forbidden',
+        message: 'Forbidden'
       });
     }
 
     const oldValue = doc.toObject();
 
     await LearnedVerb.deleteOne({
-      _id: verbId,
+      _id: verbId
     });
 
     await logAudit({
@@ -695,24 +551,21 @@ async function deleteLearnedVerb(req, res) {
       changes: {
         oldValue,
         newValue: null,
-        fields: ['verb'],
+        fields: ['verb']
       },
-      request: req,
+      request: req
     });
 
     return res.json({
       error: false,
-      message: 'Verb deleted',
+      message: 'Verb deleted'
     });
   } catch (err) {
-    logger.error(
-      { err },
-      '[learnedVerb.deleteLearnedVerb]'
-    );
+    logger.error({ err }, '[learnedVerb.deleteLearnedVerb]');
 
     return res.status(500).json({
       error: true,
-      message: 'Internal server error',
+      message: 'Internal server error'
     });
   }
 }
@@ -727,24 +580,11 @@ async function deleteLearnedVerb(req, res) {
 
 async function getSuggestedVerbs(req, res) {
   try {
-    const {
-      collegeId,
-      minUsage = 5,
-      limit = 20,
-    } = req.query;
+    const { collegeId, minUsage = 5, limit = 20 } = req.query;
 
-    const minU = Math.max(
-      1,
-      Number.parseInt(minUsage, 10) || 5
-    );
+    const minU = Math.max(1, Number.parseInt(minUsage, 10) || 5);
 
-    const cap = Math.min(
-      100,
-      Math.max(
-        1,
-        Number.parseInt(limit, 10) || 20
-      )
-    );
+    const cap = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 20));
 
     let paperQuery = {};
 
@@ -752,18 +592,18 @@ async function getSuggestedVerbs(req, res) {
       if (!isObjectId(collegeId)) {
         return res.status(400).json({
           error: true,
-          message: 'Invalid collegeId',
+          message: 'Invalid collegeId'
         });
       }
 
       paperQuery = {
-        collegeId,
+        collegeId
       };
     }
 
     const papers = await PaperInfo.find(paperQuery)
       .select({
-        'Collected Data': 1,
+        'Collected Data': 1
       })
       .limit(500)
       .lean();
@@ -771,123 +611,74 @@ async function getSuggestedVerbs(req, res) {
     const freq = new Map();
 
     for (const paper of papers) {
-      const collected =
-        paper['Collected Data'] || [];
+      const collected = paper['Collected Data'] || [];
 
       const first = collected[0];
 
-      const questions =
-        Array.isArray(first?.QuestionData)
-          ? first.QuestionData
-          : Array.isArray(collected)
-            ? collected
-            : [];
+      const questions = Array.isArray(first?.QuestionData)
+        ? first.QuestionData
+        : Array.isArray(collected)
+          ? collected
+          : [];
 
       for (const question of questions) {
-        const questionText =
-          question?.Question ||
-          question?.question ||
-          question?.text ||
-          '';
+        const questionText = question?.Question || question?.question || question?.text || '';
 
-        const verbs =
-          extractVerbsFromText(
-            questionText
-          );
+        const verbs = extractVerbsFromText(questionText);
 
         // Count a verb once per question.
         for (const verb of new Set(verbs)) {
-          if (
-            !CORE_VERBS[verb] &&
-            !AMBIGUOUS_VERBS[verb]
-          ) {
-            freq.set(
-              verb,
-              (freq.get(verb) || 0) + 1
-            );
+          if (!CORE_VERBS[verb] && !AMBIGUOUS_VERBS[verb]) {
+            freq.set(verb, (freq.get(verb) || 0) + 1);
           }
         }
       }
     }
 
-    const candidateVerbs =
-      Array.from(freq.keys());
+    const candidateVerbs = Array.from(freq.keys());
 
     let existingQuery;
 
     if (collegeId) {
       existingQuery = {
         verb: {
-          $in: candidateVerbs,
+          $in: candidateVerbs
         },
-        $or: [
-          { collegeId: null },
-          { collegeId },
-        ],
+        $or: [{ collegeId: null }, { collegeId }]
       };
     } else {
       existingQuery = {
         verb: {
-          $in: candidateVerbs,
-        },
+          $in: candidateVerbs
+        }
       };
     }
 
-    const existing =
-      candidateVerbs.length > 0
-        ? await LearnedVerb.find(
-            existingQuery
-          )
-            .select('verb')
-            .lean()
-        : [];
+    const existing = candidateVerbs.length > 0 ? await LearnedVerb.find(existingQuery).select('verb').lean() : [];
 
-    const existingSet = new Set(
-      existing.map(
-        (entry) =>
-          String(entry.verb)
-            .toLowerCase()
-            .trim()
-      )
-    );
+    const existingSet = new Set(existing.map((entry) => String(entry.verb).toLowerCase().trim()));
 
-    const suggestions =
-      Array.from(freq.entries())
-        .filter(
-          ([verb, count]) =>
-            !existingSet.has(verb) &&
-            count >= minU
-        )
-        .sort(
-          (a, b) => b[1] - a[1]
-        )
-        .slice(0, cap)
-        .map(
-          ([verb, frequency]) => ({
-            verb,
-            frequency,
-            estimatedLevel: null,
-            confidenceScore:
-              Math.min(
-                1,
-                frequency / 20
-              ),
-          })
-        );
+    const suggestions = Array.from(freq.entries())
+      .filter(([verb, count]) => !existingSet.has(verb) && count >= minU)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, cap)
+      .map(([verb, frequency]) => ({
+        verb,
+        frequency,
+        estimatedLevel: null,
+        confidenceScore: Math.min(1, frequency / 20)
+      }));
 
     return res.json({
       error: false,
-      suggestions,
+      suggestions
     });
   } catch (err) {
-    logger.error(
-      { err },
-      '[learnedVerb.getSuggestedVerbs]'
-    );
+    logger.error({ err }, '[learnedVerb.getSuggestedVerbs]');
 
     return res.status(500).json({
       error: true,
-      message: 'Internal server error',
+      message: 'Internal server error'
     });
   }
 }
@@ -904,26 +695,21 @@ async function bulkImportVerbs(req, res) {
     if (!userId) {
       return res.status(401).json({
         error: true,
-        message: 'Unauthenticated',
+        message: 'Unauthenticated'
       });
     }
 
-    if (
-      !Array.isArray(verbs) ||
-      verbs.length === 0
-    ) {
+    if (!Array.isArray(verbs) || verbs.length === 0) {
       return res.status(400).json({
         error: true,
-        message:
-          'verbs must be a non-empty array',
+        message: 'verbs must be a non-empty array'
       });
     }
 
     if (verbs.length > 1000) {
       return res.status(400).json({
         error: true,
-        message:
-          'Bulk limit is 1000 per request',
+        message: 'Bulk limit is 1000 per request'
       });
     }
 
@@ -933,31 +719,25 @@ async function bulkImportVerbs(req, res) {
     for (let i = 0; i < verbs.length; i += 1) {
       const row = verbs[i] || {};
 
-      const {
-        errors: validationErrors,
-        cleaned,
-      } = validateVerbInput(row);
+      const { errors: validationErrors, cleaned } = validateVerbInput(row);
 
       if (validationErrors.length) {
         errors.push({
           rowIndex: i,
           verb: row.verb,
-          errors: validationErrors,
+          errors: validationErrors
         });
 
         continue;
       }
 
-      const resolved = resolveCollegeId(
-        req,
-        row.collegeId
-      );
+      const resolved = resolveCollegeId(req, row.collegeId);
 
       if (resolved.error) {
         errors.push({
           rowIndex: i,
           verb: row.verb,
-          errors: [resolved.error],
+          errors: [resolved.error]
         });
 
         continue;
@@ -965,9 +745,8 @@ async function bulkImportVerbs(req, res) {
 
       toInsert.push({
         ...cleaned,
-        collegeId:
-          resolved.collegeId,
-        taughtBy: userId,
+        collegeId: resolved.collegeId,
+        taughtBy: userId
       });
     }
 
@@ -977,12 +756,9 @@ async function bulkImportVerbs(req, res) {
     const seen = new Set();
 
     for (const item of toInsert) {
-      const scope = item.collegeId
-        ? String(item.collegeId)
-        : 'global';
+      const scope = item.collegeId ? String(item.collegeId) : 'global';
 
-      const key =
-        `${item.verb}::${scope}`;
+      const key = `${item.verb}::${scope}`;
 
       if (seen.has(key)) {
         continue;
@@ -996,37 +772,26 @@ async function bulkImportVerbs(req, res) {
 
     if (deduped.length > 0) {
       try {
-        const result =
-          await LearnedVerb.insertMany(
-            deduped,
-            {
-              ordered: false,
-              rawResult: true,
-            }
-          );
+        const result = await LearnedVerb.insertMany(deduped, {
+          ordered: false,
+          rawResult: true
+        });
 
-        inserted =
-          result.insertedCount ||
-          result.insertedDocs?.length ||
-          deduped.length;
+        inserted = result.insertedCount || result.insertedDocs?.length || deduped.length;
       } catch (bulkErr) {
-        inserted =
-          bulkErr?.insertedDocs?.length ||
-          bulkErr?.result?.nInserted ||
-          0;
+        inserted = bulkErr?.insertedDocs?.length || bulkErr?.result?.nInserted || 0;
 
         logger.warn(
           {
             err: bulkErr,
-            inserted,
+            inserted
           },
           '[learnedVerb.bulkImportVerbs] Partial import'
         );
       }
     }
 
-    const skipped =
-      deduped.length - inserted;
+    const skipped = deduped.length - inserted;
 
     await logAudit({
       userId,
@@ -1037,10 +802,10 @@ async function bulkImportVerbs(req, res) {
           inserted,
           requested: verbs.length,
           invalid: errors.length,
-          skipped,
-        },
+          skipped
+        }
       },
-      request: req,
+      request: req
     });
 
     return res.json({
@@ -1048,17 +813,14 @@ async function bulkImportVerbs(req, res) {
       inserted,
       skipped,
       invalid: errors.length,
-      errors,
+      errors
     });
   } catch (err) {
-    logger.error(
-      { err },
-      '[learnedVerb.bulkImportVerbs]'
-    );
+    logger.error({ err }, '[learnedVerb.bulkImportVerbs]');
 
     return res.status(500).json({
       error: true,
-      message: 'Internal server error',
+      message: 'Internal server error'
     });
   }
 }
@@ -1069,5 +831,5 @@ module.exports = {
   updateLearnedVerb,
   deleteLearnedVerb,
   getSuggestedVerbs,
-  bulkImportVerbs,
+  bulkImportVerbs
 };

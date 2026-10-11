@@ -48,26 +48,26 @@ const router = express.Router();
  *         description: User not found or dev auth disabled
  */
 router.use((req, res, next) => {
-    if (process.env.NODE_ENV === 'production' || process.env.ENABLE_DEV_AUTH !== 'true') {
-        return res.status(404).json({ error: true, message: 'Not found' });
-    }
-    next();
+  if (process.env.NODE_ENV === 'production' || process.env.ENABLE_DEV_AUTH !== 'true') {
+    return res.status(404).json({ error: true, message: 'Not found' });
+  }
+  next();
 });
 
 router.post('/login', async (req, res) => {
-    const { email } = req.body || {};
+  const { email } = req.body || {};
 
-    if (!email || typeof email !== 'string' || !email.trim()) {
-        return res.status(400).json({ error: true, message: 'Email is required' });
-    }
+  if (!email || typeof email !== 'string' || !email.trim()) {
+    return res.status(400).json({ error: true, message: 'Email is required' });
+  }
 
-    const user = await User.findOne({ email: email.toLowerCase().trim() }).select('-password');
-    if (!user) {
-        return res.status(404).json({ error: true, message: 'User not found' });
-    }
+  const user = await User.findOne({ email: email.toLowerCase().trim() }).select('-password');
+  if (!user) {
+    return res.status(404).json({ error: true, message: 'User not found' });
+  }
 
-    const token = jwt.sign({ userId: user._id }, process.env.ACCESS_TOKEN_SECRET);
-    res.json({ error: false, token });
+  const token = jwt.sign({ userId: user._id }, process.env.ACCESS_TOKEN_SECRET);
+  res.json({ error: false, token });
 });
 
 module.exports = router;

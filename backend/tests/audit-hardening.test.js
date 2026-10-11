@@ -1,10 +1,6 @@
 const request = require('supertest');
 const app = require('../index');
-const {
-  createTestUser,
-  createTestCollege,
-  getCookieString,
-} = require('./helpers');
+const { createTestUser, createTestCollege, getCookieString } = require('./helpers');
 const User = require('../Model/user');
 const College = require('../Model/College');
 const Paper = require('../Model/PaperInfo');
@@ -16,17 +12,15 @@ const TURNSTILE = 'test-token';
 
 describe('Audit hardening regressions', () => {
   test('student welcome notification points to the student area', async () => {
-    const res = await request(app)
-      .post('/auth/create-account')
-      .send({
-        email: 'hardening-student@test.com',
-        password: PASSWORD,
-        fullName: 'Hardening Student',
-        userName: 'hardeningstudent',
-        phone: '9000000011',
-        role: 'student',
-        turnstileToken: TURNSTILE,
-      });
+    const res = await request(app).post('/auth/create-account').send({
+      email: 'hardening-student@test.com',
+      password: PASSWORD,
+      fullName: 'Hardening Student',
+      userName: 'hardeningstudent',
+      phone: '9000000011',
+      role: 'student',
+      turnstileToken: TURNSTILE
+    });
 
     expect(res.status).toBe(201);
     const user = await User.findOne({ email: 'hardening-student@test.com' });
@@ -41,19 +35,21 @@ describe('Audit hardening regressions', () => {
       .set('X-Admin-Secret', process.env.ADMIN_SECRET_KEY)
       .send({
         defaultPassword: PASSWORD,
-        users: [{
-          userName: 'bulk-reviewer',
-          fullName: 'Bulk Reviewer',
-          email: 'bulk-reviewer@test.com',
-          phone: '9000000012',
-          employeeId: 'EMP-HARDENING-1',
-          department: 'CSE',
-          stream: 'Engineering',
-          position: 'Professor',
-          collegeId: String(college._id),
-          collegeName: college.name,
-          role: 'reviewer',
-        }],
+        users: [
+          {
+            userName: 'bulk-reviewer',
+            fullName: 'Bulk Reviewer',
+            email: 'bulk-reviewer@test.com',
+            phone: '9000000012',
+            employeeId: 'EMP-HARDENING-1',
+            department: 'CSE',
+            stream: 'Engineering',
+            position: 'Professor',
+            collegeId: String(college._id),
+            collegeName: college.name,
+            role: 'reviewer'
+          }
+        ]
       });
 
     expect(res.status).toBe(207);
@@ -68,9 +64,7 @@ describe('Audit hardening regressions', () => {
     await createTestUser({ role: 'reviewer', collegeId: college._id, email: 'filter-reviewer@test.com' });
     await createTestUser({ role: 'teacher', collegeId: college._id, email: 'filter-teacher@test.com' });
 
-    const res = await request(app)
-      .get('/admin/users?role=reviewer')
-      .set('Cookie', getCookieString(admin));
+    const res = await request(app).get('/admin/users?role=reviewer').set('Cookie', getCookieString(admin));
 
     expect(res.status).toBe(200);
     expect(res.body.users).toHaveLength(1);
@@ -121,14 +115,14 @@ describe('Audit hardening regressions', () => {
       userId: owner._id,
       collegeId: college._id,
       reviewStatus: 'approved',
-      reviewHistory: [{ reviewerId: target._id, action: 'approved', comments: 'ok' }],
+      reviewHistory: [{ reviewerId: target._id, action: 'approved', comments: 'ok' }]
     });
 
     await Notification.create({
       userId: target._id,
       type: 'system',
       title: 'Reference',
-      message: 'Referenced user',
+      message: 'Referenced user'
     });
 
     const res = await request(app)
@@ -153,18 +147,20 @@ describe('Audit hardening regressions', () => {
       .set('X-Admin-Secret', process.env.ADMIN_SECRET_KEY)
       .send({
         defaultPassword: PASSWORD,
-        users: [{
-          userName: 'bulk-audit-actor',
-          fullName: 'Bulk Audit Actor',
-          email: 'bulk-audit-actor@test.com',
-          phone: '9000000013',
-          employeeId: 'EMP-HARDENING-2',
-          department: 'CSE',
-          stream: 'Engineering',
-          position: 'Professor',
-          collegeId: String(college._id),
-          collegeName: college.name,
-        }],
+        users: [
+          {
+            userName: 'bulk-audit-actor',
+            fullName: 'Bulk Audit Actor',
+            email: 'bulk-audit-actor@test.com',
+            phone: '9000000013',
+            employeeId: 'EMP-HARDENING-2',
+            department: 'CSE',
+            stream: 'Engineering',
+            position: 'Professor',
+            collegeId: String(college._id),
+            collegeName: college.name
+          }
+        ]
       });
 
     expect(res.status).toBe(207);
@@ -174,5 +170,4 @@ describe('Audit hardening regressions', () => {
     expect(audit.actorType).toBe('admin_secret');
     expect(audit.userId).toBeUndefined();
   });
-
 });

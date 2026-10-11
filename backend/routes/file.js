@@ -1,12 +1,12 @@
 const logger = require('../config/logger');
 
-const os      = require('node:os');
-const path    = require('node:path');
-const fs      = require('node:fs');
-const crypto  = require('node:crypto');
+const os = require('node:os');
+const path = require('node:path');
+const fs = require('node:fs');
+const crypto = require('node:crypto');
 const express = require('express');
-const multer  = require('multer');
-const router  = express.Router();
+const multer = require('multer');
+const router = express.Router();
 const { requireFeature } = require('../middleware/requireFeature');
 
 const authenticateToken = require('../core/auth/utilities');
@@ -42,7 +42,7 @@ const storage = multer.diskStorage({
     // guarantees collision-free names across concurrent uploads.
     const uniqueSuffix = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}`;
     cb(null, `${file.fieldname}-${uniqueSuffix}${fileExt}`);
-  },
+  }
 });
 
 // Allowed file types
@@ -56,7 +56,7 @@ const ALLOWED_EXTENSIONS = ['.xlsx', '.xls', '.csv'];
 //   2. Per-request memory footprint is O(chunk size), not O(file size).
 //   3. The uploadLimiter rate-limits this endpoint to 20 uploads/hour/IP.
 //   4. JSON/urlencoded bodies elsewhere stay at the Express default (100 KB).
-const MAX_FILE_SIZE = 25 * 1024 * 1024;  // 25 MB
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 
 // File type filter — extension whitelist
 const fileFilter = (req, file, cb) => {
@@ -75,10 +75,10 @@ const upload = multer({
   fileFilter,
   limits: {
     fileSize: MAX_FILE_SIZE,
-    files: 1,                      // hard cap on number of parts per request
-    fields: 5,                     // Sequence, FormData, and a few spares
-    fieldSize: 1 * 1024 * 1024,    // cap non-file form fields at 1 MB each
-  },
+    files: 1, // hard cap on number of parts per request
+    fields: 5, // Sequence, FormData, and a few spares
+    fieldSize: 1 * 1024 * 1024 // cap non-file form fields at 1 MB each
+  }
 });
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
@@ -89,8 +89,8 @@ router.post(
   upload.single('file'),
   fileController.convertToText
 );
-router.get('/totext',   authenticateToken, fileController.getResults);
-router.get('/all',      authenticateToken, fileController.getResultsById);
-router.post('/search',  authenticateToken, fileController.searchPapers);
+router.get('/totext', authenticateToken, fileController.getResults);
+router.get('/all', authenticateToken, fileController.getResultsById);
+router.post('/search', authenticateToken, fileController.searchPapers);
 
 module.exports = router;

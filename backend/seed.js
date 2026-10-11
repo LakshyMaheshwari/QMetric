@@ -2,10 +2,10 @@ const logger = require('./config/logger');
 
 /**
  * Seed Script for Test Users
- * 
+ *
  * This script is meant to be run ONCE to seed test users into the database.
  * It's NOT run during normal server startup.
- * 
+ *
  * Usage:
  * npm run seed
  */
@@ -34,7 +34,7 @@ const testUsers = [
         fullName: 'Dr. John Doe',
         employeeId: 'EMP001',
         collegeName: 'National Institute of Technology',
-        department: 'Computer Science',
+        department: 'Computer Science'
       },
       matchedFields: ['fullName', 'employeeId', 'collegeName', 'department'],
       confidence: 100,
@@ -59,7 +59,7 @@ const testUsers = [
         fullName: 'Prof. Jane Smith',
         employeeId: 'EMP002',
         collegeName: 'Indian Institute of Technology',
-        department: 'Electrical Engineering',
+        department: 'Electrical Engineering'
       },
       matchedFields: ['fullName', 'employeeId', 'collegeName', 'department'],
       confidence: 100,
@@ -84,7 +84,7 @@ const testUsers = [
         fullName: 'Dr. Alan Turing',
         employeeId: 'EMP003',
         collegeName: 'Delhi University',
-        department: 'Mathematics',
+        department: 'Mathematics'
       },
       matchedFields: ['fullName', 'employeeId', 'collegeName', 'department'],
       confidence: 100,
@@ -109,7 +109,7 @@ const testUsers = [
         fullName: 'Prof. Ada Lovelace',
         employeeId: 'EMP004',
         collegeName: 'BITS Pilani',
-        department: 'Information Technology',
+        department: 'Information Technology'
       },
       matchedFields: ['fullName', 'employeeId', 'collegeName', 'department'],
       confidence: 100,
@@ -134,13 +134,13 @@ const testUsers = [
         fullName: 'Dr. Grace Hopper',
         employeeId: 'EMP005',
         collegeName: 'Anna University',
-        department: 'Computer Applications',
+        department: 'Computer Applications'
       },
       matchedFields: ['fullName', 'employeeId', 'collegeName', 'department'],
       confidence: 100,
       updatedAt: new Date()
     }
-  },
+  }
 ];
 
 async function seedUsers() {
@@ -148,7 +148,7 @@ async function seedUsers() {
     // Connect to MongoDB
     await mongoose.connect(process.env.MONGO_URI, {
       useNewUrlParser: true,
-      useUnifiedTopology: true,
+      useUnifiedTopology: true
     });
 
     logger.info('✅ Connected to MongoDB');
@@ -163,7 +163,7 @@ async function seedUsers() {
 
         const newUser = new User({
           ...userData,
-          password: hashedPassword,
+          password: hashedPassword
         });
 
         await newUser.save();
@@ -175,7 +175,7 @@ async function seedUsers() {
 
     logger.info('\nSeeding complete!');
     logger.info('\nTest Accounts:');
-    testUsers.forEach(user => {
+    testUsers.forEach((user) => {
       logger.info(`  - Email: ${user.email}`);
     });
 

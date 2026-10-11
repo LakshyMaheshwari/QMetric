@@ -12,16 +12,14 @@ describe('Auth Endpoints', () => {
         email: 'login@test.com',
         password: 'ValidPass123',
         collegeId: college._id,
-        phone: '9876543210',
+        phone: '9876543210'
       });
 
-      const res = await request(app)
-        .post('/auth/login')
-        .send({
-          email: 'login@test.com',
-          password: 'ValidPass123',
-          turnstileToken: 'test-token',
-        });
+      const res = await request(app).post('/auth/login').send({
+        email: 'login@test.com',
+        password: 'ValidPass123',
+        turnstileToken: 'test-token'
+      });
 
       expect(res.status).toBe(200);
       expect(res.body.error).toBe(false);
@@ -35,13 +33,11 @@ describe('Auth Endpoints', () => {
     });
 
     it('should reject invalid email format', async () => {
-      const res = await request(app)
-        .post('/auth/login')
-        .send({
-          email: 'not-an-email',
-          password: 'ValidPass123',
-          turnstileToken: 'test-token',
-        });
+      const res = await request(app).post('/auth/login').send({
+        email: 'not-an-email',
+        password: 'ValidPass123',
+        turnstileToken: 'test-token'
+      });
 
       expect(res.status).toBe(400);
       expect(res.body.error).toBe(true);
@@ -56,16 +52,14 @@ describe('Auth Endpoints', () => {
         email: 'wrongpass@test.com',
         password: 'CorrectPass123',
         collegeId: college._id,
-        phone: '9876543211',
+        phone: '9876543211'
       });
 
-      const res = await request(app)
-        .post('/auth/login')
-        .send({
-          email: 'wrongpass@test.com',
-          password: 'WrongPass123',
-          turnstileToken: 'test-token',
-        });
+      const res = await request(app).post('/auth/login').send({
+        email: 'wrongpass@test.com',
+        password: 'WrongPass123',
+        turnstileToken: 'test-token'
+      });
 
       expect(res.status).toBe(401);
       expect(res.body.error).toBe(true);
@@ -74,13 +68,11 @@ describe('Auth Endpoints', () => {
     });
 
     it('should reject non-existent user with same generic message', async () => {
-      const res = await request(app)
-        .post('/auth/login')
-        .send({
-          email: 'nonexistent@test.com',
-          password: 'AnyPass123',
-          turnstileToken: 'test-token',
-        });
+      const res = await request(app).post('/auth/login').send({
+        email: 'nonexistent@test.com',
+        password: 'AnyPass123',
+        turnstileToken: 'test-token'
+      });
 
       expect(res.status).toBe(401);
       expect(res.body.message).toMatch(/invalid/i);
@@ -93,9 +85,7 @@ describe('Auth Endpoints', () => {
       const user = await createTestUser({ role: 'teacher', collegeId: college._id });
       const cookie = getCookieString(user);
 
-      const res = await request(app)
-        .post('/auth/logout')
-        .set('Cookie', cookie);
+      const res = await request(app).post('/auth/logout').set('Cookie', cookie);
 
       expect(res.status).toBe(200);
       expect(res.body.error).toBe(false);
@@ -109,15 +99,9 @@ describe('Auth Endpoints', () => {
       victim.refreshTokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000);
       await victim.save({ validateBeforeSave: false });
 
-      const forgedToken = require('jsonwebtoken').sign(
-        { userId: victim._id },
-        'wrong-secret',
-        { expiresIn: '1h' }
-      );
+      const forgedToken = require('jsonwebtoken').sign({ userId: victim._id }, 'wrong-secret', { expiresIn: '1h' });
 
-      const res = await request(app)
-        .post('/auth/logout')
-        .set('Cookie', `accessToken=${forgedToken}`);
+      const res = await request(app).post('/auth/logout').set('Cookie', `accessToken=${forgedToken}`);
 
       expect(res.status).toBe(200);
       const reloaded = await User.findById(victim._id).select('+refreshTokenHash +refreshTokenExpiresAt');
@@ -131,9 +115,7 @@ describe('Auth Endpoints', () => {
       const user = await createTestUser({ role: 'teacher', collegeId: college._id });
       const cookie = getCookieString(user);
 
-      const res = await request(app)
-        .get('/auth/profile')
-        .set('Cookie', cookie);
+      const res = await request(app).get('/auth/profile').set('Cookie', cookie);
 
       expect(res.status).toBe(200);
       expect(res.body.user?._id).toBeDefined();
@@ -148,9 +130,7 @@ describe('Auth Endpoints', () => {
     });
 
     it('should reject invalid token', async () => {
-      const res = await request(app)
-        .get('/auth/profile')
-        .set('Cookie', 'accessToken=invalid-token');
+      const res = await request(app).get('/auth/profile').set('Cookie', 'accessToken=invalid-token');
 
       expect(res.status).toBe(403);
       expect(res.body.error).toBe(true);

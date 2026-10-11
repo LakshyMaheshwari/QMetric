@@ -7,11 +7,7 @@ const College = require('../Model/College');
 const Paper = require('../Model/PaperInfo');
 const Notification = require('../Model/Notification');
 
-const {
-  createTestUser,
-  createTestCollege,
-  getCookieString,
-} = require('./helpers');
+const { createTestUser, createTestCollege, getCookieString } = require('./helpers');
 
 const PASSWORD = 'TestPassword123';
 const TURNSTILE = 'XXXX.DUMMY.TOKEN.XXXX';
@@ -19,9 +15,9 @@ const TURNSTILE = 'XXXX.DUMMY.TOKEN.XXXX';
 async function createPaper({ userId, collegeId, reviewStatus = 'draft', courseName = 'Test Course' }) {
   return Paper.create({
     'College Name': 'Test College',
-    'Branch': 'Computer Science',
+    Branch: 'Computer Science',
     'Year Of Study': '3rd Year',
-    'Semester': '5',
+    Semester: '5',
     'Course Name': courseName,
     'Course Code': 'CS101',
     'Course Teacher': 'Test Teacher',
@@ -29,17 +25,12 @@ async function createPaper({ userId, collegeId, reviewStatus = 'draft', courseNa
     collegeId,
     reviewStatus,
     'Collected Data': [],
-    bloomLevelMap: { remember: 1, understand: 2, apply: 3, analyze: 4, evaluate: 5, create: 6 },
+    bloomLevelMap: { remember: 1, understand: 2, apply: 3, analyze: 4, evaluate: 5, create: 6 }
   });
 }
 
 afterEach(async () => {
-  await Promise.all([
-    User.deleteMany({}),
-    College.deleteMany({}),
-    Notification.deleteMany({}),
-    Paper.deleteMany({}),
-  ]);
+  await Promise.all([User.deleteMany({}), College.deleteMany({}), Notification.deleteMany({}), Paper.deleteMany({})]);
 });
 
 // ============================================================================
@@ -47,17 +38,15 @@ afterEach(async () => {
 // ============================================================================
 describe('Signup — student', () => {
   test('creates an active student, sets cookie', async () => {
-    const res = await request(app)
-      .post('/auth/create-account')
-      .send({
-        email: 'student@test.com',
-        password: PASSWORD,
-        fullName: 'Test Student',
-        userName: 'student1',
-        phone: '9000000001',
-        role: 'student',
-        turnstileToken: TURNSTILE,
-      });
+    const res = await request(app).post('/auth/create-account').send({
+      email: 'student@test.com',
+      password: PASSWORD,
+      fullName: 'Test Student',
+      userName: 'student1',
+      phone: '9000000001',
+      role: 'student',
+      turnstileToken: TURNSTILE
+    });
 
     expect(res.status).toBe(201);
     expect(res.body.accountState).toBe('active');
@@ -73,19 +62,17 @@ describe('Signup — student', () => {
 
 describe('Signup — independent teacher', () => {
   test('creates an active independent teacher, sets cookie', async () => {
-    const res = await request(app)
-      .post('/auth/create-account')
-      .send({
-        email: 'indep@test.com',
-        password: PASSWORD,
-        fullName: 'Indep Teacher',
-        userName: 'indep1',
-        phone: '9000000003',
-        role: 'teacher',
-        signupIntent: 'independent',
-        position: 'Lecturer',
-        turnstileToken: TURNSTILE,
-      });
+    const res = await request(app).post('/auth/create-account').send({
+      email: 'indep@test.com',
+      password: PASSWORD,
+      fullName: 'Indep Teacher',
+      userName: 'indep1',
+      phone: '9000000003',
+      role: 'teacher',
+      signupIntent: 'independent',
+      position: 'Lecturer',
+      turnstileToken: TURNSTILE
+    });
 
     expect(res.status).toBe(201);
     expect(res.body.accountState).toBe('active');
@@ -103,7 +90,7 @@ describe('Signup — affiliated teacher', () => {
     const admin = await createTestUser({
       role: 'admin',
       email: 'admin@a.test',
-      collegeId: college._id,
+      collegeId: college._id
     });
 
     const res = await request(app)
@@ -121,7 +108,7 @@ describe('Signup — affiliated teacher', () => {
         employeeId: 'EMP-A1',
         department: 'CSE',
         stream: 'Engineering',
-        turnstileToken: TURNSTILE,
+        turnstileToken: TURNSTILE
       });
 
     expect(res.status).toBe(201);
@@ -134,7 +121,7 @@ describe('Signup — affiliated teacher', () => {
 
     const notif = await Notification.findOne({
       userId: admin._id,
-      type: 'pending_teacher_approval',
+      type: 'pending_teacher_approval'
     });
     expect(notif).toBeTruthy();
   });
@@ -151,7 +138,7 @@ describe('Login — pending_approval state', () => {
       email: 'pending@test.com',
       password: PASSWORD,
       collegeId: college._id,
-      collegeApprovalStatus: 'pending',
+      collegeApprovalStatus: 'pending'
     });
 
     const res = await request(app)
@@ -171,7 +158,7 @@ describe('Login — pending_approval state', () => {
       email: 'approved@test.com',
       password: PASSWORD,
       collegeId: college._id,
-      collegeApprovalStatus: 'approved',
+      collegeApprovalStatus: 'approved'
     });
 
     const res = await request(app)
@@ -193,7 +180,7 @@ describe('Feature gate — submit_for_review', () => {
     const teacher = await createTestUser({
       role: 'teacher',
       collegeId: college._id,
-      collegeApprovalStatus: 'pending',
+      collegeApprovalStatus: 'pending'
     });
     const paper = await createPaper({ userId: teacher._id, collegeId: college._id });
 
@@ -209,8 +196,8 @@ describe('Feature gate — submit_for_review', () => {
   test('independent teacher gets 403 no_affiliation', async () => {
     const teacher = await createTestUser({
       role: 'teacher',
-      collegeId: null,           // ← now allowed by patched helper
-      collegeApprovalStatus: 'approved',
+      collegeId: null, // ← now allowed by patched helper
+      collegeApprovalStatus: 'approved'
     });
     const paper = await createPaper({ userId: teacher._id, collegeId: null });
 
@@ -228,7 +215,7 @@ describe('Feature gate — submit_for_review', () => {
     const teacher = await createTestUser({
       role: 'teacher',
       collegeId: college._id,
-      collegeApprovalStatus: 'approved',
+      collegeApprovalStatus: 'approved'
     });
     const paper = await createPaper({ userId: teacher._id, collegeId: college._id });
 
@@ -247,12 +234,10 @@ describe('Feature gate — reviewer endpoints', () => {
   test('student is rejected with 403', async () => {
     const student = await createTestUser({
       role: 'student',
-      collegeId: null,           // ← now allowed
+      collegeId: null // ← now allowed
     });
 
-    const res = await request(app)
-      .get('/reviewer/papers')
-      .set('Cookie', getCookieString(student));
+    const res = await request(app).get('/reviewer/papers').set('Cookie', getCookieString(student));
 
     expect(res.status).toBe(403);
   });
@@ -271,9 +256,7 @@ describe('GET /college-admin/pending-teachers', () => {
     await createTestUser({ role: 'teacher', collegeId: collegeA._id, collegeApprovalStatus: 'pending' });
     await createTestUser({ role: 'teacher', collegeId: collegeB._id, collegeApprovalStatus: 'pending' });
 
-    const res = await request(app)
-      .get('/college-admin/pending-teachers')
-      .set('Cookie', getCookieString(admin));
+    const res = await request(app).get('/college-admin/pending-teachers').set('Cookie', getCookieString(admin));
 
     expect(res.status).toBe(200);
     expect(res.body.teachers).toHaveLength(2);
@@ -288,7 +271,7 @@ describe('PUT /college-admin/pending-teachers/:id/approve', () => {
     const teacher = await createTestUser({
       role: 'teacher',
       collegeId: college._id,
-      collegeApprovalStatus: 'pending',
+      collegeApprovalStatus: 'pending'
     });
 
     const res = await request(app)
@@ -310,7 +293,7 @@ describe('PUT /college-admin/pending-teachers/:id/reject', () => {
     const teacher = await createTestUser({
       role: 'teacher',
       collegeId: college._id,
-      collegeApprovalStatus: 'pending',
+      collegeApprovalStatus: 'pending'
     });
 
     const res = await request(app)
@@ -327,7 +310,7 @@ describe('PUT /college-admin/pending-teachers/:id/reject', () => {
     const teacher = await createTestUser({
       role: 'teacher',
       collegeId: college._id,
-      collegeApprovalStatus: 'pending',
+      collegeApprovalStatus: 'pending'
     });
     const paper = await createPaper({ userId: teacher._id, collegeId: college._id });
 
@@ -356,7 +339,7 @@ describe('POST /auth/profile/request-affiliation', () => {
     const teacher = await createTestUser({
       role: 'teacher',
       collegeId: null,
-      collegeApprovalStatus: 'approved',
+      collegeApprovalStatus: 'approved'
     });
 
     const res = await request(app)
@@ -378,7 +361,7 @@ describe('POST /auth/profile/request-affiliation', () => {
     const teacher = await createTestUser({
       role: 'teacher',
       collegeId: null,
-      collegeApprovalStatus: 'pending',
+      collegeApprovalStatus: 'pending'
     });
 
     const res = await request(app)
@@ -394,7 +377,7 @@ describe('POST /auth/profile/upgrade-to-teacher', () => {
   test('student → independent teacher (instant)', async () => {
     const student = await createTestUser({
       role: 'student',
-      collegeId: null,
+      collegeId: null
     });
 
     const res = await request(app)
@@ -415,7 +398,7 @@ describe('POST /auth/profile/upgrade-to-teacher', () => {
     const college = await createTestCollege('College M');
     const student = await createTestUser({
       role: 'student',
-      collegeId: null,
+      collegeId: null
     });
 
     const res = await request(app)
@@ -436,7 +419,7 @@ describe('POST /auth/profile/upgrade-to-teacher', () => {
   test('non-student cannot upgrade', async () => {
     const teacher = await createTestUser({
       role: 'teacher',
-      collegeId: null,
+      collegeId: null
     });
 
     const res = await request(app)

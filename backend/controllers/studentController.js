@@ -24,26 +24,18 @@ const getMyPapers = async (req, res) => {
 
     if (search && typeof search === 'string') {
       const safe = escapeRegex(search.trim().slice(0, 50));
-      query.$or = [
-        { 'Course Name': new RegExp(safe, 'i') },
-        { 'Course Code': new RegExp(safe, 'i') },
-      ];
+      query.$or = [{ 'Course Name': new RegExp(safe, 'i') }, { 'Course Code': new RegExp(safe, 'i') }];
     }
 
     const [papers, total] = await Promise.all([
-      Paper.find(query)
-        .select({ Sequence: 0, 'Collected Data': 0 })
-        .sort(sort)
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Paper.countDocuments(query),
+      Paper.find(query).select({ Sequence: 0, 'Collected Data': 0 }).sort(sort).skip(skip).limit(limit).lean(),
+      Paper.countDocuments(query)
     ]);
 
     return res.json({
       error: false,
       papers,
-      pagination: getPaginationMeta(total, page, limit),
+      pagination: getPaginationMeta(total, page, limit)
     });
   } catch (err) {
     logger.error('Student getMyPapers error:', err);
@@ -67,7 +59,7 @@ const getPaperDetails = async (req, res) => {
 
     return res.json({
       error: false,
-      paper,
+      paper
     });
   } catch (err) {
     logger.error('Student getPaperDetails error:', err);
@@ -92,22 +84,22 @@ const getStudentStats = async (req, res) => {
             _id: null,
             avgScore: { $avg: '$qualityScore' },
             maxScore: { $max: '$qualityScore' },
-            minScore: { $min: '$qualityScore' },
-          },
-        },
-      ]),
+            minScore: { $min: '$qualityScore' }
+          }
+        }
+      ])
     ]);
 
     const stats = {
       totalPapers,
       averageQualityScore: scoreAgg[0] ? Math.round(scoreAgg[0].avgScore * 10) / 10 : 0,
       highestQualityScore: scoreAgg[0] ? Math.round(scoreAgg[0].maxScore * 10) / 10 : 0,
-      lowestQualityScore:  scoreAgg[0] ? Math.round(scoreAgg[0].minScore * 10) / 10 : 0,
+      lowestQualityScore: scoreAgg[0] ? Math.round(scoreAgg[0].minScore * 10) / 10 : 0
     };
 
     return res.json({
       error: false,
-      stats,
+      stats
     });
   } catch (err) {
     logger.error('Student getStudentStats error:', err);
@@ -118,5 +110,5 @@ const getStudentStats = async (req, res) => {
 module.exports = {
   getMyPapers,
   getPaperDetails,
-  getStudentStats,
+  getStudentStats
 };

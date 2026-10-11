@@ -31,5 +31,5 @@ module.exports = {
   PASSWORD_REGEX,
   PASSWORD_ERROR_MESSAGE,
   isStrongPassword,
-  ASSIGNABLE_ROLES,
+  ASSIGNABLE_ROLES
 };

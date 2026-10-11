@@ -1,12 +1,7 @@
 const request = require('supertest');
 const app = require('../index');
 const User = require('../Model/user');
-const {
-  createTestUser,
-  createTestCollege,
-  createSuperAdmin,
-  getCookieString,
-} = require('./helpers');
+const { createTestUser, createTestCollege, createSuperAdmin, getCookieString } = require('./helpers');
 
 describe('Admin Endpoints', () => {
   let college, superAdmin, cookie;
@@ -23,13 +18,11 @@ describe('Admin Endpoints', () => {
         await createTestUser({
           role: 'teacher',
           email: `teacher${i}@test.com`,
-          collegeId: college._id,
+          collegeId: college._id
         });
       }
 
-      const res = await request(app)
-        .get('/admin/users?page=1&limit=10')
-        .set('Cookie', cookie);
+      const res = await request(app).get('/admin/users?page=1&limit=10').set('Cookie', cookie);
 
       expect(res.status).toBe(200);
       expect(res.body.users.length).toBe(10);
@@ -40,9 +33,7 @@ describe('Admin Endpoints', () => {
     });
 
     it('should reject invalid pagination', async () => {
-      const res = await request(app)
-        .get('/admin/users?page=-1&limit=9999')
-        .set('Cookie', cookie);
+      const res = await request(app).get('/admin/users?page=-1&limit=9999').set('Cookie', cookie);
 
       expect(res.status).toBe(400);
       expect(res.body.message).toBe('Validation failed');
@@ -57,9 +48,7 @@ describe('Admin Endpoints', () => {
       const teacher = await createTestUser({ role: 'teacher', collegeId: college._id });
       const teacherCookie = getCookieString(teacher);
 
-      const res = await request(app)
-        .get('/admin/users')
-        .set('Cookie', teacherCookie);
+      const res = await request(app).get('/admin/users').set('Cookie', teacherCookie);
 
       expect(res.status).toBe(403);
       expect(res.body.error).toBe(true);
@@ -69,15 +58,12 @@ describe('Admin Endpoints', () => {
 
   describe('POST /admin/users', () => {
     it('should create a new user', async () => {
-      const res = await request(app)
-        .post('/admin/users')
-        .set('Cookie', cookie)
-        .send({
-          name: 'New Teacher',
-          email: 'newteacher@test.com',
-          password: 'Password123',
-          role: 'teacher',
-        });
+      const res = await request(app).post('/admin/users').set('Cookie', cookie).send({
+        name: 'New Teacher',
+        email: 'newteacher@test.com',
+        password: 'Password123',
+        role: 'teacher'
+      });
 
       expect(res.status).toBe(201);
       expect(res.body.user).toBeDefined();
@@ -87,48 +73,39 @@ describe('Admin Endpoints', () => {
       await createTestUser({
         role: 'teacher',
         email: 'duplicate@test.com',
-        collegeId: college._id,
+        collegeId: college._id
       });
 
-      const res = await request(app)
-        .post('/admin/users')
-        .set('Cookie', cookie)
-        .send({
-          name: 'Another',
-          email: 'duplicate@test.com',
-          password: 'Password123',
-          role: 'teacher',
-        });
+      const res = await request(app).post('/admin/users').set('Cookie', cookie).send({
+        name: 'Another',
+        email: 'duplicate@test.com',
+        password: 'Password123',
+        role: 'teacher'
+      });
 
       expect(res.status).toBe(400);
       expect(res.body.message).toMatch(/already/i);
     });
 
     it('should reject invalid role', async () => {
-      const res = await request(app)
-        .post('/admin/users')
-        .set('Cookie', cookie)
-        .send({
-          name: 'Bad Role',
-          email: 'badrole@test.com',
-          password: 'Password123',
-          role: 'hacker',
-        });
+      const res = await request(app).post('/admin/users').set('Cookie', cookie).send({
+        name: 'Bad Role',
+        email: 'badrole@test.com',
+        password: 'Password123',
+        role: 'hacker'
+      });
 
       expect(res.status).toBe(400);
       expect(res.body.message).toBe('Validation failed');
     });
 
     it('should reject weak password', async () => {
-      const res = await request(app)
-        .post('/admin/users')
-        .set('Cookie', cookie)
-        .send({
-          name: 'Weak Pass',
-          email: 'weak@test.com',
-          password: '123',
-          role: 'teacher',
-        });
+      const res = await request(app).post('/admin/users').set('Cookie', cookie).send({
+        name: 'Weak Pass',
+        email: 'weak@test.com',
+        password: '123',
+        role: 'teacher'
+      });
 
       expect(res.status).toBe(400);
     });
@@ -139,7 +116,7 @@ describe('Admin Endpoints', () => {
       const user = await createTestUser({
         role: 'teacher',
         email: 'promote@test.com',
-        collegeId: college._id,
+        collegeId: college._id
       });
 
       const res = await request(app)
@@ -177,7 +154,7 @@ describe('Admin Endpoints', () => {
       const user = await createTestUser({
         role: 'teacher',
         email: 'counter-teacher@test.com',
-        collegeId: college._id,
+        collegeId: college._id
       });
       await college.constructor.findByIdAndUpdate(college._id, { $set: { totalTeachers: 1 } });
 
@@ -197,20 +174,16 @@ describe('Admin Endpoints', () => {
       const user = await createTestUser({
         role: 'teacher',
         email: 'blockme@test.com',
-        collegeId: college._id,
+        collegeId: college._id
       });
 
-      const res1 = await request(app)
-        .put(`/admin/users/${user._id}/block`)
-        .set('Cookie', cookie);
+      const res1 = await request(app).put(`/admin/users/${user._id}/block`).set('Cookie', cookie);
 
       expect(res1.status).toBe(200);
       let updated = await User.findById(user._id);
       expect(updated.isBlocked).toBe(true);
 
-      const res2 = await request(app)
-        .put(`/admin/users/${user._id}/block`)
-        .set('Cookie', cookie);
+      const res2 = await request(app).put(`/admin/users/${user._id}/block`).set('Cookie', cookie);
 
       expect(res2.status).toBe(200);
       updated = await User.findById(user._id);

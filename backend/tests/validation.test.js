@@ -4,16 +4,12 @@ const app = require('../index');
 describe('Input Validation', () => {
   describe('POST /auth/login', () => {
     it('rejects missing email', async () => {
-      const res = await request(app)
-        .post('/auth/login')
-        .send({ password: 'Test123456' });
+      const res = await request(app).post('/auth/login').send({ password: 'Test123456' });
       expect(res.status).toBe(400);
     });
 
     it('rejects short password', async () => {
-      const res = await request(app)
-        .post('/auth/login')
-        .send({ email: 'test@test.com', password: '123' });
+      const res = await request(app).post('/auth/login').send({ email: 'test@test.com', password: '123' });
       expect(res.status).toBe(400);
     });
   });

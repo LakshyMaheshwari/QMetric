@@ -9,7 +9,7 @@ let mongoServer;
 global.fetch = jest.fn(() =>
   Promise.resolve({
     ok: true,
-    json: () => Promise.resolve({ success: true }),
+    json: () => Promise.resolve({ success: true })
   })
 );
 jest.setTimeout(60000);
@@ -44,8 +44,7 @@ afterEach(async () => {
   global.fetch.mockImplementation(() =>
     Promise.resolve({
       ok: true,
-      json: () => Promise.resolve({ success: true }),
+      json: () => Promise.resolve({ success: true })
     })
   );
 });
-

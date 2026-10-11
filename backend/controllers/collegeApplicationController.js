@@ -19,7 +19,14 @@ const cleanApplication = (application) => {
 };
 
 const validateApplicationInput = ({ collegeName, collegeCode, contactName, contactEmail, contactPhone, password }) => {
-  if (!collegeName?.trim() || !collegeCode?.trim() || !contactName?.trim() || !contactEmail?.trim() || !contactPhone || !password) {
+  if (
+    !collegeName?.trim() ||
+    !collegeCode?.trim() ||
+    !contactName?.trim() ||
+    !contactEmail?.trim() ||
+    !contactPhone ||
+    !password
+  ) {
     return 'College name, college code, contact name, email, phone, and password are required.';
   }
   if (collegeName.trim().length < 2 || collegeName.trim().length > 200) {
@@ -52,11 +59,16 @@ const submitCollegeApplication = async (req, res) => {
       contactName,
       contactEmail,
       contactPhone,
-      password,
+      password
     } = req.body || {};
 
     const validationError = validateApplicationInput({
-      collegeName, collegeCode, contactName, contactEmail, contactPhone, password,
+      collegeName,
+      collegeCode,
+      contactName,
+      contactEmail,
+      contactPhone,
+      password
     });
     if (validationError) {
       return res.status(400).json({ error: true, message: validationError });
@@ -71,20 +83,19 @@ const submitCollegeApplication = async (req, res) => {
     if (existingUser) {
       return res.status(409).json({
         error: true,
-        message: 'This email address is already registered with QMetric.',
+        message: 'This email address is already registered with QMetric.'
       });
     }
 
     const existingCollege = await College.findOne({
-      $or: [
-        { code: normalizedCode },
-        { name: { $regex: `^${escapeRegex(normalizedName)}$`, $options: 'i' } },
-      ],
-    }).select('_id').lean();
+      $or: [{ code: normalizedCode }, { name: { $regex: `^${escapeRegex(normalizedName)}$`, $options: 'i' } }]
+    })
+      .select('_id')
+      .lean();
     if (existingCollege) {
       return res.status(409).json({
         error: true,
-        message: 'A college with this name or code is already registered.',
+        message: 'A college with this name or code is already registered.'
       });
     }
 
@@ -93,13 +104,15 @@ const submitCollegeApplication = async (req, res) => {
       $or: [
         { collegeCode: normalizedCode },
         { contactEmail: normalizedEmail },
-        { collegeName: { $regex: `^${escapeRegex(normalizedName)}$`, $options: 'i' } },
-      ],
-    }).select('_id').lean();
+        { collegeName: { $regex: `^${escapeRegex(normalizedName)}$`, $options: 'i' } }
+      ]
+    })
+      .select('_id')
+      .lean();
     if (duplicatePending) {
       return res.status(409).json({
         error: true,
-        message: 'A pending application already exists for this college or contact email.',
+        message: 'A pending application already exists for this college or contact email.'
       });
     }
 
@@ -113,7 +126,7 @@ const submitCollegeApplication = async (req, res) => {
       contactName: contactName.trim(),
       contactEmail: normalizedEmail,
       contactPhone: normalizedPhone,
-      adminPasswordHash,
+      adminPasswordHash
     });
 
     await logAudit({
@@ -125,11 +138,11 @@ const submitCollegeApplication = async (req, res) => {
         newValue: {
           collegeName: application.collegeName,
           collegeCode: application.collegeCode,
-          contactEmail: application.contactEmail,
+          contactEmail: application.contactEmail
         },
-        fields: ['collegeName', 'collegeCode', 'contactEmail'],
+        fields: ['collegeName', 'collegeCode', 'contactEmail']
       },
-      request: req,
+      request: req
     });
 
     try {
@@ -141,7 +154,7 @@ const submitCollegeApplication = async (req, res) => {
           title: 'New college registration application',
           message: `${application.collegeName} (${application.collegeCode}) has been submitted for review by ${application.contactName}.`,
           relatedDocId: application._id,
-          actionUrl: `/super-admin/college-applications`,
+          actionUrl: `/super-admin/college-applications`
         }).catch(() => {});
       }
     } catch (notifErr) {
@@ -156,8 +169,8 @@ const submitCollegeApplication = async (req, res) => {
         collegeName: application.collegeName,
         collegeCode: application.collegeCode,
         status: application.status,
-        createdAt: application.createdAt,
-      },
+        createdAt: application.createdAt
+      }
     });
   } catch (err) {
     console.error('submitCollegeApplication error:', err);
@@ -203,7 +216,7 @@ const getApplications = async (req, res) => {
         { collegeName: new RegExp(safe, 'i') },
         { collegeCode: new RegExp(safe, 'i') },
         { contactName: new RegExp(safe, 'i') },
-        { contactEmail: new RegExp(safe, 'i') },
+        { contactEmail: new RegExp(safe, 'i') }
       ];
     }
 
@@ -215,13 +228,13 @@ const getApplications = async (req, res) => {
         .skip(skip)
         .limit(limit)
         .lean(),
-      CollegeApplication.countDocuments(query),
+      CollegeApplication.countDocuments(query)
     ]);
 
     return res.json({
       error: false,
       applications,
-      pagination: getPaginationMeta(total, page, limit),
+      pagination: getPaginationMeta(total, page, limit)
     });
   } catch (err) {
     console.error('getApplications error:', err);
@@ -247,9 +260,11 @@ const approveApplication = async (req, res) => {
     const existingCollege = await College.findOne({
       $or: [
         { code: application.collegeCode },
-        { name: { $regex: `^${escapeRegex(application.collegeName)}$`, $options: 'i' } },
-      ],
-    }).select('_id').lean();
+        { name: { $regex: `^${escapeRegex(application.collegeName)}$`, $options: 'i' } }
+      ]
+    })
+      .select('_id')
+      .lean();
     if (existingCollege) {
       return res.status(409).json({ error: true, message: 'A college with this name or code already exists.' });
     }
@@ -260,10 +275,9 @@ const approveApplication = async (req, res) => {
     }
 
     const result = await withTransaction(async (session) => {
-      const createDocs = (Model, data) => session
-        ? Model.create([data], { session }).then((docs) => docs[0])
-        : Model.create(data);
-      const saveDoc = (doc) => session ? doc.save({ session }) : doc.save();
+      const createDocs = (Model, data) =>
+        session ? Model.create([data], { session }).then((docs) => docs[0]) : Model.create(data);
+      const saveDoc = (doc) => (session ? doc.save({ session }) : doc.save());
       const withSession = (query) => {
         if (session) query.session(session);
         return query;
@@ -275,7 +289,7 @@ const approveApplication = async (req, res) => {
         address: application.address,
         city: application.city,
         state: application.state,
-        isActive: true,
+        isActive: true
       });
 
       const admin = await createDocs(User, {
@@ -287,26 +301,28 @@ const approveApplication = async (req, res) => {
         collegeId: college._id,
         collegeName: college.name,
         department: 'Administration',
-        idVerification: { status: 'not_applicable' },
+        idVerification: { status: 'not_applicable' }
       });
 
       college.adminIds = [admin._id];
       await saveDoc(college);
 
-      const updated = await withSession(CollegeApplication.findOneAndUpdate(
-        { _id: application._id, status: 'pending' },
-        {
-          $set: {
-            status: 'approved',
-            reviewedBy: reviewerId,
-            reviewedAt: new Date(),
-            createdCollegeId: college._id,
-            createdAdminId: admin._id,
-            rejectionReason: '',
+      const updated = await withSession(
+        CollegeApplication.findOneAndUpdate(
+          { _id: application._id, status: 'pending' },
+          {
+            $set: {
+              status: 'approved',
+              reviewedBy: reviewerId,
+              reviewedAt: new Date(),
+              createdCollegeId: college._id,
+              createdAdminId: admin._id,
+              rejectionReason: ''
+            }
           },
-        },
-        { new: true },
-      ));
+          { new: true }
+        )
+      );
 
       return { college, admin, updated };
     });
@@ -322,9 +338,9 @@ const approveApplication = async (req, res) => {
       changes: {
         oldValue: { status: 'pending' },
         newValue: { status: 'approved', collegeId: result.college._id, adminId: result.admin._id },
-        fields: ['status', 'createdCollegeId', 'createdAdminId'],
+        fields: ['status', 'createdCollegeId', 'createdAdminId']
       },
-      request: req,
+      request: req
     });
 
     return res.json({
@@ -334,18 +350,20 @@ const approveApplication = async (req, res) => {
       college: {
         _id: result.college._id,
         name: result.college.name,
-        code: result.college.code,
+        code: result.college.code
       },
       admin: {
         _id: result.admin._id,
         fullName: result.admin.fullName,
-        email: result.admin.email,
-      },
+        email: result.admin.email
+      }
     });
   } catch (err) {
     console.error('approveApplication error:', err);
     if (err.code === 11000) {
-      return res.status(409).json({ error: true, message: 'A college or user with the submitted details already exists.' });
+      return res
+        .status(409)
+        .json({ error: true, message: 'A college or user with the submitted details already exists.' });
     }
     return res.status(500).json({ error: true, message: 'Server error approving college application.' });
   }
@@ -375,10 +393,10 @@ const rejectApplication = async (req, res) => {
           status: 'rejected',
           rejectionReason: reason,
           reviewedBy: reviewerId,
-          reviewedAt: new Date(),
-        },
+          reviewedAt: new Date()
+        }
       },
-      { new: true },
+      { new: true }
     ).select('-adminPasswordHash');
 
     if (!updated) {
@@ -394,15 +412,15 @@ const rejectApplication = async (req, res) => {
       changes: {
         oldValue: { status: 'pending' },
         newValue: { status: 'rejected', reason },
-        fields: ['status', 'rejectionReason'],
+        fields: ['status', 'rejectionReason']
       },
-      request: req,
+      request: req
     });
 
     return res.json({
       error: false,
       message: 'College application rejected.',
-      application: cleanApplication(updated),
+      application: cleanApplication(updated)
     });
   } catch (err) {
     console.error('rejectApplication error:', err);
@@ -415,5 +433,5 @@ module.exports = {
   getPublicApplicationStatus,
   getApplications,
   approveApplication,
-  rejectApplication,
+  rejectApplication
 };

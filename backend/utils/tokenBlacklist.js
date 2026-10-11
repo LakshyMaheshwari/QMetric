@@ -2,10 +2,7 @@
 
 const crypto = require('node:crypto');
 const logger = require('../config/logger');
-const {
-  isRedisEnabled,
-  sendCommand,
-} = require('./redisClient');
+const { isRedisEnabled, sendCommand } = require('./redisClient');
 
 const revoked = new Map(); // hashed token -> expiresAt (ms epoch)
 const REDIS_PREFIX = 'qmetric:jwt-revoked:';
@@ -16,9 +13,7 @@ function keyFor(token) {
 }
 
 function localRevoke(token, expSeconds) {
-  const expiresAt = expSeconds
-    ? Number(expSeconds) * 1000
-    : Date.now() + FALLBACK_TTL_MS;
+  const expiresAt = expSeconds ? Number(expSeconds) * 1000 : Date.now() + FALLBACK_TTL_MS;
   revoked.set(keyFor(token), expiresAt);
 }
 
@@ -31,7 +26,7 @@ async function revoke(token, expSeconds) {
 
   const ttlSeconds = Math.max(
     1,
-    Math.ceil(((Number(expSeconds) * 1000) - Date.now()) / 1000) || Math.floor(FALLBACK_TTL_MS / 1000)
+    Math.ceil((Number(expSeconds) * 1000 - Date.now()) / 1000) || Math.floor(FALLBACK_TTL_MS / 1000)
   );
 
   try {
@@ -64,11 +59,14 @@ async function isRevoked(token) {
   return true;
 }
 
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, expiresAt] of revoked.entries()) {
-    if (now >= expiresAt) revoked.delete(key);
-  }
-}, 10 * 60 * 1000).unref();
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [key, expiresAt] of revoked.entries()) {
+      if (now >= expiresAt) revoked.delete(key);
+    }
+  },
+  10 * 60 * 1000
+).unref();
 
 module.exports = { revoke, isRevoked };

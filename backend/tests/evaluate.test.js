@@ -10,19 +10,19 @@ describe('Core Evaluation Engine (core/evaluate/evaluate.js)', () => {
     apply: 3,
     analyze: 4,
     evaluate: 5,
-    create: 6,
+    create: 6
   };
 
   const coDetails = {
     CO1: { weight: 20, blooms: ['remember', 'understand'] },
     CO2: { weight: 30, blooms: ['apply'] },
-    CO3: { weight: 50, blooms: ['analyze', 'evaluate'] },
+    CO3: { weight: 50, blooms: ['analyze', 'evaluate'] }
   };
 
   const moduleHours = {
     M1: 10,
     M2: 15,
-    M3: 25,
+    M3: 25
   };
 
   const sampleQuestions = [
@@ -32,7 +32,7 @@ describe('Core Evaluation Engine (core/evaluate/evaluate.js)', () => {
       [paperFields.COURSE_OUTCOME]: '1',
       [paperFields.BLOOMS_TAXONOMY_LEVEL]: '1',
       Marks: '10',
-      Module: '1',
+      Module: '1'
     },
     {
       [paperFields.QUESTION_NO]: '2',
@@ -40,7 +40,7 @@ describe('Core Evaluation Engine (core/evaluate/evaluate.js)', () => {
       [paperFields.COURSE_OUTCOME]: '2',
       [paperFields.BLOOMS_TAXONOMY_LEVEL]: '3',
       Marks: '15',
-      Module: '2',
+      Module: '2'
     },
     {
       [paperFields.QUESTION_NO]: '3',
@@ -48,8 +48,8 @@ describe('Core Evaluation Engine (core/evaluate/evaluate.js)', () => {
       [paperFields.COURSE_OUTCOME]: '3',
       [paperFields.BLOOMS_TAXONOMY_LEVEL]: '4',
       Marks: '25',
-      Module: '3',
-    },
+      Module: '3'
+    }
   ];
 
   it('evaluates questions and produces valid FinalScore, recommendations, and domain insights', async () => {

@@ -7,7 +7,7 @@ async function dropPhoneIndex() {
     console.log('Connected to MongoDB');
     const collection = mongoose.connection.db.collection('users');
     const indexes = await collection.indexes();
-    const phoneIdx = indexes.find(idx => idx.key && idx.key.phone === 1);
+    const phoneIdx = indexes.find((idx) => idx.key && idx.key.phone === 1);
     if (phoneIdx) {
       await collection.dropIndex(phoneIdx.name);
       console.log('Dropped index:', phoneIdx.name);

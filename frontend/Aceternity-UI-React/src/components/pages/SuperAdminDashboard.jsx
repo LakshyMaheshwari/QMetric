@@ -5,9 +5,10 @@ import apiClient from '../../api/client';
 import {
   Building2, Plus, Search, Filter, RefreshCw, FileText,
   Users, CheckCircle, XCircle, Shield, AlertCircle, X,
-  BarChart3, TrendingUp, BookOpen, UserCheck,
+  BarChart3, TrendingUp, UserCheck, Activity,
 } from 'lucide-react';
 import { DashboardSkeleton } from '../SkeletonLoader';
+import ContributionSkyline from '../ui/contribution-skyline';
 
 // ─── Stat Card ───────────────────────────────────────────────────────────────
 function StatCard({ icon: Icon, label, value, sub, color = 'blue' }) {
@@ -131,6 +132,11 @@ export default function SuperAdminDashboard() {
   const [search, setSearch]   = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [activityScope, setActivityScope] = useState('all_colleges');
+  const [selectedCollegeId, setSelectedCollegeId] = useState('');
+  const [activityData, setActivityData] = useState([]);
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [activityError, setActivityError] = useState(null);
 
   // Guard: only super_admin
   useEffect(() => {
@@ -160,6 +166,43 @@ export default function SuperAdminDashboard() {
   }, [search, statusFilter]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const fetchActivity = useCallback(async (scope, collegeId) => {
+    if (scope === 'specific_college' && !collegeId) {
+      setActivityData([]);
+      setActivityLoading(false);
+      return;
+    }
+    try {
+      setActivityLoading(true);
+      setActivityError(null);
+      const params = { scope };
+      if (scope === 'specific_college' && collegeId) {
+        params.collegeId = collegeId;
+      }
+      const res = await apiClient.get('/super-admin/stats/activity', { params });
+      if (res.data && !res.data.error) {
+        setActivityData(res.data.data || []);
+      } else {
+        setActivityError(res.data?.message || 'Failed to load activity heatmap.');
+      }
+    } catch (err) {
+      console.error('Error fetching platform activity:', err);
+      setActivityError(err.response?.data?.message || 'Failed to load platform activity.');
+    } finally {
+      setActivityLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchActivity(activityScope, selectedCollegeId);
+  }, [activityScope, selectedCollegeId, fetchActivity]);
+
+  useEffect(() => {
+    if (colleges.length > 0 && !selectedCollegeId) {
+      setSelectedCollegeId(colleges[0]._id);
+    }
+  }, [colleges, selectedCollegeId]);
 
   const handleToggleStatus = async (college) => {
     try {
@@ -238,6 +281,113 @@ export default function SuperAdminDashboard() {
             <StatCard icon={TrendingUp} label="New (7 days)"   value={stats.recentPapers}    sub={`${stats.recentUsers} new users`}        color="rose"   />
           </div>
         )}
+
+        {/* Platform Activity Skyline */}
+        <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-5 shadow-xl space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-purple-500/20 text-purple-400">
+                  <Activity className="w-4 h-4" />
+                </span>
+                <h2 className="text-lg font-semibold text-white">Platform Paper Upload Activity</h2>
+              </div>
+              <p className="text-xs text-zinc-400 mt-1">
+                12-month paper upload activity skyline across colleges and independent faculty.
+              </p>
+            </div>
+
+            {/* Scope Selector Controls */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex rounded-xl bg-zinc-800/80 p-1 border border-zinc-700/60 text-xs">
+                {[
+                  { id: 'all_colleges', label: 'All Colleges' },
+                  { id: 'specific_college', label: 'Specific College' },
+                  { id: 'unaffiliated_teachers', label: 'Unaffiliated Teachers' },
+                  { id: 'entire_platform', label: 'Entire Platform' },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => {
+                      setActivityScope(s.id);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                      activityScope === s.id
+                        ? 'bg-purple-600 text-white shadow-md'
+                        : 'text-zinc-400 hover:text-white hover:bg-zinc-700/50'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+
+              {activityScope === 'specific_college' && (
+                <div className="flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-zinc-400" />
+                  <select
+                    value={selectedCollegeId}
+                    onChange={(e) => setSelectedCollegeId(e.target.value)}
+                    className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all max-w-[200px] truncate"
+                  >
+                    {colleges.length === 0 && <option value="">No colleges found</option>}
+                    {colleges.map((c) => (
+                      <option key={c._id} value={c._id}>
+                        {c.name} ({c.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {activityLoading && (
+                <span className="text-xs text-zinc-400 flex items-center gap-1.5 ml-2">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-purple-400" />
+                </span>
+              )}
+            </div>
+          </div>
+
+          {activityError ? (
+            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{activityError}</span>
+              </div>
+              <button
+                onClick={() => fetchActivity(activityScope, selectedCollegeId)}
+                className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs rounded-lg transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          ) : activityLoading && activityData.length === 0 ? (
+            <div className="h-64 rounded-xl bg-zinc-800/40 animate-pulse flex items-center justify-center text-zinc-500 text-sm">
+              Loading platform activity skyline…
+            </div>
+          ) : (
+            <div className="w-full overflow-hidden rounded-xl bg-zinc-950 p-2 sm:p-4 border border-zinc-800">
+              <ContributionSkyline
+                data={activityData}
+                unit="paper upload"
+                unitPlural="paper uploads"
+                title={`Platform Activity — ${
+                  activityScope === 'all_colleges'
+                    ? 'All Colleges'
+                    : activityScope === 'specific_college'
+                    ? (colleges.find((c) => c._id === selectedCollegeId)?.name || 'Specific College')
+                    : activityScope === 'unaffiliated_teachers'
+                    ? 'Unaffiliated Teachers'
+                    : 'Entire Platform'
+                }`}
+                palette="github"
+                className="border-0 bg-transparent text-white"
+              />
+            </div>
+          )}
+        </div>
+
         {/* Colleges Section */}
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800">

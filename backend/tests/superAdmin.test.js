@@ -1,12 +1,7 @@
 const request = require('supertest');
 const app = require('../index');
 const College = require('../Model/College');
-const {
-  createSuperAdmin,
-  createTestCollege,
-  createTestUser,
-  getCookieString,
-} = require('./helpers');
+const { createSuperAdmin, createTestCollege, createTestUser, getCookieString } = require('./helpers');
 
 describe('Super Admin Endpoints', () => {
   let superAdmin, cookie;
@@ -21,9 +16,7 @@ describe('Super Admin Endpoints', () => {
       await createTestCollege();
       await createTestCollege();
 
-      const res = await request(app)
-        .get('/super-admin/stats')
-        .set('Cookie', cookie);
+      const res = await request(app).get('/super-admin/stats').set('Cookie', cookie);
 
       expect(res.status).toBe(200);
       expect(res.body.error).toBe(false);
@@ -35,9 +28,7 @@ describe('Super Admin Endpoints', () => {
       const teacher = await createTestUser({ role: 'teacher', collegeId: college._id });
       const teacherCookie = getCookieString(teacher);
 
-      const res = await request(app)
-        .get('/super-admin/stats')
-        .set('Cookie', teacherCookie);
+      const res = await request(app).get('/super-admin/stats').set('Cookie', teacherCookie);
 
       expect(res.status).toBe(403);
     });
@@ -45,13 +36,10 @@ describe('Super Admin Endpoints', () => {
 
   describe('POST /super-admin/colleges', () => {
     it('should create a college', async () => {
-      const res = await request(app)
-        .post('/super-admin/colleges')
-        .set('Cookie', cookie)
-        .send({
-          name: 'New College',
-          code: 'NC2025',
-        });
+      const res = await request(app).post('/super-admin/colleges').set('Cookie', cookie).send({
+        name: 'New College',
+        code: 'NC2025'
+      });
 
       expect(res.status).toBe(201);
       expect(res.body.college).toBeDefined();
@@ -65,7 +53,7 @@ describe('Super Admin Endpoints', () => {
       await College.create({
         name: 'First College',
         code: 'DUP001',
-        isActive: true,
+        isActive: true
       });
 
       const res = await request(app)
@@ -80,7 +68,7 @@ describe('Super Admin Endpoints', () => {
       await College.create({
         name: 'CaseTest College',
         code: 'CT001',
-        isActive: true,
+        isActive: true
       });
 
       const res = await request(app)
@@ -104,9 +92,7 @@ describe('Super Admin Endpoints', () => {
 
   describe('GET /super-admin/audit-logs', () => {
     it('should return paginated audit logs', async () => {
-      const res = await request(app)
-        .get('/super-admin/audit-logs?limit=10')
-        .set('Cookie', cookie);
+      const res = await request(app).get('/super-admin/audit-logs?limit=10').set('Cookie', cookie);
 
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body.logs)).toBe(true);

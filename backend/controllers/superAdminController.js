@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const College = require('../Model/College');
 const User = require('../Model/user');
 const Paper = require('../Model/PaperInfo');
@@ -28,10 +29,7 @@ const createCollege = async (req, res) => {
     const trimmedCode = code.trim().toUpperCase();
 
     const existing = await College.findOne({
-      $or: [
-        { code: trimmedCode },
-        { name: { $regex: `^${escapeRegex(trimmedName)}$`, $options: 'i' } },
-      ],
+      $or: [{ code: trimmedCode }, { name: { $regex: `^${escapeRegex(trimmedName)}$`, $options: 'i' } }]
     });
     if (existing) {
       const conflict = existing.code === trimmedCode ? 'College code' : 'College name';
@@ -47,7 +45,7 @@ const createCollege = async (req, res) => {
       adminIds: Array.isArray(adminIds) ? adminIds : [],
       isActive: typeof isActive === 'boolean' ? isActive : true,
       totalPapers: 0,
-      totalTeachers: 0,
+      totalTeachers: 0
     });
 
     await newCollege.save();
@@ -57,13 +55,13 @@ const createCollege = async (req, res) => {
       action: 'CREATE_COLLEGE',
       resource: `College:${newCollege._id}`,
       changes: { newValue: { name: newCollege.name, code: newCollege.code } },
-      request: req,
+      request: req
     });
 
     return res.status(201).json({
       error: false,
       message: 'College created successfully.',
-      college: newCollege,
+      college: newCollege
     });
   } catch (err) {
     console.error('Error creating college:', err);
@@ -89,7 +87,7 @@ const getGlobalStats = async (req, res) => {
       totalSuperAdmins,
       totalPapers,
       recentPapers,
-      recentUsers,
+      recentUsers
     ] = await Promise.all([
       College.countDocuments(),
       College.countDocuments({ isActive: true }),
@@ -99,7 +97,7 @@ const getGlobalStats = async (req, res) => {
       User.countDocuments({ role: 'super_admin' }),
       Paper.countDocuments(),
       Paper.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
-      User.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
+      User.countDocuments({ createdAt: { $gte: sevenDaysAgo } })
     ]);
 
     return res.json({
@@ -115,8 +113,8 @@ const getGlobalStats = async (req, res) => {
         totalUsers: totalTeachers + totalReviewers + totalAdmins + totalSuperAdmins,
         totalPapers,
         recentPapers,
-        recentUsers,
-      },
+        recentUsers
+      }
     });
   } catch (err) {
     console.error('Error fetching global stats:', err);
@@ -138,11 +136,7 @@ const getAllColleges = async (req, res) => {
     if (search.trim()) {
       const safe = escapeRegex(search.trim().slice(0, 100));
       const regex = new RegExp(safe, 'i');
-      query.$or = [
-        { name: regex },
-        { code: regex },
-        { city: regex },
-      ];
+      query.$or = [{ name: regex }, { code: regex }, { city: regex }];
     }
 
     if (status === 'active') query.isActive = true;
@@ -155,7 +149,7 @@ const getAllColleges = async (req, res) => {
         .skip(skip)
         .limit(limit)
         .lean(),
-      College.countDocuments(query),
+      College.countDocuments(query)
     ]);
 
     const collegeIds = colleges.map((c) => c._id);
@@ -164,12 +158,12 @@ const getAllColleges = async (req, res) => {
     const [userCounts, paperCounts] = await Promise.all([
       User.aggregate([
         { $match: { collegeId: { $in: collegeIds }, role: { $in: ['teacher', 'reviewer', 'admin'] } } },
-        { $group: { _id: '$collegeId', count: { $sum: 1 } } },
+        { $group: { _id: '$collegeId', count: { $sum: 1 } } }
       ]),
       Paper.aggregate([
         { $match: { collegeId: { $in: collegeIds } } },
-        { $group: { _id: '$collegeId', count: { $sum: 1 } } },
-      ]),
+        { $group: { _id: '$collegeId', count: { $sum: 1 } } }
+      ])
     ]);
 
     const userCountMap = new Map(userCounts.map((u) => [String(u._id), u.count]));
@@ -181,7 +175,7 @@ const getAllColleges = async (req, res) => {
       return {
         ...college,
         liveTeacherCount: userCountMap.get(colIdStr) || 0,
-        livePaperCount: paperCountMap.get(colIdStr) ?? 0,
+        livePaperCount: paperCountMap.get(colIdStr) ?? 0
       };
     });
 
@@ -190,7 +184,7 @@ const getAllColleges = async (req, res) => {
       College.countDocuments(),
       College.countDocuments({ isActive: true }),
       User.countDocuments({ role: 'teacher' }),
-      Paper.countDocuments(),
+      Paper.countDocuments()
     ]);
 
     return res.json({
@@ -202,8 +196,8 @@ const getAllColleges = async (req, res) => {
         activeColleges,
         inactiveColleges: totalColleges - activeColleges,
         totalTeachers,
-        totalPapers: papersAgg,
-      },
+        totalPapers: papersAgg
+      }
     });
   } catch (err) {
     console.error('Error fetching colleges for super admin:', err);
@@ -235,7 +229,7 @@ const getCollegeDetails = async (req, res) => {
       User.countDocuments({ collegeId: id, role: 'teacher' }),
       User.countDocuments({ collegeId: id, role: 'reviewer' }),
       User.countDocuments({ collegeId: id, role: 'admin' }),
-      User.countDocuments({ collegeId: id, isBlocked: true }),
+      User.countDocuments({ collegeId: id, isBlocked: true })
     ]);
 
     const stats = {
@@ -243,7 +237,7 @@ const getCollegeDetails = async (req, res) => {
       teachers,
       reviewers,
       admins,
-      blocked,
+      blocked
     };
 
     const sevenDaysAgo = new Date();
@@ -253,10 +247,7 @@ const getCollegeDetails = async (req, res) => {
     const safeName = college.name ? escapeRegex(String(college.name).slice(0, 100)) : null;
 
     const paperQuery = {
-      $or: [
-        { collegeId: id },
-        ...(safeName ? [{ 'College Name': new RegExp(safeName, 'i') }] : []),
-      ],
+      $or: [{ collegeId: id }, ...(safeName ? [{ 'College Name': new RegExp(safeName, 'i') }] : [])]
     };
 
     const [totalPapers, recentPapers, users, papers] = await Promise.all([
@@ -273,7 +264,7 @@ const getCollegeDetails = async (req, res) => {
         .sort({ createdAt: -1 })
         .skip((paperPage - 1) * paperLimit)
         .limit(paperLimit)
-        .lean(),
+        .lean()
     ]);
 
     stats.totalPapers = totalPapers;
@@ -286,7 +277,7 @@ const getCollegeDetails = async (req, res) => {
       users,
       papers,
       usersPagination: getPaginationMeta(totalUsers, userPage, userLimit),
-      papersPagination: getPaginationMeta(totalPapers, paperPage, paperLimit),
+      papersPagination: getPaginationMeta(totalPapers, paperPage, paperLimit)
     });
   } catch (err) {
     console.error('Error fetching college details:', err);
@@ -314,7 +305,7 @@ const updateCollege = async (req, res) => {
     if (name && name.trim()) {
       const conflict = await College.findOne({
         _id: { $ne: id },
-        name: { $regex: `^${escapeRegex(name.trim())}$`, $options: 'i' },
+        name: { $regex: `^${escapeRegex(name.trim())}$`, $options: 'i' }
       });
       if (conflict) return res.status(409).json({ error: true, message: 'College name already taken.' });
       college.name = name.trim();
@@ -334,10 +325,7 @@ const updateCollege = async (req, res) => {
     await college.save();
 
     if (oldName !== college.name) {
-      await User.updateMany(
-        { collegeId: college._id },
-        { $set: { collegeName: college.name } }
-      );
+      await User.updateMany({ collegeId: college._id }, { $set: { collegeName: college.name } });
     }
 
     await logAudit({
@@ -347,9 +335,9 @@ const updateCollege = async (req, res) => {
       changes: {
         oldValue: { name: oldName, code: oldCode },
         newValue: { name: college.name, code: college.code },
-        fields: ['name', 'code'],
+        fields: ['name', 'code']
       },
-      request: req,
+      request: req
     });
 
     return res.json({ error: false, message: 'College updated successfully.', college });
@@ -376,7 +364,7 @@ const deleteCollege = async (req, res) => {
     if (userCount > 0) {
       return res.status(400).json({
         error: true,
-        message: `Cannot delete: ${userCount} user(s) are assigned to this college. Deactivate it instead.`,
+        message: `Cannot delete: ${userCount} user(s) are assigned to this college. Deactivate it instead.`
       });
     }
 
@@ -384,13 +372,13 @@ const deleteCollege = async (req, res) => {
     if (isPermanent) {
       const [paperCount, learnedVerbCount] = await Promise.all([
         Paper.countDocuments({ collegeId: id }),
-        require('../Model/LearnedVerb').countDocuments({ collegeId: id }),
+        require('../Model/LearnedVerb').countDocuments({ collegeId: id })
       ]);
 
       if (paperCount > 0 || learnedVerbCount > 0) {
         return res.status(400).json({
           error: true,
-          message: `Cannot permanently delete this college: ${paperCount} paper(s) and ${learnedVerbCount} learned verb(s) still reference it. Deactivate it instead.`,
+          message: `Cannot permanently delete this college: ${paperCount} paper(s) and ${learnedVerbCount} learned verb(s) still reference it. Deactivate it instead.`
         });
       }
 
@@ -405,12 +393,12 @@ const deleteCollege = async (req, res) => {
       action: 'DELETE_COLLEGE',
       resource: `College:${id}`,
       changes: { oldValue: { name: college.name, code: college.code, permanent: isPermanent } },
-      request: req,
+      request: req
     });
 
     return res.json({
       error: false,
-      message: isPermanent ? 'College permanently deleted.' : 'College deactivated successfully.',
+      message: isPermanent ? 'College permanently deleted.' : 'College deactivated successfully.'
     });
   } catch (err) {
     console.error('Error deleting college:', err);
@@ -465,7 +453,7 @@ const getAuditLogs = async (req, res) => {
         .skip(skip)
         .limit(limit)
         .lean(),
-      AuditLog.countDocuments(query),
+      AuditLog.countDocuments(query)
     ]);
 
     res.json({
@@ -477,8 +465,8 @@ const getAuditLogs = async (req, res) => {
         limit,
         pages: Math.ceil(total / limit),
         hasNextPage: page < Math.ceil(total / limit),
-        hasPrevPage: page > 1,
-      },
+        hasPrevPage: page > 1
+      }
     });
   } catch (error) {
     console.error('getAuditLogs error:', error);
@@ -504,7 +492,7 @@ const testEmailConfig = async (req, res) => {
       to: targetEmail,
       subject: '[QMetric] SMTP configuration test',
       text: `This is a test email from QMetric. If you received it, your SMTP configuration is working.\n\nSent at: ${new Date().toISOString()}`,
-      html: `<p>This is a test email from <strong>QMetric</strong>.</p><p>If you received it, your SMTP configuration is working.</p><p style="color:#666;font-size:12px;">Sent at: ${new Date().toISOString()}</p>`,
+      html: `<p>This is a test email from <strong>QMetric</strong>.</p><p>If you received it, your SMTP configuration is working.</p><p style="color:#666;font-size:12px;">Sent at: ${new Date().toISOString()}</p>`
     });
 
     return res.json({
@@ -512,14 +500,14 @@ const testEmailConfig = async (req, res) => {
       message: 'Test email sent.',
       target: targetEmail,
       smtpConfigured: configured,
-      timestamp: new Date(),
+      timestamp: new Date()
     });
   } catch (err) {
     console.error('testEmailConfig error:', err);
     res.status(500).json({
       error: true,
       message: 'Failed to send test email.',
-      smtpConfigured: Boolean(process.env.SMTP_HOST),
+      smtpConfigured: Boolean(process.env.SMTP_HOST)
     });
   }
 };
@@ -544,25 +532,19 @@ const getAllUsers = async (req, res) => {
       query.$or = [
         { userName: new RegExp(safe, 'i') },
         { email: new RegExp(safe, 'i') },
-        { fullName: new RegExp(safe, 'i') },
+        { fullName: new RegExp(safe, 'i') }
       ];
     }
 
     const [users, total] = await Promise.all([
-      User.find(query)
-        .select('-password')
-        .populate('collegeId', 'name code')
-        .sort(sort)
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      User.countDocuments(query),
+      User.find(query).select('-password').populate('collegeId', 'name code').sort(sort).skip(skip).limit(limit).lean(),
+      User.countDocuments(query)
     ]);
 
     return res.json({
       error: false,
       users,
-      pagination: getPaginationMeta(total, page, limit),
+      pagination: getPaginationMeta(total, page, limit)
     });
   } catch (err) {
     console.error('Error fetching users for super admin:', err);
@@ -601,7 +583,7 @@ const updateUserRole = async (req, res) => {
     if (!role || !allowedRoles.includes(role)) {
       return res.status(400).json({
         error: true,
-        message: `Invalid role. Allowed roles: ${allowedRoles.join(', ')}`,
+        message: `Invalid role. Allowed roles: ${allowedRoles.join(', ')}`
       });
     }
 
@@ -619,7 +601,7 @@ const updateUserRole = async (req, res) => {
         userId: user._id,
         oldRole,
         newRole: role,
-        session,
+        session
       });
       await user.save(session ? { session } : {});
 
@@ -637,7 +619,7 @@ const updateUserRole = async (req, res) => {
       action: 'UPDATE_ROLE',
       resource: `User:${id}`,
       changes: { oldValue: { role: oldRole }, newValue: { role } },
-      request: req,
+      request: req
     });
 
     const updated = user.toObject();
@@ -646,7 +628,7 @@ const updateUserRole = async (req, res) => {
     return res.json({
       error: false,
       message: `User role updated to ${role}.`,
-      user: updated,
+      user: updated
     });
   } catch (err) {
     console.error('Error updating user role:', err);
@@ -685,13 +667,13 @@ const toggleUserBlock = async (req, res) => {
       userId: getUserId(req),
       action: user.isBlocked ? 'BLOCK_USER' : 'UNBLOCK_USER',
       resource: `User:${id}`,
-      request: req,
+      request: req
     });
 
     return res.json({
       error: false,
       message: `User has been ${user.isBlocked ? 'blocked' : 'unblocked'}.`,
-      user,
+      user
     });
   } catch (err) {
     console.error('Error toggling user block:', err);
@@ -717,20 +699,30 @@ const deleteUser = async (req, res) => {
     }
 
     // Do not hard-delete users that are referenced by business/history records.
-    const [paperRefs, reviewHistoryRefs, ocrLogs, corrections, taughtVerbs, adminMemberships, notifications] = await Promise.all([
-      Paper.countDocuments({ $or: [{ userId: id }, { reviewedBy: id }] }),
-      Paper.countDocuments({ 'reviewHistory.reviewerId': id }),
-      OCRLog.countDocuments({ userId: id }),
-      VerifiedQuestion.countDocuments({ correctedBy: id }),
-      LearnedVerb.countDocuments({ taughtBy: id }),
-      College.countDocuments({ adminIds: id }),
-      Notification.countDocuments({ userId: id }),
-    ]);
+    const [paperRefs, reviewHistoryRefs, ocrLogs, corrections, taughtVerbs, adminMemberships, notifications] =
+      await Promise.all([
+        Paper.countDocuments({ $or: [{ userId: id }, { reviewedBy: id }] }),
+        Paper.countDocuments({ 'reviewHistory.reviewerId': id }),
+        OCRLog.countDocuments({ userId: id }),
+        VerifiedQuestion.countDocuments({ correctedBy: id }),
+        LearnedVerb.countDocuments({ taughtBy: id }),
+        College.countDocuments({ adminIds: id }),
+        Notification.countDocuments({ userId: id })
+      ]);
 
-    if (paperRefs > 0 || reviewHistoryRefs > 0 || ocrLogs > 0 || corrections > 0 || taughtVerbs > 0 || adminMemberships > 0 || notifications > 0) {
+    if (
+      paperRefs > 0 ||
+      reviewHistoryRefs > 0 ||
+      ocrLogs > 0 ||
+      corrections > 0 ||
+      taughtVerbs > 0 ||
+      adminMemberships > 0 ||
+      notifications > 0
+    ) {
       return res.status(409).json({
         error: true,
-        message: 'User cannot be permanently deleted because records still reference this account. Block the account instead.',
+        message:
+          'User cannot be permanently deleted because records still reference this account. Block the account instead.'
       });
     }
 
@@ -750,13 +742,166 @@ const deleteUser = async (req, res) => {
       action: 'DELETE_USER',
       resource: `User:${id}`,
       changes: { oldValue: { userName: user.userName, email: user.email, role: user.role } },
-      request: req,
+      request: req
     });
 
     return res.json({ error: false, message: 'User deleted successfully.' });
   } catch (err) {
     console.error('Error deleting user:', err);
     return res.status(500).json({ error: true, message: 'Server error deleting user.' });
+  }
+};
+
+/**
+ * GET /super-admin/stats/activity
+ * 12-month daily paper upload activity with platform scope selector:
+ * Scopes:
+ * - 'all_colleges': Affiliated activity only (excludes unaffiliated teachers)
+ * - 'specific_college': Activity for a specific college (requires valid collegeId)
+ * - 'unaffiliated_teachers': Activity from genuine independent teachers (excludes pending affiliations & students)
+ * - 'entire_platform': Affiliated + genuine unaffiliated activity without double-counting (excludes students)
+ */
+const getPlatformActivity = async (req, res) => {
+  try {
+    const { scope = 'all_colleges', collegeId } = req.query;
+    const validScopes = ['all_colleges', 'specific_college', 'unaffiliated_teachers', 'entire_platform'];
+
+    if (!validScopes.includes(scope)) {
+      return res.status(400).json({
+        error: true,
+        message: `Invalid scope '${scope}'. Must be one of: ${validScopes.join(', ')}`
+      });
+    }
+
+    const startDate = new Date();
+    startDate.setUTCHours(0, 0, 0, 0);
+    startDate.setUTCDate(startDate.getUTCDate() - 365);
+
+    let paperMatchQuery = {
+      createdAt: { $gte: startDate }
+    };
+
+    let collegeInfo = null;
+
+    if (scope === 'specific_college') {
+      if (!collegeId) {
+        return res.status(400).json({
+          error: true,
+          message: 'collegeId is required for specific_college scope.'
+        });
+      }
+      if (!mongoose.Types.ObjectId.isValid(collegeId)) {
+        return res.status(400).json({
+          error: true,
+          message: 'Invalid collegeId format.'
+        });
+      }
+
+      const college = await College.findById(collegeId);
+      if (!college) {
+        return res.status(404).json({
+          error: true,
+          message: 'College not found.'
+        });
+      }
+      collegeInfo = { id: college._id, name: college.name, code: college.code };
+
+      const collegeUsers = await User.find({ collegeId }).select('_id');
+      const userIds = collegeUsers.map((u) => u._id);
+
+      paperMatchQuery.$or = [
+        { collegeId: new mongoose.Types.ObjectId(collegeId) },
+        ...(userIds.length > 0 ? [{ userId: { $in: userIds } }] : [])
+      ];
+    } else if (scope === 'unaffiliated_teachers') {
+      // Genuinely unaffiliated teachers: role === 'teacher', no collegeId, no pending affiliation request
+      const unaffiliatedTeachers = await User.find({
+        role: 'teacher',
+        collegeId: null,
+        $or: [
+          { 'pendingAffiliationRequest.collegeId': null },
+          { 'pendingAffiliationRequest.collegeId': { $exists: false } },
+          { pendingAffiliationRequest: null }
+        ]
+      }).select('_id');
+
+      const unaffiliatedIds = unaffiliatedTeachers.map((u) => u._id);
+
+      paperMatchQuery.userId = { $in: unaffiliatedIds };
+      paperMatchQuery.collegeId = null;
+    } else if (scope === 'all_colleges') {
+      // Exclude genuine unaffiliated teachers and students
+      const unaffiliatedTeachers = await User.find({
+        role: 'teacher',
+        collegeId: null,
+        $or: [
+          { 'pendingAffiliationRequest.collegeId': null },
+          { 'pendingAffiliationRequest.collegeId': { $exists: false } },
+          { pendingAffiliationRequest: null }
+        ]
+      }).select('_id');
+      const unaffiliatedIds = unaffiliatedTeachers.map((u) => u._id);
+
+      const students = await User.find({ role: 'student' }).select('_id');
+      const studentIds = students.map((u) => u._id);
+
+      const excludedUserIds = [...unaffiliatedIds, ...studentIds];
+
+      paperMatchQuery.$and = [
+        {
+          $or: [
+            { collegeId: { $ne: null } },
+            {
+              userId: { $nin: excludedUserIds }
+            }
+          ]
+        },
+        { userId: { $nin: unaffiliatedIds } }
+      ];
+    } else if (scope === 'entire_platform') {
+      // Entire platform: include all valid teacher & college activity, excluding students
+      const students = await User.find({ role: 'student' }).select('_id');
+      const studentIds = students.map((u) => u._id);
+      if (studentIds.length > 0) {
+        paperMatchQuery.userId = { $nin: studentIds };
+      }
+    }
+
+    const activity = await Paper.aggregate([
+      { $match: paperMatchQuery },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: 'UTC' }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } },
+      {
+        $project: {
+          _id: 0,
+          date: '$_id',
+          count: 1
+        }
+      }
+    ]);
+
+    return res.json({
+      error: false,
+      data: activity,
+      meta: {
+        scope,
+        college: collegeInfo,
+        totalUploads: activity.reduce((sum, item) => sum + item.count, 0)
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching platform activity stats:', err);
+    return res.status(500).json({
+      error: true,
+      message: 'Server error fetching platform activity.'
+    });
   }
 };
 
@@ -774,4 +919,5 @@ module.exports = {
   updateUserRole,
   toggleUserBlock,
   deleteUser,
+  getPlatformActivity
 };

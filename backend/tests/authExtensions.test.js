@@ -18,16 +18,14 @@ describe('Auth Extensions — Forgot/Reset Password, Refresh Token, Revoke Sessi
       email: 'teacher.recovery@test.com',
       password: 'OldPassword123!',
       collegeId: college._id,
-      phone: '9876543201',
+      phone: '9876543201'
     });
     cookie = getCookieString(user);
   });
 
   describe('POST /auth/forgot-password', () => {
     it('generates a password reset token and returns success without leaking presence', async () => {
-      const res = await request(app)
-        .post('/auth/forgot-password')
-        .send({ email: 'teacher.recovery@test.com' });
+      const res = await request(app).post('/auth/forgot-password').send({ email: 'teacher.recovery@test.com' });
 
       expect(res.status).toBe(200);
       expect(res.body.error).toBe(false);
@@ -42,9 +40,7 @@ describe('Auth Extensions — Forgot/Reset Password, Refresh Token, Revoke Sessi
     });
 
     it('returns generic 200 message when email does not exist (prevents account enumeration)', async () => {
-      const res = await request(app)
-        .post('/auth/forgot-password')
-        .send({ email: 'nonexistent.ghost@test.com' });
+      const res = await request(app).post('/auth/forgot-password').send({ email: 'nonexistent.ghost@test.com' });
 
       expect(res.status).toBe(200);
       expect(res.body.error).toBe(false);
@@ -52,9 +48,7 @@ describe('Auth Extensions — Forgot/Reset Password, Refresh Token, Revoke Sessi
     });
 
     it('rejects invalid email format with 400', async () => {
-      const res = await request(app)
-        .post('/auth/forgot-password')
-        .send({ email: 'invalid-email-address' });
+      const res = await request(app).post('/auth/forgot-password').send({ email: 'invalid-email-address' });
 
       expect(res.status).toBe(400);
       expect(res.body.error).toBe(true);
@@ -71,9 +65,7 @@ describe('Auth Extensions — Forgot/Reset Password, Refresh Token, Revoke Sessi
       await user.save();
 
       const newPassword = 'NewSecretPassword456!';
-      const res = await request(app)
-        .post(`/auth/reset-password/${rawToken}`)
-        .send({ password: newPassword });
+      const res = await request(app).post(`/auth/reset-password/${rawToken}`).send({ password: newPassword });
 
       expect(res.status).toBe(200);
       expect(res.body.error).toBe(false);
@@ -109,9 +101,7 @@ describe('Auth Extensions — Forgot/Reset Password, Refresh Token, Revoke Sessi
       user.passwordResetExpires = new Date(Date.now() + 30 * 60 * 1000);
       await user.save();
 
-      const res = await request(app)
-        .post(`/auth/reset-password/${rawToken}`)
-        .send({ password: '123' });
+      const res = await request(app).post(`/auth/reset-password/${rawToken}`).send({ password: '123' });
 
       expect(res.status).toBe(400);
       expect(res.body.error).toBe(true);
@@ -127,9 +117,7 @@ describe('Auth Extensions — Forgot/Reset Password, Refresh Token, Revoke Sessi
       user.refreshTokenExpiresAt = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
       await user.save();
 
-      const res = await request(app)
-        .post('/auth/refresh')
-        .send({ refreshToken: rawRefresh });
+      const res = await request(app).post('/auth/refresh').send({ refreshToken: rawRefresh });
 
       expect(res.status).toBe(200);
       expect(res.body.error).toBe(false);
@@ -143,9 +131,7 @@ describe('Auth Extensions — Forgot/Reset Password, Refresh Token, Revoke Sessi
     });
 
     it('rejects invalid or expired refresh token with 401', async () => {
-      const res = await request(app)
-        .post('/auth/refresh')
-        .send({ refreshToken: 'unrecognized-invalid-token' });
+      const res = await request(app).post('/auth/refresh').send({ refreshToken: 'unrecognized-invalid-token' });
 
       expect(res.status).toBe(401);
       expect(res.body.error).toBe(true);
@@ -160,9 +146,7 @@ describe('Auth Extensions — Forgot/Reset Password, Refresh Token, Revoke Sessi
       user.refreshTokenExpiresAt = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
       await user.save();
 
-      const res = await request(app)
-        .post('/auth/revoke-all-sessions')
-        .set('Cookie', cookie);
+      const res = await request(app).post('/auth/revoke-all-sessions').set('Cookie', cookie);
 
       expect(res.status).toBe(200);
       expect(res.body.error).toBe(false);
@@ -194,10 +178,10 @@ describe('Auth Extensions — Forgot/Reset Password, Refresh Token, Revoke Sessi
               fullName: 'Bulk Teacher One',
               userName: 'bulk_t1',
               phone: '9876543291',
-              collegeId: college._id.toString(),
-            },
+              collegeId: college._id.toString()
+            }
           ],
-          defaultPassword: 'TempPassword123!',
+          defaultPassword: 'TempPassword123!'
         });
 
       expect([200, 201, 207]).toContain(res.status);

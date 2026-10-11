@@ -33,7 +33,7 @@ async function fetchOpenApiSpec(port) {
   const urls = [
     `http://127.0.0.1:${port}/api-docs.json`,
     `http://localhost:${port}/api-docs.json`,
-    `http://127.0.0.1:${port}/api-docs/swagger.json`,
+    `http://127.0.0.1:${port}/api-docs/swagger.json`
   ];
 
   for (const url of urls) {
@@ -67,18 +67,17 @@ function generateLocalSpec() {
       info: {
         title: 'QMetric API',
         version: '1.0.0',
-        description:
-          'Academic Context Management System (ACMS) — Question Paper Quality Evaluation API',
+        description: 'Academic Context Management System (ACMS) — Question Paper Quality Evaluation API',
         contact: {
           name: 'QMetric Support',
-          email: 'support@qmetric.edu',
-        },
+          email: 'support@qmetric.edu'
+        }
       },
       servers: [
         {
           url: process.env.API_URL || `http://localhost:${PORT}`,
-          description: process.env.NODE_ENV === 'production' ? 'Production server' : 'Development server',
-        },
+          description: process.env.NODE_ENV === 'production' ? 'Production server' : 'Development server'
+        }
       ],
       components: {
         securitySchemes: {
@@ -86,8 +85,8 @@ function generateLocalSpec() {
             type: 'apiKey',
             in: 'cookie',
             name: 'accessToken',
-            description: 'HttpOnly cookie set on login',
-          },
+            description: 'HttpOnly cookie set on login'
+          }
         },
         schemas: {
           User: {
@@ -99,13 +98,13 @@ function generateLocalSpec() {
               fullName: { type: 'string' },
               role: {
                 type: 'string',
-                enum: ['teacher', 'reviewer', 'admin', 'super_admin'],
+                enum: ['teacher', 'reviewer', 'admin', 'super_admin']
               },
               collegeId: { type: 'string', nullable: true },
               collegeName: { type: 'string' },
               isBlocked: { type: 'boolean' },
-              createdAt: { type: 'string', format: 'date-time' },
-            },
+              createdAt: { type: 'string', format: 'date-time' }
+            }
           },
           Paper: {
             type: 'object',
@@ -115,11 +114,11 @@ function generateLocalSpec() {
               courseCode: { type: 'string' },
               reviewStatus: {
                 type: 'string',
-                enum: ['pending', 'approved', 'rejected', 'needs_revision'],
+                enum: ['pending', 'approved', 'rejected', 'needs_revision']
               },
               qualityScore: { type: 'number' },
-              createdAt: { type: 'string', format: 'date-time' },
-            },
+              createdAt: { type: 'string', format: 'date-time' }
+            }
           },
           College: {
             type: 'object',
@@ -128,21 +127,21 @@ function generateLocalSpec() {
               name: { type: 'string' },
               code: { type: 'string' },
               isActive: { type: 'boolean' },
-              createdAt: { type: 'string', format: 'date-time' },
-            },
+              createdAt: { type: 'string', format: 'date-time' }
+            }
           },
           Error: {
             type: 'object',
             properties: {
               error: { type: 'boolean', example: true },
-              message: { type: 'string', example: 'Something went wrong' },
-            },
-          },
-        },
+              message: { type: 'string', example: 'Something went wrong' }
+            }
+          }
+        }
       },
-      security: [{ cookieAuth: [] }],
+      security: [{ cookieAuth: [] }]
     },
-    apis: [routesPattern],
+    apis: [routesPattern]
   };
 
   logger.info('ℹ️  Compiled OpenAPI spec locally from routes/*.js via swagger-jsdoc');
@@ -219,28 +218,28 @@ function convertOpenApiToPostman(spec) {
       _postman_id: crypto.randomUUID(),
       name: spec.info?.title || 'QMetric API',
       description: spec.info?.description || 'QMetric ACMS API Postman Collection',
-      schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
+      schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json'
     },
     variable: [
       {
         key: 'baseUrl',
         value: `http://localhost:${PORT}`,
-        type: 'string',
+        type: 'string'
       },
       {
         key: 'token',
         value: '',
         type: 'string',
-        description: 'JWT access token for authenticated requests',
+        description: 'JWT access token for authenticated requests'
       },
       {
         key: 'adminSecret',
         value: process.env.ADMIN_SECRET_KEY || 'your-admin-secret-key',
         type: 'string',
-        description: 'Admin secret key for privileged routes (X-Admin-Secret header)',
-      },
+        description: 'Admin secret key for privileged routes (X-Admin-Secret header)'
+      }
     ],
-    item: [],
+    item: []
   };
 
   const tagGroups = new Map();
@@ -252,7 +251,7 @@ function convertOpenApiToPostman(spec) {
       if (['parameters', '$ref', 'summary', 'description'].includes(methodRaw)) continue;
 
       const method = methodRaw.toUpperCase();
-      const tags = (op.tags && op.tags.length > 0) ? op.tags : ['General'];
+      const tags = op.tags && op.tags.length > 0 ? op.tags : ['General'];
       const tag = tags[0];
 
       // Check if endpoint requires authentication:
@@ -270,7 +269,7 @@ function convertOpenApiToPostman(spec) {
           key: 'Authorization',
           value: 'Bearer {{token}}',
           type: 'text',
-          description: 'Bearer authentication token',
+          description: 'Bearer authentication token'
         });
       }
 
@@ -283,22 +282,22 @@ function convertOpenApiToPostman(spec) {
         if (param.in === 'header') {
           headers.push({
             key: param.name,
-            value: param.name === 'X-Admin-Secret' ? '{{adminSecret}}' : (param.schema?.default || ''),
+            value: param.name === 'X-Admin-Secret' ? '{{adminSecret}}' : param.schema?.default || '',
             type: 'text',
-            description: param.description || '',
+            description: param.description || ''
           });
         } else if (param.in === 'query') {
           queryParams.push({
             key: param.name,
             value: String(param.example ?? param.schema?.default ?? ''),
             description: param.description || '',
-            disabled: !param.required,
+            disabled: !param.required
           });
         } else if (param.in === 'path') {
           pathVariables.push({
             key: param.name,
             value: String(param.example ?? (param.name.toLowerCase().includes('id') ? '123' : 'value')),
-            description: param.description || '',
+            description: param.description || ''
           });
         }
       }
@@ -310,8 +309,8 @@ function convertOpenApiToPostman(spec) {
       let rawUrl = '{{baseUrl}}' + postmanPath;
       if (queryParams.length > 0) {
         const queryStr = queryParams
-          .filter(q => !q.disabled)
-          .map(q => `${encodeURIComponent(q.key)}=${encodeURIComponent(q.value)}`)
+          .filter((q) => !q.disabled)
+          .map((q) => `${encodeURIComponent(q.key)}=${encodeURIComponent(q.value)}`)
           .join('&');
         if (queryStr) rawUrl += '?' + queryStr;
       }
@@ -325,7 +324,7 @@ function convertOpenApiToPostman(spec) {
           headers.push({
             key: 'Content-Type',
             value: 'application/json',
-            type: 'text',
+            type: 'text'
           });
 
           const jsonSchema = reqBodyContent['application/json'].schema;
@@ -336,9 +335,9 @@ function convertOpenApiToPostman(spec) {
             raw: JSON.stringify(sample || {}, null, 2),
             options: {
               raw: {
-                language: 'json',
-              },
-            },
+                language: 'json'
+              }
+            }
           };
         } else if (reqBodyContent['multipart/form-data']) {
           const formSchema = reqBodyContent['multipart/form-data'].schema;
@@ -352,14 +351,16 @@ function convertOpenApiToPostman(spec) {
                   key: propName,
                   type: 'file',
                   src: '',
-                  description: propDef.description || 'Upload file',
+                  description: propDef.description || 'Upload file'
                 });
               } else {
                 formdata.push({
                   key: propName,
-                  value: String(propDef.example ?? propDef.default ?? (propDef.enum ? propDef.enum[0] : 'sample_value')),
+                  value: String(
+                    propDef.example ?? propDef.default ?? (propDef.enum ? propDef.enum[0] : 'sample_value')
+                  ),
                   type: 'text',
-                  description: propDef.description || '',
+                  description: propDef.description || ''
                 });
               }
             }
@@ -367,7 +368,7 @@ function convertOpenApiToPostman(spec) {
 
           body = {
             mode: 'formdata',
-            formdata,
+            formdata
           };
         }
       }
@@ -383,11 +384,11 @@ function convertOpenApiToPostman(spec) {
             host: ['{{baseUrl}}'],
             path: pathSegments,
             ...(queryParams.length > 0 ? { query: queryParams } : {}),
-            ...(pathVariables.length > 0 ? { variable: pathVariables } : {}),
+            ...(pathVariables.length > 0 ? { variable: pathVariables } : {})
           },
-          description: op.description || op.summary || '',
+          description: op.description || op.summary || ''
         },
-        response: [],
+        response: []
       };
 
       if (!tagGroups.has(tag)) {
@@ -402,7 +403,7 @@ function convertOpenApiToPostman(spec) {
   for (const tag of sortedTags) {
     collection.item.push({
       name: tag,
-      item: tagGroups.get(tag),
+      item: tagGroups.get(tag)
     });
   }
 
@@ -423,7 +424,8 @@ async function main() {
   }
 
   const endpointCount = Object.values(spec.paths).reduce(
-    (acc, methods) => acc + Object.keys(methods).filter(m => !['parameters', '$ref', 'summary', 'description'].includes(m)).length,
+    (acc, methods) =>
+      acc + Object.keys(methods).filter((m) => !['parameters', '$ref', 'summary', 'description'].includes(m)).length,
     0
   );
   logger.info(`📊 Found ${endpointCount} endpoints across ${Object.keys(spec.paths).length} paths`);
@@ -441,12 +443,12 @@ async function main() {
   logger.info(`✅ Postman Collection v2.1 successfully written to:`);
   logger.info(`   ${outFile}`);
   logger.info(`\n📁 Folder Breakdown:`);
-  collection.item.forEach(folder => {
+  collection.item.forEach((folder) => {
     logger.info(`   - ${folder.name} (${folder.item.length} requests)`);
   });
 }
 
-main().catch(err => {
+main().catch((err) => {
   logger.error('❌ Export failed:', err);
   process.exit(1);
 });

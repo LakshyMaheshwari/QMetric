@@ -21,14 +21,9 @@ async function reconcile({ dryRun = false } = {}) {
 
     const stored = college.totalTeachers ?? 0;
     if (stored !== actualTeachers) {
-      logger.info(
-        `[DRIFT] ${college.name} (${college._id}): stored=${stored} actual=${actualTeachers}`
-      );
+      logger.info(`[DRIFT] ${college.name} (${college._id}): stored=${stored} actual=${actualTeachers}`);
       if (!dryRun) {
-        await College.updateOne(
-          { _id: college._id },
-          { $set: { totalTeachers: actualTeachers } }
-        );
+        await College.updateOne({ _id: college._id }, { $set: { totalTeachers: actualTeachers } });
       }
       corrected++;
     }
@@ -36,7 +31,7 @@ async function reconcile({ dryRun = false } = {}) {
 
   logger.info(
     `\nReconciliation ${dryRun ? '(dry-run) ' : ''}complete. ` +
-    `Scanned: ${colleges.length}, drift fixed: ${corrected}`
+      `Scanned: ${colleges.length}, drift fixed: ${corrected}`
   );
 
   await mongoose.disconnect();

@@ -5,30 +5,28 @@
  * (from module hours) against the actual marks allocated in the paper.
  */
 function generateModuleRecommendations(moduleWeights) {
-    const recommendations = [];
+  const recommendations = [];
 
-    moduleWeights.forEach((module, index) => {
-        const expected = Math.round(module.expected);
-        const actual = Math.round(module.actual);
+  moduleWeights.forEach((module, index) => {
+    const expected = Math.round(module.expected);
+    const actual = Math.round(module.actual);
 
-        let suggestion;
-        if (expected !== actual) {
-            suggestion = actual < expected
-                ? 'Increase marks for this module'
-                : 'Reduce marks for this module';
-        } else {
-            suggestion = 'Marks for this module are appropriate';
-        }
+    let suggestion;
+    if (expected !== actual) {
+      suggestion = actual < expected ? 'Increase marks for this module' : 'Reduce marks for this module';
+    } else {
+      suggestion = 'Marks for this module are appropriate';
+    }
 
-        recommendations.push({
-            module: `Module ${index + 1}`,
-            expected,
-            actual,
-            suggestion,
-        });
+    recommendations.push({
+      module: `Module ${index + 1}`,
+      expected,
+      actual,
+      suggestion
     });
+  });
 
-    return recommendations;
+  return recommendations;
 }
 
 module.exports = { generateModuleRecommendations };

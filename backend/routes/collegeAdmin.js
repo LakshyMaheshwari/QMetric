@@ -25,12 +25,7 @@ router.get(
   collegeAdminController.getCollegeUsers
 );
 
-router.post(
-  '/users',
-  validateCreateUser,
-  handleValidationErrors,
-  collegeAdminController.addCollegeUser
-);
+router.post('/users', validateCreateUser, handleValidationErrors, collegeAdminController.addCollegeUser);
 
 router.put(
   '/users/:id/role',
@@ -40,14 +35,10 @@ router.put(
   collegeAdminController.changeUserRole
 );
 
-router.put(
-  '/users/:id/block',
-  validateUserId,
-  handleValidationErrors,
-  collegeAdminController.toggleBlockUser
-);
+router.put('/users/:id/block', validateUserId, handleValidationErrors, collegeAdminController.toggleBlockUser);
 
 router.get('/stats', collegeAdminController.getCollegeStats);
+router.get('/stats/activity', collegeAdminController.getCollegeActivity);
 
 /**
  * @swagger
@@ -95,12 +86,7 @@ router.get('/metadata-analytics', paperMetadataController.getMetadataAnalytics);
  *     responses:
  *       200: { description: List of pending teachers }
  */
-router.get(
-  '/pending-teachers',
-  validatePagination,
-  handleValidationErrors,
-  collegeAdminController.getPendingTeachers
-);
+router.get('/pending-teachers', validatePagination, handleValidationErrors, collegeAdminController.getPendingTeachers);
 
 /**
  * @swagger

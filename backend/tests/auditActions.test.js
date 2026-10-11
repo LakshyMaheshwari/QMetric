@@ -26,7 +26,13 @@ describe('Audit log action registry', () => {
   it('persists previously-dropped actions (no silent validation failure)', async () => {
     const college = await createTestCollege();
     const user = await createTestUser({ role: 'teacher', collegeId: college._id });
-    for (const action of ['REGISTER_STUDENT', 'APPROVE_TEACHER', 'RESEND_REVIEW_EMAIL', 'verified_question.correction_submitted', 'LEARNED_VERB_CREATED']) {
+    for (const action of [
+      'REGISTER_STUDENT',
+      'APPROVE_TEACHER',
+      'RESEND_REVIEW_EMAIL',
+      'verified_question.correction_submitted',
+      'LEARNED_VERB_CREATED'
+    ]) {
       await logAudit({ userId: user._id, action, resource: `User:${user._id}` });
     }
     expect(await AuditLog.countDocuments({ userId: user._id })).toBe(5);

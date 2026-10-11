@@ -22,8 +22,7 @@ async function detectTransactionSupport() {
     _supported = Boolean(hello.setName || hello.msg === 'isdbgrid');
   } catch (err) {
     logger.warn(
-      '[withTransaction] Failed to detect topology: ' + err.message +
-      ' — falling back to non-atomic writes.'
+      '[withTransaction] Failed to detect topology: ' + err.message + ' — falling back to non-atomic writes.'
     );
     _supported = false;
   }

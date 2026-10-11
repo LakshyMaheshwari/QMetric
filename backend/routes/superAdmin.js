@@ -13,7 +13,7 @@ const {
   validateBlockUpdate,
   validateCollege,
   validateCollegeUpdate,
-  handleValidationErrors,
+  handleValidationErrors
 } = require('../middleware/validators');
 
 // All /super-admin routes require authentication + super_admin role
@@ -21,6 +21,7 @@ router.use(authenticateToken, requireSuperAdmin);
 
 // Global platform stats
 router.get('/stats', superAdminController.getGlobalStats);
+router.get('/stats/activity', superAdminController.getPlatformActivity);
 
 // College management
 router.get(
@@ -30,18 +31,8 @@ router.get(
   handleValidationErrors,
   superAdminController.getAllColleges
 );
-router.post(
-  '/colleges',
-  validateCollege,
-  handleValidationErrors,
-  superAdminController.createCollege
-);
-router.get(
-  '/colleges/:id',
-  validateCollegeId,
-  handleValidationErrors,
-  superAdminController.getCollegeDetails
-);
+router.post('/colleges', validateCollege, handleValidationErrors, superAdminController.createCollege);
+router.get('/colleges/:id', validateCollegeId, handleValidationErrors, superAdminController.getCollegeDetails);
 router.put(
   '/colleges/:id',
   validateCollegeId,
@@ -49,16 +40,10 @@ router.put(
   handleValidationErrors,
   superAdminController.updateCollege
 );
-router.delete(
-  '/colleges/:id',
-  validateCollegeId,
-  handleValidationErrors,
-  superAdminController.deleteCollege
-);
+router.delete('/colleges/:id', validateCollegeId, handleValidationErrors, superAdminController.deleteCollege);
 
 // Audit logs
 router.get('/audit-logs', superAdminController.getAuditLogs);
-
 
 /**
  * @swagger
@@ -132,7 +117,13 @@ router.put('/college-applications/:id/reject', collegeApplicationController.reje
 router.get('/users', validatePagination, handleValidationErrors, superAdminController.getAllUsers);
 router.get('/users/:id', ...validateMongoId('id'), handleValidationErrors, superAdminController.getUserById);
 router.put('/users/:id/role', ...validateMongoId('id'), handleValidationErrors, superAdminController.updateUserRole);
-router.put('/users/:id/block', ...validateMongoId('id'), validateBlockUpdate, handleValidationErrors, superAdminController.toggleUserBlock);
+router.put(
+  '/users/:id/block',
+  ...validateMongoId('id'),
+  validateBlockUpdate,
+  handleValidationErrors,
+  superAdminController.toggleUserBlock
+);
 router.delete('/users/:id', ...validateMongoId('id'), handleValidationErrors, superAdminController.deleteUser);
 
 /* -------------------------------------------------------------------------- */
@@ -257,7 +248,12 @@ router.post('/learned-verbs/bulk-import', learnedVerbController.bulkImportVerbs)
  *       200: { description: Updated }
  *       404: { description: Not found }
  */
-router.put('/learned-verbs/:verbId', ...validateMongoId('verbId'), handleValidationErrors, learnedVerbController.updateLearnedVerb);
+router.put(
+  '/learned-verbs/:verbId',
+  ...validateMongoId('verbId'),
+  handleValidationErrors,
+  learnedVerbController.updateLearnedVerb
+);
 
 /**
  * @swagger
@@ -274,7 +270,12 @@ router.put('/learned-verbs/:verbId', ...validateMongoId('verbId'), handleValidat
  *       200: { description: Deleted }
  *       404: { description: Not found }
  */
-router.delete('/learned-verbs/:verbId', ...validateMongoId('verbId'), handleValidationErrors, learnedVerbController.deleteLearnedVerb);
+router.delete(
+  '/learned-verbs/:verbId',
+  ...validateMongoId('verbId'),
+  handleValidationErrors,
+  learnedVerbController.deleteLearnedVerb
+);
 /**
  * @swagger
  * /super-admin/email/test:

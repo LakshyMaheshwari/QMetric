@@ -1,6 +1,12 @@
 const request = require('supertest');
 const app = require('../index');
-const { createTestUser, createTestCollege, createCollegeAdmin, createTestPaper, getCookieString } = require('./helpers');
+const {
+  createTestUser,
+  createTestCollege,
+  createCollegeAdmin,
+  createTestPaper,
+  getCookieString
+} = require('./helpers');
 
 describe('GET /college-admin/metadata-analytics', () => {
   it('returns real question/difficulty totals (regression: broken .select projection)', async () => {
@@ -10,13 +16,15 @@ describe('GET /college-admin/metadata-analytics', () => {
     await createTestPaper({
       userId: teacher._id,
       collegeId: college._id,
-      collectedData: [{
-        QuestionData: [
-          { Question: 'q1', Difficulty: 'Easy', 'Question Type': 'MCQ' },
-          { Question: 'q2', Difficulty: 'hard', 'Question Type': 'Essay' },
-          { Question: 'q3', Difficulty: 'Medium', 'Question Type': 'MCQ' },
-        ],
-      }],
+      collectedData: [
+        {
+          QuestionData: [
+            { Question: 'q1', Difficulty: 'Easy', 'Question Type': 'MCQ' },
+            { Question: 'q2', Difficulty: 'hard', 'Question Type': 'Essay' },
+            { Question: 'q3', Difficulty: 'Medium', 'Question Type': 'MCQ' }
+          ]
+        }
+      ]
     });
 
     const res = await request(app).get('/college-admin/metadata-analytics').set('Cookie', getCookieString(admin));

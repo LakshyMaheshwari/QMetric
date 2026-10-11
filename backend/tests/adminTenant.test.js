@@ -16,7 +16,10 @@ describe('Admin tenant isolation (/admin/users/:id ...)', () => {
   });
 
   it('rejects cross-college role change (404, user untouched)', async () => {
-    const res = await request(app).put(`/admin/users/${teacherB._id}/role`).set('Cookie', cookieA).send({ role: 'reviewer' });
+    const res = await request(app)
+      .put(`/admin/users/${teacherB._id}/role`)
+      .set('Cookie', cookieA)
+      .send({ role: 'reviewer' });
     expect(res.status).toBe(404);
     expect((await User.findById(teacherB._id)).role).toBe('teacher');
   });
@@ -34,7 +37,10 @@ describe('Admin tenant isolation (/admin/users/:id ...)', () => {
   });
 
   it('still allows same-college role change, block and delete', async () => {
-    const r1 = await request(app).put(`/admin/users/${teacherA._id}/role`).set('Cookie', cookieA).send({ role: 'reviewer' });
+    const r1 = await request(app)
+      .put(`/admin/users/${teacherA._id}/role`)
+      .set('Cookie', cookieA)
+      .send({ role: 'reviewer' });
     expect(r1.status).toBe(200);
     const r2 = await request(app).put(`/admin/users/${teacherA._id}/block`).set('Cookie', cookieA);
     expect(r2.status).toBe(200);
@@ -43,7 +49,10 @@ describe('Admin tenant isolation (/admin/users/:id ...)', () => {
   });
 
   it('prevents an admin from changing/blocking/deleting themselves', async () => {
-    const r1 = await request(app).put(`/admin/users/${adminA._id}/role`).set('Cookie', cookieA).send({ role: 'teacher' });
+    const r1 = await request(app)
+      .put(`/admin/users/${adminA._id}/role`)
+      .set('Cookie', cookieA)
+      .send({ role: 'teacher' });
     const r2 = await request(app).put(`/admin/users/${adminA._id}/block`).set('Cookie', cookieA);
     const r3 = await request(app).delete(`/admin/users/${adminA._id}`).set('Cookie', cookieA);
     expect([r1.status, r2.status, r3.status]).toEqual([400, 400, 400]);

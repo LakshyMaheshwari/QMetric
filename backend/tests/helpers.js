@@ -38,7 +38,7 @@ async function createTestUser({
   collegeId,
   collegeApprovalStatus,
   userName = 'testuser',
-  phone = null,
+  phone = null
 } = {}) {
   const suffix = uniqueSuffix();
   const uniqueEmail = email || `${role}-${suffix}@test.com`;
@@ -50,13 +50,13 @@ async function createTestUser({
     email: uniqueEmail.toLowerCase(),
     password: hashedPassword,
     role,
-    phone: phone || nextPhone(),
+    phone: phone || nextPhone()
   };
 
   if (role === 'super_admin') {
     return User.create({
       ...base,
-      fullName: 'Super Admin',
+      fullName: 'Super Admin'
     });
   }
 
@@ -75,7 +75,7 @@ async function createTestUser({
     stream: 'Engineering',
     employeeId: `EMP-${suffix}`,
     position: 'Professor',
-    ...(collegeApprovalStatus !== undefined ? { collegeApprovalStatus } : {}),
+    ...(collegeApprovalStatus !== undefined ? { collegeApprovalStatus } : {})
   });
 }
 
@@ -91,7 +91,7 @@ async function createTestCollege({ name = 'Test College', code = null } = {}) {
   return College.create({
     name: `${name} ${suffix}`,
     code: code ? `${code}${suffix.slice(-3)}` : `TST${suffix}`,
-    isActive: true,
+    isActive: true
   });
 }
 
@@ -103,21 +103,21 @@ async function createTestPaper({
   collegeId,
   courseName = 'CS101',
   reviewStatus = 'pending',
-  collectedData = null,
+  collectedData = null
 } = {}) {
   const defaultCollectedData = [
     {
       question: 'Define polymorphism with an example.',
       domain: 'cognitive',
       bloomLevel: 1,
-      score: 0.8,
+      score: 0.8
     },
     {
       question: 'Design a distributed cache system.',
       domain: 'cognitive',
       bloomLevel: 6,
-      score: 0.9,
-    },
+      score: 0.9
+    }
   ];
 
   return Paper.create({
@@ -131,7 +131,7 @@ async function createTestPaper({
     userId,
     collegeId,
     'Collected Data': collectedData !== null ? collectedData : defaultCollectedData,
-    reviewStatus,
+    reviewStatus
   });
 }
 
@@ -139,11 +139,7 @@ async function createTestPaper({
  * Sign a JWT for the given user.
  */
 function generateToken(user) {
-  return jwt.sign(
-    { userId: user._id, role: user.role },
-    process.env.ACCESS_TOKEN_SECRET,
-    { expiresIn: '1h' }
-  );
+  return jwt.sign({ userId: user._id, role: user.role }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
 }
 
 /**
@@ -161,7 +157,7 @@ async function createSuperAdmin() {
 async function createCollegeAdmin(college) {
   return createTestUser({
     role: 'admin',
-    collegeId: college._id,
+    collegeId: college._id
   });
 }
 
@@ -178,7 +174,7 @@ async function createTestVerifiedQuestion({
   correctedLevel = 3,
   correctedLevelName = 'Apply',
   correctedBy,
-  reason = 'Test correction',
+  reason = 'Test correction'
 } = {}) {
   return VerifiedQuestion.create({
     paperId,
@@ -190,7 +186,7 @@ async function createTestVerifiedQuestion({
     correctedLevel,
     correctedLevelName,
     correctedBy,
-    reason,
+    reason
   });
 }
 
@@ -206,7 +202,7 @@ async function createTestOcrLog({
   confidence = 80,
   ocrRawText = 'Raw OCR Extracted Text',
   imageUrl = 'https://res.cloudinary.com/test/id.jpg',
-  reason = '',
+  reason = ''
 } = {}) {
   return OCRLog.create({
     userId,
@@ -216,20 +212,20 @@ async function createTestOcrLog({
       employeeId: 'EMP-1234',
       collegeName: 'Test College',
       department: 'Computer Science',
-      ...userInput,
+      ...userInput
     },
     extractedData: {
       fullName: 'Test Teacher',
       employeeId: 'EMP-1234',
       collegeName: 'Test College',
       department: 'Computer Science',
-      ...extractedData,
+      ...extractedData
     },
     matchedFields,
     confidence,
     ocrRawText,
     imageUrl,
-    reason,
+    reason
   });
 }
 
@@ -242,5 +238,5 @@ module.exports = {
   createTestVerifiedQuestion,
   createTestOcrLog,
   generateToken,
-  getCookieString,
+  getCookieString
 };

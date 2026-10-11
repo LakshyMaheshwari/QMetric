@@ -6,61 +6,58 @@ const verifiedQuestionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'PaperInfo',
       required: true,
-      index: true,
+      index: true
     },
     questionIndex: {
       type: Number,
-      required: true,
+      required: true
     },
     originalDomain: {
       type: String,
-      enum: ['cognitive', 'affective', 'psychomotor'],
+      enum: ['cognitive', 'affective', 'psychomotor']
     },
     originalLevel: {
       type: Number,
       min: 1,
-      max: 7,
+      max: 7
     },
     originalScore: {
       type: Number,
       min: 0,
-      max: 1,
+      max: 1
     },
     correctedDomain: {
       type: String,
       enum: ['cognitive', 'affective', 'psychomotor'],
-      required: true,
+      required: true
     },
     correctedLevel: {
       type: Number,
       required: true,
       min: 1,
-      max: 7,
+      max: 7
     },
     correctedLevelName: {
-      type: String,
+      type: String
     },
     correctedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: true
     },
     correctedAt: {
       type: Date,
-      default: Date.now,
+      default: Date.now
     },
     reason: {
       type: String,
-      trim: true,
-    },
+      trim: true
+    }
   },
   { timestamps: true }
 );
 
 // One correction per question per paper
-verifiedQuestionSchema.index(
-  { paperId: 1, questionIndex: 1 },
-  { unique: true }
-);
+verifiedQuestionSchema.index({ paperId: 1, questionIndex: 1 }, { unique: true });
 
 module.exports = mongoose.model('VerifiedQuestion', verifiedQuestionSchema);

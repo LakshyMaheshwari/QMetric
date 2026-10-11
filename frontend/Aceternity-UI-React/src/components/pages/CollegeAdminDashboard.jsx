@@ -5,10 +5,11 @@ import apiClient from '../../api/client';
 import {
   Building, Users, UserCheck, Shield, FileText, Ban,
   Plus, Search, Filter, RefreshCw, X, AlertCircle, CheckCircle,
-  Award
+  Award, Activity
 } from 'lucide-react';
 import { DashboardSkeleton } from '../SkeletonLoader';
 import PendingTeachersPanel from './PendingTeachersPanel';
+import ContributionSkyline from '../ui/contribution-skyline';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createCollegeUserSchema } from '../../schemas/validationSchemas';
@@ -26,6 +27,9 @@ export default function CollegeAdminDashboard() {
   const [message, setMessage] = useState({ text: '', type: '' });
   const [showAddModal, setShowAddModal] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [activityData, setActivityData] = useState([]);
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [activityError, setActivityError] = useState(null);
 
   const {
     register: registerAddUser,
@@ -55,13 +59,19 @@ export default function CollegeAdminDashboard() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      setActivityLoading(true);
+      setActivityError(null);
       const params = {};
       if (search.trim()) params.search = search.trim();
       if (roleFilter && roleFilter !== 'all') params.role = roleFilter;
 
-      const [usersRes, statsRes] = await Promise.all([
+      const [usersRes, statsRes, activityRes] = await Promise.all([
         apiClient.get('/college-admin/users', { params }),
         apiClient.get('/college-admin/stats'),
+        apiClient.get('/college-admin/stats/activity').catch((err) => {
+          console.error('Error fetching activity:', err);
+          return { error: true, data: { data: [] } };
+        }),
       ]);
 
       if (usersRes.data && !usersRes.data.error) {
@@ -70,13 +80,36 @@ export default function CollegeAdminDashboard() {
       if (statsRes.data && !statsRes.data.error) {
         setStats(statsRes.data.stats);
       }
+      if (activityRes.data && !activityRes.data.error) {
+        setActivityData(activityRes.data.data || []);
+      } else {
+        setActivityError('Unable to load activity heatmap.');
+      }
     } catch (error) {
       console.error('Error fetching college admin data:', error);
       setMessage({ text: error.response?.data?.message || 'Failed to fetch college users', type: 'error' });
     } finally {
       setLoading(false);
+      setActivityLoading(false);
     }
   }, [search, roleFilter]);
+
+  const retryActivityFetch = async () => {
+    try {
+      setActivityLoading(true);
+      setActivityError(null);
+      const res = await apiClient.get('/college-admin/stats/activity');
+      if (res.data && !res.data.error) {
+        setActivityData(res.data.data || []);
+      } else {
+        setActivityError('Unable to load activity heatmap.');
+      }
+    } catch (err) {
+      setActivityError(err.response?.data?.message || 'Failed to load activity heatmap.');
+    } finally {
+      setActivityLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -260,6 +293,59 @@ export default function CollegeAdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* Paper Upload Activity Skyline */}
+        <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-5 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400">
+                  <Activity className="w-4 h-4" />
+                </span>
+                <h2 className="text-lg font-semibold text-white">College Paper Upload Activity</h2>
+              </div>
+              <p className="text-xs text-zinc-400 mt-1">
+                Daily exam paper uploads across faculty over the last 12 months.
+              </p>
+            </div>
+            {activityLoading && (
+              <span className="text-xs text-zinc-400 flex items-center gap-1.5 self-start sm:self-auto">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-400" />
+                Updating skyline…
+              </span>
+            )}
+          </div>
+
+          {activityError ? (
+            <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{activityError}</span>
+              </div>
+              <button
+                onClick={retryActivityFetch}
+                className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs rounded-lg transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          ) : activityLoading && activityData.length === 0 ? (
+            <div className="h-64 rounded-xl bg-zinc-800/40 animate-pulse flex items-center justify-center text-zinc-500 text-sm">
+              Loading contribution skyline…
+            </div>
+          ) : (
+            <div className="w-full overflow-hidden rounded-xl bg-zinc-950 p-2 sm:p-4 border border-zinc-800">
+              <ContributionSkyline
+                data={activityData}
+                unit="paper upload"
+                unitPlural="paper uploads"
+                title="College Paper Upload Activity"
+                palette="github"
+                className="border-0 bg-transparent text-white"
+              />
+            </div>
+          )}
+        </div>
 
         {/* Search & Filter Bar */}
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-between bg-zinc-900/70 p-4 rounded-2xl border border-zinc-800">

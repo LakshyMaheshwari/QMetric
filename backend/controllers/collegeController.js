@@ -234,22 +234,19 @@ const { logAudit } = require('../utils/auditLog');
  * Public / helper route returning all active colleges for user registration dropdown.
  */
 const getActiveColleges = async (req, res) => {
-    try {
-        const colleges = await College.find({ isActive: true })
-            .select('_id name code city state')
-            .sort({ name: 1 })
-            .lean();
+  try {
+    const colleges = await College.find({ isActive: true }).select('_id name code city state').sort({ name: 1 }).lean();
 
-        return res.json({
-            error: false,
-            colleges
-        });
-    } catch (err) {
-        logger.error('Error fetching active colleges:', err);
-        return res.status(500).json({ error: true, message: 'Error fetching active colleges.' });
-    }
+    return res.json({
+      error: false,
+      colleges
+    });
+  } catch (err) {
+    logger.error('Error fetching active colleges:', err);
+    return res.status(500).json({ error: true, message: 'Error fetching active colleges.' });
+  }
 };
 
 module.exports = {
-    getActiveColleges
+  getActiveColleges
 };

@@ -36,10 +36,7 @@ async function buildCollegePaperQuery(userId) {
   // Exact collegeId matching only — no regex fallbacks (prevents data leaks)
   const collegeUsers = await User.find({ collegeId }).distinct('_id');
 
-  const paperMatches = [
-    { collegeId },
-    ...(collegeUsers.length > 0 ? [{ userId: { $in: collegeUsers } }] : []),
-  ];
+  const paperMatches = [{ collegeId }, ...(collegeUsers.length > 0 ? [{ userId: { $in: collegeUsers } }] : [])];
 
   const baseQuery = { $or: paperMatches };
   const college = await College.findById(collegeId);
@@ -66,7 +63,7 @@ function mergeQuery(baseQuery, extraCondition) {
 function formatPaper(p) {
   const plain = typeof p?.toObject === 'function' ? p.toObject() : p;
   const collectedData = plain[paperFields.COLLECTED_DATA] || [];
-  const questionsList = Array.isArray(collectedData) ? collectedData : (plain.questions || []);
+  const questionsList = Array.isArray(collectedData) ? collectedData : plain.questions || [];
   const questionsCount = questionsList.length;
 
   return {
@@ -80,7 +77,7 @@ function formatPaper(p) {
     questions: questionsList,
     questionsCount,
     qualityScore: plain.qualityScore || 0,
-    reviewStatus: plain.reviewStatus || 'pending',
+    reviewStatus: plain.reviewStatus || 'pending'
   };
 }
 
@@ -115,11 +112,7 @@ exports.getCollegePapers = async (req, res) => {
     if (status && status !== 'all') {
       if (status === 'pending') {
         conditions.push({
-          $or: [
-            { reviewStatus: 'pending' },
-            { reviewStatus: { $exists: false } },
-            { reviewStatus: null },
-          ],
+          $or: [{ reviewStatus: 'pending' }, { reviewStatus: { $exists: false } }, { reviewStatus: null }]
         });
       } else {
         conditions.push({ reviewStatus: status });
@@ -134,12 +127,12 @@ exports.getCollegePapers = async (req, res) => {
         $or: [
           { [paperFields.COURSE_NAME]: searchRegex },
           { [paperFields.COURSE_CODE]: searchRegex },
-          { [paperFields.COURSE_TEACHER]: searchRegex },
-        ],
+          { [paperFields.COURSE_TEACHER]: searchRegex }
+        ]
       });
     }
 
-    const finalQuery = conditions.length > 1 ? { $and: conditions } : (conditions[0] || {});
+    const finalQuery = conditions.length > 1 ? { $and: conditions } : conditions[0] || {};
 
     const [rawPapers, total] = await Promise.all([
       Paper.find(finalQuery)
@@ -149,7 +142,7 @@ exports.getCollegePapers = async (req, res) => {
         .skip(skip)
         .limit(limit)
         .lean(),
-      Paper.countDocuments(finalQuery),
+      Paper.countDocuments(finalQuery)
     ]);
 
     const papers = rawPapers.map(formatPaper);
@@ -157,7 +150,7 @@ exports.getCollegePapers = async (req, res) => {
     res.json({
       error: false,
       papers,
-      pagination: getPaginationMeta(total, page, limit),
+      pagination: getPaginationMeta(total, page, limit)
     });
   } catch (error) {
     logger.error('Error fetching reviewer papers:', error);
@@ -190,7 +183,7 @@ exports.getPaperDetails = async (req, res) => {
 
     res.json({
       error: false,
-      paper: formatPaper(paper),
+      paper: formatPaper(paper)
     });
   } catch (error) {
     logger.error('Error fetching paper details:', error);
@@ -208,7 +201,7 @@ exports.reviewPaper = async (req, res) => {
     if (!['approved', 'rejected', 'needs_revision'].includes(action)) {
       return res.status(400).json({
         error: true,
-        message: 'Invalid action. Use approved, rejected, or needs_revision',
+        message: 'Invalid action. Use approved, rejected, or needs_revision'
       });
     }
 
@@ -233,7 +226,7 @@ exports.reviewPaper = async (req, res) => {
     if (previousReviewStatus !== 'pending') {
       return res.status(400).json({
         error: true,
-        message: `Cannot review a paper with status: ${previousReviewStatus}. Only pending papers can be reviewed.`,
+        message: `Cannot review a paper with status: ${previousReviewStatus}. Only pending papers can be reviewed.`
       });
     }
 
@@ -241,7 +234,7 @@ exports.reviewPaper = async (req, res) => {
     if (String(paper.userId) === String(reviewerId)) {
       return res.status(403).json({
         error: true,
-        message: 'You cannot review your own paper.',
+        message: 'You cannot review your own paper.'
       });
     }
 
@@ -253,7 +246,7 @@ exports.reviewPaper = async (req, res) => {
       reviewStatus: action,
       reviewedBy: reviewerId,
       reviewComments: comments || '',
-      reviewedAt: now,
+      reviewedAt: now
     };
     if (!paper.collegeId && collegeId) {
       setFields.collegeId = collegeId;
@@ -268,16 +261,16 @@ exports.reviewPaper = async (req, res) => {
             reviewerId,
             action,
             comments: comments || '',
-            timestamp: now,
-          },
-        },
+            timestamp: now
+          }
+        }
       },
       { new: true }
     );
     if (!updated) {
       return res.status(409).json({
         error: true,
-        message: 'This paper was already reviewed by someone else. Refresh and try again.',
+        message: 'This paper was already reviewed by someone else. Refresh and try again.'
       });
     }
     // Use the freshly-updated document for everything below (populate, response).
@@ -290,25 +283,25 @@ exports.reviewPaper = async (req, res) => {
       changes: {
         oldValue: { reviewStatus: previousReviewStatus },
         newValue: { reviewStatus: action, comments },
-        fields: ['reviewStatus', 'reviewComments'],
+        fields: ['reviewStatus', 'reviewComments']
       },
-      request: req,
+      request: req
     });
 
     await paper.populate('reviewedBy', 'fullName userName email');
     await paper.populate('reviewHistory.reviewerId', 'fullName userName email');
     await paper.populate('userId', 'fullName email');
 
-        // ── Emit in-app notification to the paper's author ──
+    // ── Emit in-app notification to the paper's author ──
     const notifTypeMap = {
       approved: 'paper_approved',
       rejected: 'paper_rejected',
-      needs_revision: 'revision_needed',
+      needs_revision: 'revision_needed'
     };
     const notifTitleMap = {
       approved: 'Paper approved',
       rejected: 'Paper rejected',
-      needs_revision: 'Revision requested',
+      needs_revision: 'Revision requested'
     };
     if (paper.userId?._id) {
       createNotification({
@@ -317,7 +310,7 @@ exports.reviewPaper = async (req, res) => {
         title: notifTitleMap[action],
         message: `"${paper['Course Name'] || 'Untitled'}" was ${action.replace('_', ' ')} by ${paper.reviewedBy?.fullName || 'a reviewer'}.`,
         relatedDocId: paper._id,
-        actionUrl: `/teacher/papers/${paper._id}`,
+        actionUrl: `/teacher/papers/${paper._id}`
       }).catch((err) => logger.error('In-app notification dispatch error:', err.message));
     }
 
@@ -328,14 +321,14 @@ exports.reviewPaper = async (req, res) => {
         to: authorEmail,
         courseName: paper[paperFields.COURSE_NAME] || paper.courseName || 'Untitled',
         reviewStatus: action,
-        comments,
+        comments
       }).catch((err) => logger.error('Notification dispatch error:', err.message));
     }
 
     res.json({
       error: false,
       message: `Paper ${action.replace('_', ' ')} successfully`,
-      paper: formatPaper(paper),
+      paper: formatPaper(paper)
     });
   } catch (error) {
     await logAudit({
@@ -343,7 +336,7 @@ exports.reviewPaper = async (req, res) => {
       action: 'REVIEW_PAPER',
       resource: `Paper:${req.params.id}`,
       request: req,
-      error,
+      error
     });
     logger.error('Error reviewing paper:', error);
     res.status(500).json({ error: true, message: 'Server error' });
@@ -359,19 +352,15 @@ exports.getReviewStats = async (req, res) => {
     }
 
     const pendingCond = {
-      $or: [
-        { reviewStatus: 'pending' },
-        { reviewStatus: { $exists: false } },
-        { reviewStatus: null },
-      ],
+      $or: [{ reviewStatus: 'pending' }, { reviewStatus: { $exists: false } }, { reviewStatus: null }]
     };
 
-    const pendingQuery        = mergeQuery(baseQuery, pendingCond);
-    const approvedQuery       = mergeQuery(baseQuery, { reviewStatus: 'approved' });
-    const rejectedQuery       = mergeQuery(baseQuery, { reviewStatus: 'rejected' });
-    const needsRevisionQuery  = mergeQuery(baseQuery, { reviewStatus: 'needs_revision' });
-    const totalQuery          = baseQuery && Object.keys(baseQuery).length > 0 ? baseQuery : {};
-    const myReviewsQuery      = mergeQuery(baseQuery, { reviewedBy: getUserId(req) });
+    const pendingQuery = mergeQuery(baseQuery, pendingCond);
+    const approvedQuery = mergeQuery(baseQuery, { reviewStatus: 'approved' });
+    const rejectedQuery = mergeQuery(baseQuery, { reviewStatus: 'rejected' });
+    const needsRevisionQuery = mergeQuery(baseQuery, { reviewStatus: 'needs_revision' });
+    const totalQuery = baseQuery && Object.keys(baseQuery).length > 0 ? baseQuery : {};
+    const myReviewsQuery = mergeQuery(baseQuery, { reviewedBy: getUserId(req) });
 
     const [pending, approved, rejected, needsRevision, total, myReviews] = await Promise.all([
       Paper.countDocuments(pendingQuery),
@@ -379,7 +368,7 @@ exports.getReviewStats = async (req, res) => {
       Paper.countDocuments(rejectedQuery),
       Paper.countDocuments(needsRevisionQuery),
       Paper.countDocuments(totalQuery),
-      Paper.countDocuments(myReviewsQuery),
+      Paper.countDocuments(myReviewsQuery)
     ]);
 
     const formattedStats = {
@@ -389,13 +378,13 @@ exports.getReviewStats = async (req, res) => {
       needsRevision,
       total,
       myReviews,
-      myPending: pending,
+      myPending: pending
     };
 
     res.json({
       error: false,
       stats: formattedStats,
-      ...formattedStats,
+      ...formattedStats
     });
   } catch (error) {
     logger.error('Error fetching review stats:', error);
@@ -412,11 +401,7 @@ exports.getPendingCount = async (req, res) => {
     }
 
     const pendingCond = {
-      $or: [
-        { reviewStatus: 'pending' },
-        { reviewStatus: { $exists: false } },
-        { reviewStatus: null },
-      ],
+      $or: [{ reviewStatus: 'pending' }, { reviewStatus: { $exists: false } }, { reviewStatus: null }]
     };
 
     const query = mergeQuery(baseQuery, pendingCond);
@@ -436,103 +421,80 @@ exports.getPendingCount = async (req, res) => {
  * If it hasn't been generated yet, respond 404 telling the caller to re-evaluate.
  */
 async function getBloomRecommendations(req, res) {
-    try {
-        const { id } = req.params;
+  try {
+    const { id } = req.params;
 
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({ error: true, message: 'Invalid paper ID' });
-        }
-
-        // `Collected Data` contains a space, so use the object form of select().
-        const paper = await PaperInfo.findById(id)
-            .select({
-                collegeId: 1,
-                BloomRecommendations: 1,
-                [paperFields.COLLECTED_DATA]: 1,
-            })
-            .lean();
-
-        if (!paper) {
-            return res.status(404).json({ error: true, message: 'Paper not found' });
-        }
-
-        // Authorization: ONLY super_admin bypasses; everyone else (incl. college
-        // admins) must match the paper's college. isAdmin() is true for both
-        // admin and super_admin, so it must not be used here.
-        if (
-            !isSuperAdmin(req) &&
-            (!paper.collegeId || String(paper.collegeId) !== String(getCollegeId(req)))
-        ) {
-            return res.status(403).json({ error: true, message: 'Forbidden' });
-        }
-
-        // The upload pipeline stores recommendations inside Collected Data[0]
-        // (top-level fields are not in the PaperInfo schema and are dropped on save).
-        const bloomData =
-            paper.BloomRecommendations ||
-            paper[paperFields.COLLECTED_DATA]?.[0]?.BloomRecommendations;
-
-        if (!bloomData) {
-            return res.status(404).json({
-                error: true,
-                message:
-                    'Bloom recommendations not yet generated for this paper. Re-evaluate the paper first.',
-            });
-        }
-
-        const {
-            recommendations = [],
-            bloomLevelOverview = {},
-        } = bloomData;
-
-        // Aggregate by expected level (1..6)
-        const byLevel = {};
-        for (let lvl = 1; lvl <= 6; lvl++) {
-            const subset = recommendations.filter((r) => r.expectedLevel === lvl);
-            byLevel[lvl] = {
-                expectedLevel: lvl,
-                totalQuestions: subset.length,
-                mismatched: subset.filter((r) => r.actualLevel !== r.expectedLevel).length,
-                avgGap: subset.length
-                    ? Number(
-                          (
-                              subset.reduce((s, r) => s + (r.gap || 0), 0) / subset.length
-                          ).toFixed(2)
-                      )
-                    : 0,
-                overview: bloomLevelOverview[lvl] || null,
-            };
-        }
-
-        const summary = {
-            totalGaps: recommendations.filter((r) => r.gap !== 0).length,
-            avgGap: recommendations.length
-                ? Number(
-                      (
-                          recommendations.reduce((s, r) => s + (r.gap || 0), 0) /
-                          recommendations.length
-                      ).toFixed(2)
-                  )
-                : 0,
-            criticalCount: recommendations.filter((r) => r.severity === 'critical').length,
-            estimatedPointsToGain: recommendations.reduce(
-                (s, r) => s + (r.estimatedPoints || 0),
-                0
-            ),
-        };
-
-        return res.status(200).json({
-            error: false,
-            recommendations: {
-                byLevel,
-                byQuestion: recommendations,
-                summary,
-            },
-        });
-    } catch (err) {
-        logger.error('[reviewer.getBloomRecommendations]', err);
-        return res.status(500).json({ error: true, message: 'Internal server error' });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: true, message: 'Invalid paper ID' });
     }
+
+    // `Collected Data` contains a space, so use the object form of select().
+    const paper = await PaperInfo.findById(id)
+      .select({
+        collegeId: 1,
+        BloomRecommendations: 1,
+        [paperFields.COLLECTED_DATA]: 1
+      })
+      .lean();
+
+    if (!paper) {
+      return res.status(404).json({ error: true, message: 'Paper not found' });
+    }
+
+    // Authorization: ONLY super_admin bypasses; everyone else (incl. college
+    // admins) must match the paper's college. isAdmin() is true for both
+    // admin and super_admin, so it must not be used here.
+    if (!isSuperAdmin(req) && (!paper.collegeId || String(paper.collegeId) !== String(getCollegeId(req)))) {
+      return res.status(403).json({ error: true, message: 'Forbidden' });
+    }
+
+    // The upload pipeline stores recommendations inside Collected Data[0]
+    // (top-level fields are not in the PaperInfo schema and are dropped on save).
+    const bloomData = paper.BloomRecommendations || paper[paperFields.COLLECTED_DATA]?.[0]?.BloomRecommendations;
+
+    if (!bloomData) {
+      return res.status(404).json({
+        error: true,
+        message: 'Bloom recommendations not yet generated for this paper. Re-evaluate the paper first.'
+      });
+    }
+
+    const { recommendations = [], bloomLevelOverview = {} } = bloomData;
+
+    // Aggregate by expected level (1..6)
+    const byLevel = {};
+    for (let lvl = 1; lvl <= 6; lvl++) {
+      const subset = recommendations.filter((r) => r.expectedLevel === lvl);
+      byLevel[lvl] = {
+        expectedLevel: lvl,
+        totalQuestions: subset.length,
+        mismatched: subset.filter((r) => r.actualLevel !== r.expectedLevel).length,
+        avgGap: subset.length ? Number((subset.reduce((s, r) => s + (r.gap || 0), 0) / subset.length).toFixed(2)) : 0,
+        overview: bloomLevelOverview[lvl] || null
+      };
+    }
+
+    const summary = {
+      totalGaps: recommendations.filter((r) => r.gap !== 0).length,
+      avgGap: recommendations.length
+        ? Number((recommendations.reduce((s, r) => s + (r.gap || 0), 0) / recommendations.length).toFixed(2))
+        : 0,
+      criticalCount: recommendations.filter((r) => r.severity === 'critical').length,
+      estimatedPointsToGain: recommendations.reduce((s, r) => s + (r.estimatedPoints || 0), 0)
+    };
+
+    return res.status(200).json({
+      error: false,
+      recommendations: {
+        byLevel,
+        byQuestion: recommendations,
+        summary
+      }
+    });
+  } catch (err) {
+    logger.error('[reviewer.getBloomRecommendations]', err);
+    return res.status(500).json({ error: true, message: 'Internal server error' });
+  }
 }
 
 /**
@@ -554,7 +516,9 @@ exports.resendDecisionEmail = async (req, res) => {
       return res.status(400).json({ error: true, message: error });
     }
     if (baseQuery && Object.keys(baseQuery).length > 0) {
-      const allowed = await Paper.findOne({ _id: id, $and: [baseQuery] }).select('_id').lean();
+      const allowed = await Paper.findOne({ _id: id, $and: [baseQuery] })
+        .select('_id')
+        .lean();
       if (!allowed) {
         return res.status(404).json({ error: true, message: 'Paper not found in your college' });
       }
@@ -564,7 +528,7 @@ exports.resendDecisionEmail = async (req, res) => {
     if (!['approved', 'rejected', 'needs_revision'].includes(status)) {
       return res.status(400).json({
         error: true,
-        message: `Cannot resend decision — paper status is "${status}".`,
+        message: `Cannot resend decision — paper status is "${status}".`
       });
     }
 
@@ -587,7 +551,7 @@ exports.resendDecisionEmail = async (req, res) => {
         courseCode,
         reviewerName,
         qualityScore: paper.qualityScore,
-        paperId: paper._id,
+        paperId: paper._id
       });
     } else if (status === 'rejected') {
       await emailService.sendPaperRejectedEmail({
@@ -597,7 +561,7 @@ exports.resendDecisionEmail = async (req, res) => {
         reviewerName,
         reason: paper.reviewComments || '',
         comments: paper.reviewComments || '',
-        paperId: paper._id,
+        paperId: paper._id
       });
     } else {
       await emailService.sendPaperNeedsRevisionEmail({
@@ -607,13 +571,13 @@ exports.resendDecisionEmail = async (req, res) => {
         reviewerName,
         changes: paper.reviewComments || '',
         deadline: '',
-        paperId: paper._id,
+        paperId: paper._id
       });
     }
 
     return res.json({
       error: false,
-      message: `Decision email resent to ${authorEmail}.`,
+      message: `Decision email resent to ${authorEmail}.`
     });
   } catch (err) {
     logger.error('resendDecisionEmail error:', err);

@@ -42,13 +42,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/admin/users",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "users"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users"],
               "query": [
                 {
                   "key": "page",
@@ -108,13 +103,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/admin/users",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "users"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users"]
             },
             "description": "Create a new user (teacher/reviewer/admin)"
           },
@@ -148,15 +138,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/admin/users/:id/role",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "users",
-                ":id",
-                "role"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users", ":id", "role"],
               "variable": [
                 {
                   "key": "id",
@@ -183,15 +166,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/admin/users/:id/block",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "users",
-                ":id",
-                "block"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users", ":id", "block"],
               "variable": [
                 {
                   "key": "id",
@@ -218,14 +194,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/admin/users/:id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "users",
-                ":id"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "users", ":id"],
               "variable": [
                 {
                   "key": "id",
@@ -257,13 +227,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/auth/profile",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "profile"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "profile"]
             },
             "description": "Get current user profile"
           },
@@ -297,13 +262,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/profile",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "profile"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "profile"]
             },
             "description": "Update current user profile"
           },
@@ -331,13 +291,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "login"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
             },
             "description": "User login"
           },
@@ -403,13 +358,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/create-account",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "create-account"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "create-account"]
             },
             "description": "Register a new teacher/reviewer account"
           },
@@ -422,14 +372,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/auth/verify-email/:token",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "verify-email",
-                ":token"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify-email", ":token"],
               "variable": [
                 {
                   "key": "token",
@@ -464,13 +408,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/resend-verification",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "resend-verification"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "resend-verification"]
             },
             "description": "Resend email verification link"
           },
@@ -504,13 +443,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/bulk-register",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "bulk-register"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "bulk-register"]
             },
             "description": "Bulk register users via CSV/JSON (admin secret required)"
           },
@@ -523,13 +457,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/auth/colleges",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "colleges"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "colleges"]
             },
             "description": "List active colleges (for registration dropdown)"
           },
@@ -563,13 +492,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/auth/create-admin",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "create-admin"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "create-admin"]
             },
             "description": "Create an admin account (admin secret required)"
           },
@@ -582,13 +506,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/auth/logout",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "auth",
-                "logout"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
             },
             "description": "Logout (clears accessToken cookie + revokes token)"
           },
@@ -621,13 +540,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/dev/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "dev",
-                "login"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["dev", "login"]
             },
             "description": "Development-only login (bypasses CSRF and Turnstile)"
           },
@@ -652,13 +566,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/reviewer/stats",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reviewer",
-                "stats"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["reviewer", "stats"]
             },
             "description": "Get review statistics for the reviewer's college"
           },
@@ -678,13 +587,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/reviewer/pending-count",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reviewer",
-                "pending-count"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["reviewer", "pending-count"]
             },
             "description": "Get count of pending papers (for badge)"
           },
@@ -704,13 +608,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/reviewer/papers",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reviewer",
-                "papers"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["reviewer", "papers"],
               "query": [
                 {
                   "key": "status",
@@ -756,14 +655,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/reviewer/papers/:id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reviewer",
-                "papers",
-                ":id"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["reviewer", "papers", ":id"],
               "variable": [
                 {
                   "key": "id",
@@ -804,15 +697,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/reviewer/papers/:id/review",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reviewer",
-                "papers",
-                ":id",
-                "review"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["reviewer", "papers", ":id", "review"],
               "variable": [
                 {
                   "key": "id",
@@ -853,15 +739,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/reviewer/papers/:paperId/corrections",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reviewer",
-                "papers",
-                ":paperId",
-                "corrections"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["reviewer", "papers", ":paperId", "corrections"],
               "variable": [
                 {
                   "key": "paperId",
@@ -888,15 +767,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/reviewer/papers/:paperId/corrections",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reviewer",
-                "papers",
-                ":paperId",
-                "corrections"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["reviewer", "papers", ":paperId", "corrections"],
               "query": [
                 {
                   "key": "page",
@@ -937,16 +809,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/reviewer/papers/:paperId/corrections/:questionIndex",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reviewer",
-                "papers",
-                ":paperId",
-                "corrections",
-                ":questionIndex"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["reviewer", "papers", ":paperId", "corrections", ":questionIndex"],
               "variable": [
                 {
                   "key": "paperId",
@@ -992,16 +856,8 @@
             },
             "url": {
               "raw": "{{baseUrl}}/reviewer/papers/:paperId/corrections/:questionIndex",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reviewer",
-                "papers",
-                ":paperId",
-                "corrections",
-                ":questionIndex"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["reviewer", "papers", ":paperId", "corrections", ":questionIndex"],
               "variable": [
                 {
                   "key": "paperId",
@@ -1033,16 +889,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/reviewer/papers/:paperId/corrections/:questionIndex",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reviewer",
-                "papers",
-                ":paperId",
-                "corrections",
-                ":questionIndex"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["reviewer", "papers", ":paperId", "corrections", ":questionIndex"],
               "variable": [
                 {
                   "key": "paperId",
@@ -1074,16 +922,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/reviewer/papers/:id/recommendations/bloom",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "reviewer",
-                "papers",
-                ":id",
-                "recommendations",
-                "bloom"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["reviewer", "papers", ":id", "recommendations", "bloom"],
               "variable": [
                 {
                   "key": "id",

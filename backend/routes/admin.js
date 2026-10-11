@@ -123,12 +123,7 @@ router.put('/users/:id/role', validateUserId, validateRoleUpdate, handleValidati
  *       200:
  *         description: User blocked/unblocked
  */
-router.put(
-  '/users/:id/block',
-  validateUserId,
-  handleValidationErrors,
-  adminController.toggleBlock
-);
+router.put('/users/:id/block', validateUserId, handleValidationErrors, adminController.toggleBlock);
 
 /**
  * @swagger
@@ -157,8 +152,18 @@ const ocrLogController = require('../controllers/ocrLogController');
 router.get('/ocr-logs', validatePagination, handleValidationErrors, ocrLogController.listOcrLogs);
 router.get('/ocr-logs/stats', ocrLogController.getOcrStats);
 router.get('/ocr-logs/:logId', ...validateMongoId('logId'), handleValidationErrors, ocrLogController.getOcrLog);
-router.put('/ocr-logs/:logId/verify', ...validateMongoId('logId'), handleValidationErrors, ocrLogController.verifyOcrLog);
-router.put('/ocr-logs/:logId/reject', ...validateMongoId('logId'), handleValidationErrors, ocrLogController.rejectOcrLog);
+router.put(
+  '/ocr-logs/:logId/verify',
+  ...validateMongoId('logId'),
+  handleValidationErrors,
+  ocrLogController.verifyOcrLog
+);
+router.put(
+  '/ocr-logs/:logId/reject',
+  ...validateMongoId('logId'),
+  handleValidationErrors,
+  ocrLogController.rejectOcrLog
+);
 
 /* -------------------------------------------------------------------------- */
 /* Question Papers (College-scoped visibility for admins)                     */

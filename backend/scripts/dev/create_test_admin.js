@@ -18,7 +18,7 @@ async function createTestCollegeAdmin() {
       city: 'Sangli',
       state: 'Maharashtra',
       address: 'Vishrambag, Sangli',
-      isActive: true,
+      isActive: true
     });
     console.log('Created college:', college.name);
   } else {
@@ -54,7 +54,7 @@ async function createTestCollegeAdmin() {
       phone: '9998887771',
       employeeId: 'ADM-WCE-001',
       isBlocked: false,
-      idVerification: { status: 'not_applicable' },
+      idVerification: { status: 'not_applicable' }
     });
     await adminUser.save();
     console.log('Created new college admin:', email);
@@ -72,39 +72,37 @@ async function createTestCollegeAdmin() {
 
   let teacher = await User.findOne({ email: sampleTeacherEmail });
   if (!teacher) {
-    const teacherPassword = await bcrypt.hash(
-      process.env.TEST_TEACHER_PASSWORD || 'change-me-in-production',
-      salt
-    );
+    const teacherPassword = await bcrypt.hash(process.env.TEST_TEACHER_PASSWORD || 'change-me-in-production', salt);
 
     await withTransaction(async (session) => {
       const opts = session ? { session } : {};
 
-      const [created] = await User.create([{
-        userName: 'Dr. Anand Joshi',
-        fullName: 'Dr. Anand Joshi',
-        email: sampleTeacherEmail,
-        password: teacherPassword,
-        role: 'teacher',
-        collegeId: college._id,
-        collegeName: college.name,
-        department: 'Computer Science & Engineering',
-        position: 'Professor',
-        phone: '9822012345',
-        employeeId: 'WCE-CSE-101',
-        stream: 'Engineering',
-        isBlocked: false,
-        idVerification: { status: 'verified', confidence: 95 },
-      }], opts);
+      const [created] = await User.create(
+        [
+          {
+            userName: 'Dr. Anand Joshi',
+            fullName: 'Dr. Anand Joshi',
+            email: sampleTeacherEmail,
+            password: teacherPassword,
+            role: 'teacher',
+            collegeId: college._id,
+            collegeName: college.name,
+            department: 'Computer Science & Engineering',
+            position: 'Professor',
+            phone: '9822012345',
+            employeeId: 'WCE-CSE-101',
+            stream: 'Engineering',
+            isBlocked: false,
+            idVerification: { status: 'verified', confidence: 95 }
+          }
+        ],
+        opts
+      );
 
       teacher = created;
 
       // Same transaction — user and counter commit or roll back together
-      await College.findByIdAndUpdate(
-        college._id,
-        { $inc: { totalTeachers: 1 } },
-        opts
-      );
+      await College.findByIdAndUpdate(college._id, { $inc: { totalTeachers: 1 } }, opts);
     });
 
     console.log('Created sample teacher for WCE:', sampleTeacherEmail);

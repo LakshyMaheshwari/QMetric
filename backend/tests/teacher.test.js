@@ -1,12 +1,7 @@
 const request = require('supertest');
 const app = require('../index');
 const Paper = require('../Model/PaperInfo');
-const {
-  createTestUser,
-  createTestCollege,
-  createSuperAdmin,
-  getCookieString,
-} = require('./helpers');
+const { createTestUser, createTestCollege, createSuperAdmin, getCookieString } = require('./helpers');
 
 /**
  * Create a paper directly in MongoDB. Going through the /upload endpoint
@@ -15,9 +10,9 @@ const {
 async function createTestPaper({ userId, collegeId, reviewStatus = 'draft', courseName = 'Test Course' }) {
   return Paper.create({
     'College Name': 'Test College',
-    'Branch': 'Computer Science',
+    Branch: 'Computer Science',
     'Year Of Study': '3rd Year',
-    'Semester': '5',
+    Semester: '5',
     'Course Name': courseName,
     'Course Code': 'CS101',
     'Course Teacher': 'Test Teacher',
@@ -25,7 +20,7 @@ async function createTestPaper({ userId, collegeId, reviewStatus = 'draft', cour
     collegeId,
     reviewStatus,
     'Collected Data': [],
-    bloomLevelMap: { remember: 1, understand: 2, apply: 3, analyze: 4, evaluate: 5, create: 6 },
+    bloomLevelMap: { remember: 1, understand: 2, apply: 3, analyze: 4, evaluate: 5, create: 6 }
   });
 }
 
@@ -61,14 +56,12 @@ describe('Teacher Endpoints', () => {
   // GET /teacher/papers — list
   // ═══════════════════════════════════════════════════════════════
   describe('GET /teacher/papers', () => {
-    it('should list only the teacher\'s own papers', async () => {
+    it("should list only the teacher's own papers", async () => {
       await createTestPaper({ userId: teacher._id, collegeId: college._id, courseName: 'Mine 1' });
       await createTestPaper({ userId: teacher._id, collegeId: college._id, courseName: 'Mine 2' });
       await createTestPaper({ userId: otherTeacher._id, collegeId: otherCollege._id, courseName: 'Not Mine' });
 
-      const res = await request(app)
-        .get('/teacher/papers')
-        .set('Cookie', teacherCookie);
+      const res = await request(app).get('/teacher/papers').set('Cookie', teacherCookie);
 
       expect(res.status).toBe(200);
       expect(res.body.papers.length).toBe(2);
@@ -78,9 +71,7 @@ describe('Teacher Endpoints', () => {
     it('should let a reviewer see their college papers', async () => {
       await createTestPaper({ userId: teacher._id, collegeId: college._id, courseName: 'College Paper' });
 
-      const res = await request(app)
-        .get('/teacher/papers')
-        .set('Cookie', reviewerCookie);
+      const res = await request(app).get('/teacher/papers').set('Cookie', reviewerCookie);
 
       expect(res.status).toBe(200);
       expect(res.body.papers.length).toBeGreaterThanOrEqual(1);
@@ -90,14 +81,10 @@ describe('Teacher Endpoints', () => {
       await createTestPaper({ userId: teacher._id, collegeId: college._id });
       await createTestPaper({ userId: otherTeacher._id, collegeId: otherCollege._id });
 
-      const res = await request(app)
-        .get('/teacher/papers')
-        .set('Cookie', reviewerCookie);
+      const res = await request(app).get('/teacher/papers').set('Cookie', reviewerCookie);
 
       expect(res.status).toBe(200);
-      expect(res.body.papers.every(
-        (p) => String(p.collegeId) === String(college._id)
-      )).toBe(true);
+      expect(res.body.papers.every((p) => String(p.collegeId) === String(college._id))).toBe(true);
     });
 
     it('should filter by status', async () => {
@@ -105,9 +92,7 @@ describe('Teacher Endpoints', () => {
       await createTestPaper({ userId: teacher._id, collegeId: college._id, reviewStatus: 'approved' });
       await createTestPaper({ userId: teacher._id, collegeId: college._id, reviewStatus: 'approved' });
 
-      const res = await request(app)
-        .get('/teacher/papers?status=approved')
-        .set('Cookie', teacherCookie);
+      const res = await request(app).get('/teacher/papers?status=approved').set('Cookie', teacherCookie);
 
       expect(res.status).toBe(200);
       expect(res.body.papers.every((p) => p.reviewStatus === 'approved')).toBe(true);
@@ -120,9 +105,7 @@ describe('Teacher Endpoints', () => {
     });
 
     it('should reject invalid pagination with 400', async () => {
-      const res = await request(app)
-        .get('/teacher/papers?page=-1&limit=9999')
-        .set('Cookie', teacherCookie);
+      const res = await request(app).get('/teacher/papers?page=-1&limit=9999').set('Cookie', teacherCookie);
       expect(res.status).toBe(400);
     });
   });
@@ -134,9 +117,7 @@ describe('Teacher Endpoints', () => {
     it('should allow the owner to view their paper', async () => {
       const paper = await createTestPaper({ userId: teacher._id, collegeId: college._id });
 
-      const res = await request(app)
-        .get(`/teacher/papers/${paper._id}`)
-        .set('Cookie', teacherCookie);
+      const res = await request(app).get(`/teacher/papers/${paper._id}`).set('Cookie', teacherCookie);
 
       expect(res.status).toBe(200);
       expect(res.body.paper._id).toBe(String(paper._id));
@@ -145,9 +126,7 @@ describe('Teacher Endpoints', () => {
     it('should block a different teacher from viewing it (404, not 403)', async () => {
       const paper = await createTestPaper({ userId: teacher._id, collegeId: college._id });
 
-      const res = await request(app)
-        .get(`/teacher/papers/${paper._id}`)
-        .set('Cookie', otherTeacherCookie);
+      const res = await request(app).get(`/teacher/papers/${paper._id}`).set('Cookie', otherTeacherCookie);
 
       // The controller returns 404 when the query doesn't match — correct
       // behaviour (does not confirm existence of the paper).
@@ -157,17 +136,13 @@ describe('Teacher Endpoints', () => {
     it('should allow a reviewer from the same college', async () => {
       const paper = await createTestPaper({ userId: teacher._id, collegeId: college._id });
 
-      const res = await request(app)
-        .get(`/teacher/papers/${paper._id}`)
-        .set('Cookie', reviewerCookie);
+      const res = await request(app).get(`/teacher/papers/${paper._id}`).set('Cookie', reviewerCookie);
 
       expect(res.status).toBe(200);
     });
 
     it('should reject invalid Mongo ID', async () => {
-      const res = await request(app)
-        .get('/teacher/papers/not-a-real-id')
-        .set('Cookie', teacherCookie);
+      const res = await request(app).get('/teacher/papers/not-a-real-id').set('Cookie', teacherCookie);
       expect(res.status).toBe(400);
     });
   });
@@ -202,7 +177,11 @@ describe('Teacher Endpoints', () => {
     });
 
     it('should allow editing a needs_revision paper', async () => {
-      const paper = await createTestPaper({ userId: teacher._id, collegeId: college._id, reviewStatus: 'needs_revision' });
+      const paper = await createTestPaper({
+        userId: teacher._id,
+        collegeId: college._id,
+        reviewStatus: 'needs_revision'
+      });
 
       const res = await request(app)
         .put(`/teacher/papers/${paper._id}`)
@@ -265,9 +244,7 @@ describe('Teacher Endpoints', () => {
     it('should allow the owner to submit a draft', async () => {
       const paper = await createTestPaper({ userId: teacher._id, collegeId: college._id, reviewStatus: 'draft' });
 
-      const res = await request(app)
-        .put(`/teacher/papers/${paper._id}/submit`)
-        .set('Cookie', teacherCookie);
+      const res = await request(app).put(`/teacher/papers/${paper._id}/submit`).set('Cookie', teacherCookie);
 
       expect(res.status).toBe(200);
 
@@ -279,9 +256,7 @@ describe('Teacher Endpoints', () => {
     it('should reject submission of a non-draft paper', async () => {
       const paper = await createTestPaper({ userId: teacher._id, collegeId: college._id, reviewStatus: 'approved' });
 
-      const res = await request(app)
-        .put(`/teacher/papers/${paper._id}/submit`)
-        .set('Cookie', teacherCookie);
+      const res = await request(app).put(`/teacher/papers/${paper._id}/submit`).set('Cookie', teacherCookie);
 
       expect(res.status).toBe(400);
       expect(res.body.message).toMatch(/draft/i);
@@ -290,9 +265,7 @@ describe('Teacher Endpoints', () => {
     it('should reject submission by a different teacher (404)', async () => {
       const paper = await createTestPaper({ userId: teacher._id, collegeId: college._id });
 
-      const res = await request(app)
-        .put(`/teacher/papers/${paper._id}/submit`)
-        .set('Cookie', otherTeacherCookie);
+      const res = await request(app).put(`/teacher/papers/${paper._id}/submit`).set('Cookie', otherTeacherCookie);
 
       expect(res.status).toBe(404);
     });
@@ -300,9 +273,7 @@ describe('Teacher Endpoints', () => {
     it('should reject a reviewer from submitting', async () => {
       const paper = await createTestPaper({ userId: teacher._id, collegeId: college._id });
 
-      const res = await request(app)
-        .put(`/teacher/papers/${paper._id}/submit`)
-        .set('Cookie', reviewerCookie);
+      const res = await request(app).put(`/teacher/papers/${paper._id}/submit`).set('Cookie', reviewerCookie);
 
       // Route restricts to requireRole('teacher') → 403 before ownership is checked
       expect(res.status).toBe(403);
@@ -316,9 +287,7 @@ describe('Teacher Endpoints', () => {
     it('should reject a reviewer', async () => {
       const paper = await createTestPaper({ userId: teacher._id, collegeId: college._id });
 
-      const res = await request(app)
-        .delete(`/teacher/papers/${paper._id}`)
-        .set('Cookie', reviewerCookie);
+      const res = await request(app).delete(`/teacher/papers/${paper._id}`).set('Cookie', reviewerCookie);
 
       expect(res.status).toBe(403);
       expect(res.body.message).toMatch(/restricted|permission/i);
@@ -329,9 +298,7 @@ describe('Teacher Endpoints', () => {
     it('should allow the owner to delete a draft', async () => {
       const paper = await createTestPaper({ userId: teacher._id, collegeId: college._id, reviewStatus: 'draft' });
 
-      const res = await request(app)
-        .delete(`/teacher/papers/${paper._id}`)
-        .set('Cookie', teacherCookie);
+      const res = await request(app).delete(`/teacher/papers/${paper._id}`).set('Cookie', teacherCookie);
 
       expect(res.status).toBe(200);
 
@@ -340,11 +307,13 @@ describe('Teacher Endpoints', () => {
     });
 
     it('should allow the owner to delete a needs_revision paper', async () => {
-      const paper = await createTestPaper({ userId: teacher._id, collegeId: college._id, reviewStatus: 'needs_revision' });
+      const paper = await createTestPaper({
+        userId: teacher._id,
+        collegeId: college._id,
+        reviewStatus: 'needs_revision'
+      });
 
-      const res = await request(app)
-        .delete(`/teacher/papers/${paper._id}`)
-        .set('Cookie', teacherCookie);
+      const res = await request(app).delete(`/teacher/papers/${paper._id}`).set('Cookie', teacherCookie);
 
       expect(res.status).toBe(200);
     });
@@ -352,9 +321,7 @@ describe('Teacher Endpoints', () => {
     it('should reject deleting an approved paper (audit-trail protection)', async () => {
       const paper = await createTestPaper({ userId: teacher._id, collegeId: college._id, reviewStatus: 'approved' });
 
-      const res = await request(app)
-        .delete(`/teacher/papers/${paper._id}`)
-        .set('Cookie', teacherCookie);
+      const res = await request(app).delete(`/teacher/papers/${paper._id}`).set('Cookie', teacherCookie);
 
       expect(res.status).toBe(400);
       expect(res.body.message).toMatch(/status/i);
@@ -366,9 +333,7 @@ describe('Teacher Endpoints', () => {
     it('should reject deleting a pending paper', async () => {
       const paper = await createTestPaper({ userId: teacher._id, collegeId: college._id, reviewStatus: 'pending' });
 
-      const res = await request(app)
-        .delete(`/teacher/papers/${paper._id}`)
-        .set('Cookie', teacherCookie);
+      const res = await request(app).delete(`/teacher/papers/${paper._id}`).set('Cookie', teacherCookie);
 
       expect(res.status).toBe(400);
     });
@@ -376,9 +341,7 @@ describe('Teacher Endpoints', () => {
     it('should let super_admin delete an approved paper (override)', async () => {
       const paper = await createTestPaper({ userId: teacher._id, collegeId: college._id, reviewStatus: 'approved' });
 
-      const res = await request(app)
-        .delete(`/teacher/papers/${paper._id}`)
-        .set('Cookie', superAdminCookie);
+      const res = await request(app).delete(`/teacher/papers/${paper._id}`).set('Cookie', superAdminCookie);
 
       expect(res.status).toBe(200);
     });
@@ -386,9 +349,7 @@ describe('Teacher Endpoints', () => {
     it('should let admin delete a draft in their college', async () => {
       const paper = await createTestPaper({ userId: teacher._id, collegeId: college._id, reviewStatus: 'draft' });
 
-      const res = await request(app)
-        .delete(`/teacher/papers/${paper._id}`)
-        .set('Cookie', adminCookie);
+      const res = await request(app).delete(`/teacher/papers/${paper._id}`).set('Cookie', adminCookie);
 
       expect(res.status).toBe(200);
     });
@@ -407,7 +368,9 @@ describe('POST /teacher/papers/:id/resend-review-email (regression: missing logA
     await h.createTestUser({ role: 'reviewer', collegeId: college._id });
     const paper = await h.createTestPaper({ userId: teacher._id, collegeId: college._id, reviewStatus: 'pending' });
 
-    const res = await request(app).post(`/teacher/papers/${paper._id}/resend-review-email`).set('Cookie', h.getCookieString(teacher));
+    const res = await request(app)
+      .post(`/teacher/papers/${paper._id}/resend-review-email`)
+      .set('Cookie', h.getCookieString(teacher));
     expect(res.status).toBe(200);
     expect(res.body.sentCount).toBe(1);
     expect(await AuditLog.countDocuments({ action: 'RESEND_REVIEW_EMAIL' })).toBe(1);
@@ -417,7 +380,9 @@ describe('POST /teacher/papers/:id/resend-review-email (regression: missing logA
     const college = await h.createTestCollege();
     const teacher = await h.createTestUser({ role: 'teacher', collegeId: college._id });
     const paper = await h.createTestPaper({ userId: teacher._id, collegeId: college._id, reviewStatus: 'draft' });
-    const res = await request(app).post(`/teacher/papers/${paper._id}/resend-review-email`).set('Cookie', h.getCookieString(teacher));
+    const res = await request(app)
+      .post(`/teacher/papers/${paper._id}/resend-review-email`)
+      .set('Cookie', h.getCookieString(teacher));
     expect(res.status).toBe(400);
   });
 });

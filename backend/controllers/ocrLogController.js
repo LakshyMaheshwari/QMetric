@@ -16,10 +16,7 @@ function isObjectId(value) {
 
 function parsePagination(q) {
   const page = Math.max(1, Number.parseInt(q.page, 10) || 1);
-  const limit = Math.min(
-    MAX_PAGE_LIMIT,
-    Math.max(1, Number.parseInt(q.limit, 10) || DEFAULT_PAGE_LIMIT)
-  );
+  const limit = Math.min(MAX_PAGE_LIMIT, Math.max(1, Number.parseInt(q.limit, 10) || DEFAULT_PAGE_LIMIT));
   return { page, limit, skip: (page - 1) * limit };
 }
 
@@ -37,7 +34,9 @@ async function buildUserScope(req) {
 async function listOcrLogs(req, res) {
   try {
     let scope;
-    try { scope = await buildUserScope(req); } catch (e) {
+    try {
+      scope = await buildUserScope(req);
+    } catch (e) {
       return res.status(e.status || 403).json({ error: true, message: e.message });
     }
     const { page, limit, skip } = parsePagination(req.query);
@@ -55,13 +54,13 @@ async function listOcrLogs(req, res) {
         .limit(limit)
         .populate('userId', 'fullName email collegeName department')
         .lean(),
-      OCRLog.countDocuments(filter),
+      OCRLog.countDocuments(filter)
     ]);
 
     return res.status(200).json({
       error: false,
       ocrLogs,
-      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) }
     });
   } catch (err) {
     logger.error('[ocrLog.listOcrLogs]', err);
@@ -75,7 +74,9 @@ async function listOcrLogs(req, res) {
 async function getOcrStats(req, res) {
   try {
     let scope;
-    try { scope = await buildUserScope(req); } catch (e) {
+    try {
+      scope = await buildUserScope(req);
+    } catch (e) {
       return res.status(e.status || 403).json({ error: true, message: e.message });
     }
     const base = scope || {};
@@ -83,7 +84,7 @@ async function getOcrStats(req, res) {
     const [verified, flagged, unverified] = await Promise.all([
       OCRLog.countDocuments({ ...base, status: 'verified' }),
       OCRLog.countDocuments({ ...base, status: 'flagged' }),
-      OCRLog.countDocuments({ ...base, status: 'unverified' }),
+      OCRLog.countDocuments({ ...base, status: 'unverified' })
     ]);
     const total = verified + flagged + unverified;
 
@@ -94,8 +95,8 @@ async function getOcrStats(req, res) {
         verified,
         flagged,
         unverified,
-        verificationRate: total > 0 ? Number(((verified / total) * 100).toFixed(1)) : 0,
-      },
+        verificationRate: total > 0 ? Number(((verified / total) * 100).toFixed(1)) : 0
+      }
     });
   } catch (err) {
     logger.error('[ocrLog.getOcrStats]', err);
@@ -164,7 +165,7 @@ async function verifyOcrLog(req, res) {
     if (!['verified', 'flagged', 'unverified'].includes(status)) {
       return res.status(400).json({
         error: true,
-        message: 'status must be one of: verified, flagged, unverified',
+        message: 'status must be one of: verified, flagged, unverified'
       });
     }
 
@@ -174,7 +175,7 @@ async function verifyOcrLog(req, res) {
     const userId = log.userId._id || log.userId;
     await User.findByIdAndUpdate(userId, {
       'idVerification.status': status,
-      'idVerification.updatedAt': new Date(),
+      'idVerification.updatedAt': new Date()
     });
 
     await logAudit({
@@ -184,9 +185,9 @@ async function verifyOcrLog(req, res) {
       changes: {
         oldValue: { status: log.status },
         newValue: { status },
-        fields: ['status'],
+        fields: ['status']
       },
-      request: req,
+      request: req
     });
 
     return res.status(200).json({ error: false, ocrLog: updated, message: `Status set to ${status}` });
@@ -210,7 +211,7 @@ async function rejectOcrLog(req, res) {
     if (!reason || typeof reason !== 'string' || !reason.trim()) {
       return res.status(400).json({
         error: true,
-        message: 'Reason is required',
+        message: 'Reason is required'
       });
     }
 
@@ -239,7 +240,7 @@ async function rejectOcrLog(req, res) {
     const userId = log.userId._id || log.userId;
     await User.findByIdAndUpdate(userId, {
       'idVerification.status': status,
-      'idVerification.updatedAt': new Date(),
+      'idVerification.updatedAt': new Date()
     });
 
     await logAudit({
@@ -249,15 +250,15 @@ async function rejectOcrLog(req, res) {
       changes: {
         oldValue: { status: log.status },
         newValue: { status, reason: reason.trim() },
-        fields: ['status', 'reason'],
+        fields: ['status', 'reason']
       },
-      request: req,
+      request: req
     });
 
     return res.status(200).json({
       error: false,
       ocrLog: updated,
-      message: 'OCR log rejected',
+      message: 'OCR log rejected'
     });
   } catch (err) {
     logger.error('[ocrLog.rejectOcrLog]', err);

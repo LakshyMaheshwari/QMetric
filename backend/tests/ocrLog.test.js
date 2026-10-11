@@ -7,7 +7,7 @@ const {
   createTestCollege,
   createCollegeAdmin,
   createTestOcrLog,
-  getCookieString,
+  getCookieString
 } = require('./helpers');
 
 describe('Admin OCR Logs Endpoints', () => {
@@ -25,21 +25,19 @@ describe('Admin OCR Logs Endpoints', () => {
       const otherCollege = await createTestCollege();
       const otherTeacher = await createTestUser({
         role: 'teacher',
-        collegeId: otherCollege._id,
+        collegeId: otherCollege._id
       });
 
       const ownLog = await createTestOcrLog({
         userId: teacher._id,
-        status: 'unverified',
+        status: 'unverified'
       });
       const otherLog = await createTestOcrLog({
         userId: otherTeacher._id,
-        status: 'unverified',
+        status: 'unverified'
       });
 
-      const res = await request(app)
-        .get('/admin/ocr-logs')
-        .set('Cookie', adminCookie);
+      const res = await request(app).get('/admin/ocr-logs').set('Cookie', adminCookie);
 
       expect(res.status).toBe(200);
       expect(res.body.error).toBe(false);
@@ -53,20 +51,18 @@ describe('Admin OCR Logs Endpoints', () => {
     it('filters by status', async () => {
       await createTestOcrLog({
         userId: teacher._id,
-        status: 'verified',
+        status: 'verified'
       });
       await createTestOcrLog({
         userId: teacher._id,
-        status: 'flagged',
+        status: 'flagged'
       });
       await createTestOcrLog({
         userId: teacher._id,
-        status: 'unverified',
+        status: 'unverified'
       });
 
-      const res = await request(app)
-        .get('/admin/ocr-logs?status=verified')
-        .set('Cookie', adminCookie);
+      const res = await request(app).get('/admin/ocr-logs?status=verified').set('Cookie', adminCookie);
 
       expect(res.status).toBe(200);
       expect(res.body.error).toBe(false);
@@ -79,7 +75,7 @@ describe('Admin OCR Logs Endpoints', () => {
     it('updates log status and user.idVerification.status', async () => {
       const log = await createTestOcrLog({
         userId: teacher._id,
-        status: 'unverified',
+        status: 'unverified'
       });
 
       const res = await request(app)
@@ -102,7 +98,7 @@ describe('Admin OCR Logs Endpoints', () => {
     it('requires a reason', async () => {
       const log = await createTestOcrLog({
         userId: teacher._id,
-        status: 'unverified',
+        status: 'unverified'
       });
 
       // Without reason or with empty reason: rejects with 400
@@ -142,20 +138,18 @@ describe('Admin OCR Logs Endpoints', () => {
     it('returns correct counts by status', async () => {
       await createTestOcrLog({
         userId: teacher._id,
-        status: 'verified',
+        status: 'verified'
       });
       await createTestOcrLog({
         userId: teacher._id,
-        status: 'flagged',
+        status: 'flagged'
       });
       await createTestOcrLog({
         userId: teacher._id,
-        status: 'unverified',
+        status: 'unverified'
       });
 
-      const res = await request(app)
-        .get('/admin/ocr-logs/stats')
-        .set('Cookie', adminCookie);
+      const res = await request(app).get('/admin/ocr-logs/stats').set('Cookie', adminCookie);
 
       expect(res.status).toBe(200);
       expect(res.body.error).toBe(false);

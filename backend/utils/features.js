@@ -15,27 +15,16 @@
  *   approve_teachers     — /college-admin/pending-teachers/*
  */
 const FEATURES = {
-  student: [
-    'upload_paper',
-    'view_score',
-    'view_analysis',
-  ],
+  student: ['upload_paper', 'view_score', 'view_analysis'],
   teacher: [
     'upload_paper',
     'view_score',
     'view_analysis',
     'pdf_export',
     'certificate',
-    'submit_for_review', // only if affiliated + approved
+    'submit_for_review' // only if affiliated + approved
   ],
-  reviewer: [
-    'upload_paper',
-    'view_score',
-    'view_analysis',
-    'pdf_export',
-    'certificate',
-    'review_papers',
-  ],
+  reviewer: ['upload_paper', 'view_score', 'view_analysis', 'pdf_export', 'certificate', 'review_papers'],
   admin: [
     'upload_paper',
     'view_score',
@@ -44,9 +33,9 @@ const FEATURES = {
     'certificate',
     'review_papers',
     'manage_college_users',
-    'approve_teachers',
+    'approve_teachers'
   ],
-  super_admin: ['*'],
+  super_admin: ['*']
 };
 
 /**

@@ -19,32 +19,32 @@ const crypto = require('node:crypto');
  * so the length of the real secret is not leaked via timing.
  */
 function secretsMatch(provided, expected) {
-    const expectedHash = crypto.createHash('sha256').update(String(expected)).digest();
-    const providedHash = crypto.createHash('sha256').update(String(provided)).digest();
-    return crypto.timingSafeEqual(expectedHash, providedHash);
+  const expectedHash = crypto.createHash('sha256').update(String(expected)).digest();
+  const providedHash = crypto.createHash('sha256').update(String(provided)).digest();
+  return crypto.timingSafeEqual(expectedHash, providedHash);
 }
 
 module.exports = function adminAuth(req, res, next) {
-    const adminSecret = process.env.ADMIN_SECRET_KEY;
+  const adminSecret = process.env.ADMIN_SECRET_KEY;
 
-    // Fail closed — if no secret is configured, deny everything
-    if (!adminSecret) {
-        logger.error('[adminAuth] ADMIN_SECRET_KEY is not set in .env — blocking request');
-        return res.status(503).json({
-            error: true,
-            message: 'Admin operations are not configured. Contact the server administrator.',
-        });
-    }
+  // Fail closed — if no secret is configured, deny everything
+  if (!adminSecret) {
+    logger.error('[adminAuth] ADMIN_SECRET_KEY is not set in .env — blocking request');
+    return res.status(503).json({
+      error: true,
+      message: 'Admin operations are not configured. Contact the server administrator.'
+    });
+  }
 
-    const provided = req.headers['x-admin-secret'];
+  const provided = req.headers['x-admin-secret'];
 
-    if (!provided || typeof provided !== 'string') {
-        return res.status(401).json({ error: true, message: 'Admin secret header required.' });
-    }
+  if (!provided || typeof provided !== 'string') {
+    return res.status(401).json({ error: true, message: 'Admin secret header required.' });
+  }
 
-    if (!secretsMatch(provided, adminSecret)) {
-        return res.status(403).json({ error: true, message: 'Invalid admin secret.' });
-    }
+  if (!secretsMatch(provided, adminSecret)) {
+    return res.status(403).json({ error: true, message: 'Invalid admin secret.' });
+  }
 
-    next();
+  next();
 };

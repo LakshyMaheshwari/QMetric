@@ -18,7 +18,7 @@ const QUESTION_TYPE_CANON = {
   casestudy: 'Case Study',
   'true/false': 'True/False',
   truefalse: 'True/False',
-  'true or false': 'True/False',
+  'true or false': 'True/False'
 };
 
 function isObjectId(v) {
@@ -59,9 +59,7 @@ function tally(questions, fieldName, canonicalMap) {
       out.Unknown = (out.Unknown || 0) + 1;
       continue;
     }
-    const key = canonicalMap
-      ? canonicalMap[trimmed.toLowerCase()] || trimmed
-      : trimmed;
+    const key = canonicalMap ? canonicalMap[trimmed.toLowerCase()] || trimmed : trimmed;
     out[key] = (out[key] || 0) + 1;
   }
   return out;
@@ -72,7 +70,7 @@ function withPercentages(counts, total) {
   for (const [k, v] of Object.entries(counts)) {
     out[k] = {
       count: v,
-      percentage: total > 0 ? Number(((v / total) * 100).toFixed(1)) : 0,
+      percentage: total > 0 ? Number(((v / total) * 100).toFixed(1)) : 0
     };
   }
   return out;
@@ -88,10 +86,7 @@ async function getPaperMetadata(req, res) {
       return res.status(400).json({ error: true, message: 'Invalid paper ID' });
     }
 
-    const paperQuery =
-      req.user.role === 'super_admin'
-        ? { _id: id }
-        : { _id: id, collegeId: req.user.collegeId };
+    const paperQuery = req.user.role === 'super_admin' ? { _id: id } : { _id: id, collegeId: req.user.collegeId };
 
     const paper = await PaperInfo.findOne(paperQuery).lean();
     if (!paper) {
@@ -117,9 +112,7 @@ async function getPaperMetadata(req, res) {
         weightedCount += v;
       }
     }
-    const averageDifficulty = weightedCount > 0
-      ? Number((weightedSum / weightedCount).toFixed(2))
-      : null;
+    const averageDifficulty = weightedCount > 0 ? Number((weightedSum / weightedCount).toFixed(2)) : null;
 
     const bloomCounts = { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0, level6: 0 };
     for (const q of questions) {
@@ -144,7 +137,7 @@ async function getPaperMetadata(req, res) {
       questionTypes,
       averageDifficulty,
       blooms: bloomCounts,
-      modules: moduleCounts,
+      modules: moduleCounts
     });
   } catch (err) {
     logger.error('[paperMetadata.getPaperMetadata]', err);
@@ -200,7 +193,7 @@ async function getMetadataAnalytics(req, res) {
       totalPapers: papers.length,
       totalQuestions: 0,
       difficultyTotals: { Easy: 0, Medium: 0, Hard: 0, Unknown: 0 },
-      questionTypeTotals: {},
+      questionTypeTotals: {}
     };
 
     for (const p of papers) {
@@ -213,22 +206,20 @@ async function getMetadataAnalytics(req, res) {
         else agg.difficultyTotals.Unknown++;
 
         const rawQt = String(q['Question Type'] || '').trim();
-        const qtKey = QUESTION_TYPE_CANON[rawQt.toLowerCase()] || (rawQt || 'Unknown');
+        const qtKey = QUESTION_TYPE_CANON[rawQt.toLowerCase()] || rawQt || 'Unknown';
         agg.questionTypeTotals[qtKey] = (agg.questionTypeTotals[qtKey] || 0) + 1;
       }
     }
 
-    const avgQuestionsPerPaper = papers.length > 0
-      ? Number((agg.totalQuestions / papers.length).toFixed(1))
-      : 0;
+    const avgQuestionsPerPaper = papers.length > 0 ? Number((agg.totalQuestions / papers.length).toFixed(1)) : 0;
 
     return res.json({
       error: false,
       analytics: {
         ...agg,
         avgQuestionsPerPaper,
-        dateRange: { startDate: startDate || null, endDate: endDate || null },
-      },
+        dateRange: { startDate: startDate || null, endDate: endDate || null }
+      }
     });
   } catch (err) {
     logger.error('[paperMetadata.getMetadataAnalytics]', err);

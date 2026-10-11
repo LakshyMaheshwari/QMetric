@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node backend/tests/classifier.test.js)",
+      "Bash(npx jest:*)",
+      "Bash(npx prettier:*)",
+      "Bash(ls frontend/Aceternity-UI-React/src/*.ts)"
+    ]
+  }
+}

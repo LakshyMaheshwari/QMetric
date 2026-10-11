@@ -23,22 +23,20 @@ describe('Super Admin Extensions — Global User Management, Audit Resource Filt
       role: 'teacher',
       email: 'teacher.alpha@test.com',
       collegeId: college1._id,
-      phone: '9876543101',
+      phone: '9876543101'
     });
 
     reviewer1 = await createTestUser({
       role: 'reviewer',
       email: 'reviewer.beta@test.com',
       collegeId: college2._id,
-      phone: '9876543102',
+      phone: '9876543102'
     });
   });
 
   describe('GET /super-admin/users', () => {
     it('returns a paginated list of all users across colleges', async () => {
-      const res = await request(app)
-        .get('/super-admin/users')
-        .set('Cookie', cookie);
+      const res = await request(app).get('/super-admin/users').set('Cookie', cookie);
 
       expect(res.status).toBe(200);
       expect(res.body.error).toBe(false);
@@ -58,9 +56,7 @@ describe('Super Admin Extensions — Global User Management, Audit Resource Filt
     });
 
     it('searches users by name or email', async () => {
-      const res = await request(app)
-        .get('/super-admin/users?search=reviewer.beta')
-        .set('Cookie', cookie);
+      const res = await request(app).get('/super-admin/users?search=reviewer.beta').set('Cookie', cookie);
 
       expect(res.status).toBe(200);
       expect(res.body.users.length).toBe(1);
@@ -69,7 +65,6 @@ describe('Super Admin Extensions — Global User Management, Audit Resource Filt
   });
 
   describe('PUT /super-admin/users/:id/role', () => {
-
     it('does not allow assigning super_admin through the HTTP role endpoint', async () => {
       const teacher = await createTestUser({ role: 'teacher', collegeId: teacher1.collegeId });
 
@@ -152,7 +147,7 @@ describe('Super Admin Extensions — Global User Management, Audit Resource Filt
       const victim = await createTestUser({
         role: 'reviewer',
         email: 'delete-ref-victim@test.com',
-        collegeId: college1._id,
+        collegeId: college1._id
       });
 
       await Paper.create({
@@ -165,18 +160,16 @@ describe('Super Admin Extensions — Global User Management, Audit Resource Filt
         'Course Teacher': teacher1.fullName || teacher1.userName,
         userId: teacher1._id,
         collegeId: college1._id,
-        reviewHistory: [{ reviewerId: victim._id, action: 'approved' }],
+        reviewHistory: [{ reviewerId: victim._id, action: 'approved' }]
       });
 
       await Notification.create({
         userId: victim._id,
         type: 'system',
-        title: 'Reference test',
+        title: 'Reference test'
       });
 
-      const res = await request(app)
-        .delete(`/super-admin/users/${victim._id}`)
-        .set('Cookie', cookie);
+      const res = await request(app).delete(`/super-admin/users/${victim._id}`).set('Cookie', cookie);
 
       expect(res.status).toBe(409);
       expect(res.body.error).toBe(true);
@@ -184,9 +177,7 @@ describe('Super Admin Extensions — Global User Management, Audit Resource Filt
     });
 
     it('deletes a user and creates an audit log', async () => {
-      const res = await request(app)
-        .delete(`/super-admin/users/${teacher1._id}`)
-        .set('Cookie', cookie);
+      const res = await request(app).delete(`/super-admin/users/${teacher1._id}`).set('Cookie', cookie);
 
       expect(res.status).toBe(200);
       expect(res.body.error).toBe(false);
@@ -199,9 +190,7 @@ describe('Super Admin Extensions — Global User Management, Audit Resource Filt
     });
 
     it('prevents super admin from deleting their own account', async () => {
-      const res = await request(app)
-        .delete(`/super-admin/users/${superAdmin._id}`)
-        .set('Cookie', cookie);
+      const res = await request(app).delete(`/super-admin/users/${superAdmin._id}`).set('Cookie', cookie);
 
       expect(res.status).toBe(400);
       expect(res.body.error).toBe(true);
@@ -214,19 +203,17 @@ describe('Super Admin Extensions — Global User Management, Audit Resource Filt
         userId: superAdmin._id,
         action: 'UPDATE_ROLE',
         resource: 'Paper:target_special_123',
-        timestamp: new Date(),
+        timestamp: new Date()
       });
 
       await AuditLog.create({
         userId: superAdmin._id,
         action: 'BLOCK_USER',
         resource: 'User:other_special_456',
-        timestamp: new Date(),
+        timestamp: new Date()
       });
 
-      const res = await request(app)
-        .get('/super-admin/audit-logs?resource=target_special_123')
-        .set('Cookie', cookie);
+      const res = await request(app).get('/super-admin/audit-logs?resource=target_special_123').set('Cookie', cookie);
 
       expect(res.status).toBe(200);
       expect(res.body.logs.length).toBe(1);

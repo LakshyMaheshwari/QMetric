@@ -8,31 +8,15 @@ async function syncCollegeMembership({ collegeId, userId, oldRole, newRole, sess
   const options = session ? { session } : {};
 
   if (oldRole === 'teacher' && newRole !== 'teacher') {
-    await College.updateOne(
-      { _id: collegeId, totalTeachers: { $gt: 0 } },
-      { $inc: { totalTeachers: -1 } },
-      options
-    );
+    await College.updateOne({ _id: collegeId, totalTeachers: { $gt: 0 } }, { $inc: { totalTeachers: -1 } }, options);
   } else if (oldRole !== 'teacher' && newRole === 'teacher') {
-    await College.updateOne(
-      { _id: collegeId },
-      { $inc: { totalTeachers: 1 } },
-      options
-    );
+    await College.updateOne({ _id: collegeId }, { $inc: { totalTeachers: 1 } }, options);
   }
 
   if (oldRole === 'admin' && newRole !== 'admin') {
-    await College.updateOne(
-      { _id: collegeId },
-      { $pull: { adminIds: userId } },
-      options
-    );
+    await College.updateOne({ _id: collegeId }, { $pull: { adminIds: userId } }, options);
   } else if (oldRole !== 'admin' && newRole === 'admin') {
-    await College.updateOne(
-      { _id: collegeId },
-      { $addToSet: { adminIds: userId } },
-      options
-    );
+    await College.updateOne({ _id: collegeId }, { $addToSet: { adminIds: userId } }, options);
   }
 }
 

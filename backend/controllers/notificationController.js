@@ -18,10 +18,7 @@ function isObjectId(v) {
 
 function parsePagination(q) {
   const page = Math.max(1, Number.parseInt(q.page, 10) || 1);
-  const limit = Math.min(
-    MAX_PAGE_LIMIT,
-    Math.max(1, Number.parseInt(q.limit, 10) || DEFAULT_PAGE_LIMIT)
-  );
+  const limit = Math.min(MAX_PAGE_LIMIT, Math.max(1, Number.parseInt(q.limit, 10) || DEFAULT_PAGE_LIMIT));
   return { page, limit, skip: (page - 1) * limit };
 }
 
@@ -29,14 +26,7 @@ function parsePagination(q) {
 // Helper — used by other controllers to emit a notification.
 // Never throws. Callers should not await (fire-and-forget).
 // ---------------------------------------------------------------------------
-async function createNotification({
-  userId,
-  type,
-  title,
-  message = '',
-  relatedDocId = null,
-  actionUrl = '',
-}) {
+async function createNotification({ userId, type, title, message = '', relatedDocId = null, actionUrl = '' }) {
   try {
     if (!userId || !type || !title) {
       logger.warn('[notification.create] missing required fields');
@@ -48,7 +38,7 @@ async function createNotification({
       title,
       message: String(message).slice(0, 500),
       relatedDocId: relatedDocId || null,
-      actionUrl: String(actionUrl).slice(0, 500),
+      actionUrl: String(actionUrl).slice(0, 500)
     });
   } catch (err) {
     logger.error('[notification.create]', err.message);
@@ -73,14 +63,14 @@ async function getNotifications(req, res) {
     const [notifications, total, unreadCount] = await Promise.all([
       Notification.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       Notification.countDocuments(query),
-      Notification.countDocuments({ userId, isRead: false }),
+      Notification.countDocuments({ userId, isRead: false })
     ]);
 
     return res.json({
       error: false,
       notifications,
       unreadCount,
-      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) }
     });
   } catch (err) {
     logger.error('[notification.getNotifications]', err);
@@ -183,5 +173,5 @@ module.exports = {
   getUnreadCount,
   markAsRead,
   markAllAsRead,
-  deleteNotification,
+  deleteNotification
 };

@@ -13,9 +13,7 @@ const { BCRYPT_ROUNDS, isStrongPassword, PASSWORD_ERROR_MESSAGE } = require('../
 const getProfile = async (req, res) => {
   try {
     // req.user is set by the authenticateToken middleware
-    const user = await User.findById(getUserId(req))
-      .select('-password')
-      .populate('collegeId', 'name code city state');
+    const user = await User.findById(getUserId(req)).select('-password').populate('collegeId', 'name code city state');
 
     if (!user) {
       return res.status(404).json({ error: true, message: 'User not found' });
@@ -72,13 +70,13 @@ const updateProfile = async (req, res) => {
     res.json({
       error: false,
       message: 'Profile updated successfully',
-      user: updatedUser,
+      user: updatedUser
     });
   } catch (err) {
     console.error('Error updating profile:', err);
     res.status(500).json({
       error: true,
-      message: 'Server error updating profile',
+      message: 'Server error updating profile'
     });
   }
 };
@@ -96,7 +94,7 @@ const changePassword = async (req, res) => {
     if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
       return res.status(400).json({
         error: true,
-        message: 'currentPassword and newPassword are required.',
+        message: 'currentPassword and newPassword are required.'
       });
     }
     if (!isStrongPassword(newPassword)) {
@@ -106,13 +104,13 @@ const changePassword = async (req, res) => {
     if (Buffer.byteLength(newPassword, 'utf8') > 72) {
       return res.status(400).json({
         error: true,
-        message: 'Password must be at most 72 bytes long.',
+        message: 'Password must be at most 72 bytes long.'
       });
     }
     if (currentPassword === newPassword) {
       return res.status(400).json({
         error: true,
-        message: 'New password must be different from the current password.',
+        message: 'New password must be different from the current password.'
       });
     }
 
@@ -128,7 +126,7 @@ const changePassword = async (req, res) => {
         action: 'CHANGE_PASSWORD',
         resource: `User:${user._id}`,
         request: req,
-        error: new Error('Wrong current password'),
+        error: new Error('Wrong current password')
       });
       // 400 (not 401) so a frontend interceptor doesn't treat this as "session expired".
       return res.status(400).json({ error: true, message: 'Current password is incorrect.' });
@@ -144,23 +142,19 @@ const changePassword = async (req, res) => {
     const oldToken = req.cookies?.accessToken || req.headers.authorization?.split(' ')[1];
     if (oldToken) await revoke(oldToken);
 
-    const accessToken = jwt.sign(
-      { userId: user._id },
-      process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: '72h' }
-    );
+    const accessToken = jwt.sign({ userId: user._id }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '72h' });
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 72 * 60 * 60 * 1000,
+      maxAge: 72 * 60 * 60 * 1000
     });
 
     await logAudit({
       userId: user._id,
       action: 'CHANGE_PASSWORD',
       resource: `User:${user._id}`,
-      request: req,
+      request: req
     });
 
     return res.json({ error: false, message: 'Password changed successfully.' });
@@ -173,5 +167,5 @@ const changePassword = async (req, res) => {
 module.exports = {
   getProfile,
   updateProfile,
-  changePassword,
+  changePassword
 };

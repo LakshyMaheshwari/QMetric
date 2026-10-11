@@ -32,7 +32,7 @@ function getPaginationMeta(total, page, limit) {
     limit,
     pages,
     hasNextPage: page < pages,
-    hasPrevPage: page > 1,
+    hasPrevPage: page > 1
   };
 }
 
@@ -46,7 +46,7 @@ function getPaginationMeta(total, page, limit) {
 function getSortOptions(req, allowedFields = ['createdAt'], defaultSort = { createdAt: -1 }) {
   const { sortBy, order } = req.query;
   if (sortBy && allowedFields.includes(sortBy)) {
-    const sortOrder = (order && (order.toLowerCase() === 'asc' || order === '1')) ? 1 : -1;
+    const sortOrder = order && (order.toLowerCase() === 'asc' || order === '1') ? 1 : -1;
     return { [sortBy]: sortOrder };
   }
   return defaultSort;

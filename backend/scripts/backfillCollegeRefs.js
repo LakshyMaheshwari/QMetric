@@ -30,7 +30,7 @@ const College = require('../Model/College');
     const userResult = await User.updateMany(
       {
         collegeName: college.name,
-        $or: [{ collegeId: null }, { collegeId: { $exists: false } }],
+        $or: [{ collegeId: null }, { collegeId: { $exists: false } }]
       },
       { $set: { collegeId: college._id } }
     );
@@ -41,7 +41,7 @@ const College = require('../Model/College');
       const paperResult = await Paper.updateMany(
         {
           userId: { $in: collegeUsers },
-          $or: [{ collegeId: null }, { collegeId: { $exists: false } }],
+          $or: [{ collegeId: null }, { collegeId: { $exists: false } }]
         },
         { $set: { collegeId: college._id } }
       );

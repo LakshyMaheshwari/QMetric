@@ -35,20 +35,14 @@ async function migrate() {
   // ── 1. Default: everyone gets 'approved' ──────────────
   const r1 = await User.updateMany(
     {
-      $or: [
-        { collegeApprovalStatus: { $exists: false } },
-        { collegeApprovalStatus: null },
-      ],
+      $or: [{ collegeApprovalStatus: { $exists: false } }, { collegeApprovalStatus: null }]
     },
     { $set: { collegeApprovalStatus: 'approved' } }
   );
   logger.info(`✅ Set 'approved' for ${r1.modifiedCount} users`);
 
   // ── 2. Super admins → 'not_applicable' ────────────────
-  const r2 = await User.updateMany(
-    { role: 'super_admin' },
-    { $set: { collegeApprovalStatus: 'not_applicable' } }
-  );
+  const r2 = await User.updateMany({ role: 'super_admin' }, { $set: { collegeApprovalStatus: 'not_applicable' } });
   logger.info(`✅ Set 'not_applicable' for ${r2.modifiedCount} super admins`);
 
   // ── 3. Defensive: student cleanup (no students should exist yet) ──
@@ -58,8 +52,8 @@ async function migrate() {
       $set: {
         collegeId: null,
         collegeName: '',
-        collegeApprovalStatus: 'approved',
-      },
+        collegeApprovalStatus: 'approved'
+      }
     }
   );
   logger.info(`✅ Normalized ${r3.modifiedCount} student accounts`);
@@ -68,7 +62,7 @@ async function migrate() {
   const total = await User.countDocuments({});
   const breakdown = await User.aggregate([
     { $group: { _id: '$collegeApprovalStatus', count: { $sum: 1 } } },
-    { $sort: { count: -1 } },
+    { $sort: { count: -1 } }
   ]);
 
   logger.info('\n📊 Final state:');

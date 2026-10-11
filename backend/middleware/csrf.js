@@ -1,17 +1,17 @@
 const { doubleCsrf } = require('csrf-csrf');
 
 // Skip CSRF in test environment or dev mode with dev auth enabled
-if (process.env.NODE_ENV === 'test' || (process.env.ENABLE_DEV_AUTH === 'true' && process.env.NODE_ENV !== 'production')) {
+if (
+  process.env.NODE_ENV === 'test' ||
+  (process.env.ENABLE_DEV_AUTH === 'true' && process.env.NODE_ENV !== 'production')
+) {
   module.exports = {
     generateCsrfToken: () => 'test-csrf-token',
     doubleCsrfProtection: (req, res, next) => next(),
-    csrfWithBearerSkip: (req, res, next) => next(),
+    csrfWithBearerSkip: (req, res, next) => next()
   };
 } else {
-  const {
-    generateCsrfToken,
-    doubleCsrfProtection: rawDoubleCsrfProtection,
-  } = doubleCsrf({
+  const { generateCsrfToken, doubleCsrfProtection: rawDoubleCsrfProtection } = doubleCsrf({
     // Secret used to sign the CSRF token
     getSecret: () => process.env.CSRF_SECRET || process.env.ACCESS_TOKEN_SECRET,
 
@@ -27,10 +27,10 @@ if (process.env.NODE_ENV === 'test' || (process.env.ENABLE_DEV_AUTH === 'true' &
     // Cookie name for the CSRF token
     cookieName: 'x-csrf-token',
     cookieOptions: {
-      httpOnly: false,          // MUST be false — frontend JS reads it
+      httpOnly: false, // MUST be false — frontend JS reads it
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
-      path: '/',
+      path: '/'
     },
 
     // Token size
@@ -40,7 +40,7 @@ if (process.env.NODE_ENV === 'test' || (process.env.ENABLE_DEV_AUTH === 'true' &
     ignoredMethods: ['GET', 'HEAD', 'OPTIONS'],
 
     // How to read the token from the request
-    getCsrfTokenFromRequest: (req) => req.headers['x-csrf-token'],
+    getCsrfTokenFromRequest: (req) => req.headers['x-csrf-token']
   });
 
   const doubleCsrfProtection = (req, res, next) => {
@@ -53,11 +53,7 @@ if (process.env.NODE_ENV === 'test' || (process.env.ENABLE_DEV_AUTH === 'true' &
     // But if the browser ALSO sent the auth cookie, the cookie is what
     // authenticates the request (see authenticateToken), so CSRF must still apply.
     const hasAuthCookie = Boolean(req.cookies && req.cookies.accessToken);
-    if (
-      typeof authHeader === 'string' &&
-      authHeader.startsWith('Bearer ') &&
-      !hasAuthCookie
-    ) {
+    if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ') && !hasAuthCookie) {
       return next();
     }
     return doubleCsrfProtection(req, res, next);
@@ -66,6 +62,6 @@ if (process.env.NODE_ENV === 'test' || (process.env.ENABLE_DEV_AUTH === 'true' &
   module.exports = {
     generateCsrfToken,
     doubleCsrfProtection,
-    csrfWithBearerSkip,
+    csrfWithBearerSkip
   };
 }

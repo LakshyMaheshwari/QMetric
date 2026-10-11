@@ -5,22 +5,22 @@ require('./config/validateEnv')();
 const notificationsRouter = require('./routes/notification');
 const csrfRouter = require('./routes/csrf');
 const createError = require('http-errors');
-const express     = require('express');
-const path        = require('node:path');
+const express = require('express');
+const path = require('node:path');
 const cookieParser = require('cookie-parser');
-const pinoHttp    = require('pino-http');
-const logger      = require('./config/logger');
-const crypto      = require('node:crypto');
-const cors        = require('cors');
-const mongoose    = require('mongoose');
-const rateLimit   = require('express-rate-limit');
-const helmet      = require('helmet');
+const pinoHttp = require('pino-http');
+const logger = require('./config/logger');
+const crypto = require('node:crypto');
+const cors = require('cors');
+const mongoose = require('mongoose');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 const setupSwagger = require('./config/swagger');
 const { csrfWithBearerSkip } = require('./middleware/csrf');
 const { RedisStore } = require('rate-limit-redis');
 const { sendCommand, connectRedis, disconnectRedis, isRedisEnabled, isRedisReady } = require('./utils/redisClient');
 
-const fileRouter  = require('./routes/file');
+const fileRouter = require('./routes/file');
 const usersRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
 const superAdminRouter = require('./routes/superAdmin');
@@ -45,84 +45,69 @@ if (process.env.TRUST_PROXY) {
 }
 
 // ─── Security Headers ──────────────────────────────────────────────────
-app.use(helmet({
+app.use(
+  helmet({
     contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: [
-                "'self'",
-                "'unsafe-inline'",
-                'https://challenges.cloudflare.com',
-            ],
-            styleSrc: [
-                "'self'",
-                "'unsafe-inline'",
-            ],
-            imgSrc: [
-                "'self'",
-                'data:',
-                'https://res.cloudinary.com',
-            ],
-            connectSrc: [
-                "'self'",
-                'https://challenges.cloudflare.com',
-                ...(process.env.NODE_ENV !== 'production'
-                    ? ['http://localhost:3000', 'http://localhost:3001']
-                    : [process.env.FRONTEND_URL].filter(Boolean)),
-            ],
-            frameSrc: [
-                "'self'",
-                'https://challenges.cloudflare.com',
-            ],
-            fontSrc: ["'self'", 'data:'],
-            objectSrc: ["'none'"],
-            baseUri: ["'self'"],
-            formAction: ["'self'"],
-            frameAncestors: ["'none'"],
-            upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
-        },
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", 'https://challenges.cloudflare.com'],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https://res.cloudinary.com'],
+        connectSrc: [
+          "'self'",
+          'https://challenges.cloudflare.com',
+          ...(process.env.NODE_ENV !== 'production'
+            ? ['http://localhost:3000', 'http://localhost:3001']
+            : [process.env.FRONTEND_URL].filter(Boolean))
+        ],
+        frameSrc: ["'self'", 'https://challenges.cloudflare.com'],
+        fontSrc: ["'self'", 'data:'],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null
+      }
     },
     crossOriginResourcePolicy: { policy: 'cross-origin' },
     crossOriginEmbedderPolicy: false,
-    hsts: process.env.NODE_ENV === 'production'
-        ? { maxAge: 31536000, includeSubDomains: true, preload: true }
-        : false,
+    hsts: process.env.NODE_ENV === 'production' ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     noSniff: true,
     frameguard: { action: 'deny' },
     hidePoweredBy: true,
-    ieNoOpen: true,
-}));
+    ieNoOpen: true
+  })
+);
 
 // ─── CORS ──────────────────────────────────────────────────────────────────────
-const allowedOrigins = [
-  'https://q-metric-3k72.vercel.app',
-  'http://localhost:3000',
-  'http://localhost:3001'
-];
+const allowedOrigins = ['https://q-metric-3k72.vercel.app', 'http://localhost:3000', 'http://localhost:3001'];
 if (process.env.FRONTEND_URL && !allowedOrigins.includes(process.env.FRONTEND_URL)) {
   allowedOrigins.push(process.env.FRONTEND_URL);
 }
 
-
-app.use(cors({
-  origin: allowedOrigins,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: allowedOrigins,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    credentials: true
+  })
+);
 
 // ─── Logging ───────────────────────────────────────────────────────────
-app.use(pinoHttp({
-  logger,
-  genReqId: (req) => req.headers['x-request-id'] || crypto.randomUUID(),
-  customProps: (req) => ({ requestId: req.id }),
-  customSuccessMessage: () => 'request completed',
-  customErrorMessage:   () => 'request failed',
-  serializers: {
-    req: (req) => ({ id: req.id, method: req.method, url: req.url }),
-    res: (res) => ({ statusCode: res.statusCode }),
-  },
-}));
+app.use(
+  pinoHttp({
+    logger,
+    genReqId: (req) => req.headers['x-request-id'] || crypto.randomUUID(),
+    customProps: (req) => ({ requestId: req.id }),
+    customSuccessMessage: () => 'request completed',
+    customErrorMessage: () => 'request failed',
+    serializers: {
+      req: (req) => ({ id: req.id, method: req.method, url: req.url }),
+      res: (res) => ({ statusCode: res.statusCode })
+    }
+  })
+);
 
 // Stamp X-Request-ID on every response early — before any controller runs.
 // pinoHttp's customSuccessMessage / customErrorMessage fire AFTER the response
@@ -138,15 +123,15 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ limit: '5mb', extended: true }));
 app.use((req, res, next) => {
-    if (!req.body) req.body = {};
-    next();
+  if (!req.body) req.body = {};
+  next();
 });
 app.use(cookieParser());
 
 // ─── Dev Auth Bypass (never mounts in production) ──────────────
 if (process.env.NODE_ENV === 'development' && process.env.ENABLE_DEV_AUTH === 'true') {
-    app.use('/dev', devAuthRouter);
-    console.log('⚠️  Dev auth ENABLED — POST /dev/login with { email }');
+  app.use('/dev', devAuthRouter);
+  console.log('⚠️  Dev auth ENABLED — POST /dev/login with { email }');
 }
 
 // ─── CSRF Protection ──────────────────────────────────────────────────────────
@@ -170,9 +155,9 @@ function createLimiter(name, options) {
     ...options,
     store: new RedisStore({
       sendCommand,
-      prefix: `qmetric:rl:${name}:`,
+      prefix: `qmetric:rl:${name}:`
     }),
-    passOnStoreError: process.env.NODE_ENV !== 'production',
+    passOnStoreError: process.env.NODE_ENV !== 'production'
   });
 }
 
@@ -186,8 +171,8 @@ const loginLimiter = createLimiter('login', {
   legacyHeaders: false,
   message: {
     error: true,
-    message: 'Too many failed attempts from this IP. Please wait 15 minutes before trying again.',
-  },
+    message: 'Too many failed attempts from this IP. Please wait 15 minutes before trying again.'
+  }
 });
 
 // Everything else under /auth (profile reads, colleges list, logout...).
@@ -199,8 +184,8 @@ const authGeneralLimiter = createLimiter('auth-general', {
   legacyHeaders: false,
   message: {
     error: true,
-    message: 'Too many requests from this IP. Please slow down.',
-  },
+    message: 'Too many requests from this IP. Please slow down.'
+  }
 });
 
 // Account creation / verification-email resend: every request counts.
@@ -211,8 +196,8 @@ const signupLimiter = createLimiter('signup', {
   legacyHeaders: false,
   message: {
     error: true,
-    message: 'Too many sign-up requests from this IP. Please try again later.',
-  },
+    message: 'Too many sign-up requests from this IP. Please try again later.'
+  }
 });
 
 const adminCreationLimiter = createLimiter('admin-create', {
@@ -220,7 +205,7 @@ const adminCreationLimiter = createLimiter('admin-create', {
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: true, message: 'Too many admin-creation attempts from this IP. Please try again later.' },
+  message: { error: true, message: 'Too many admin-creation attempts from this IP. Please try again later.' }
 });
 
 // General limiter for protected admin/reviewer/teacher routes
@@ -231,8 +216,8 @@ const generalLimiter = createLimiter('general', {
   legacyHeaders: false,
   message: {
     error: true,
-    message: 'Too many requests from this IP. Please slow down.',
-  },
+    message: 'Too many requests from this IP. Please slow down.'
+  }
 });
 
 // Upload: 20 uploads per hour per IP
@@ -243,8 +228,8 @@ const uploadLimiter = createLimiter('upload', {
   legacyHeaders: false,
   message: {
     error: true,
-    message: 'Upload limit reached. You can upload up to 20 files per hour.',
-  },
+    message: 'Upload limit reached. You can upload up to 20 files per hour.'
+  }
 });
 
 // Bulk register: 3 attempts per hour (admin-only but still protect it)
@@ -255,35 +240,35 @@ const bulkLimiter = createLimiter('bulk', {
   legacyHeaders: false,
   message: {
     error: true,
-    message: 'Bulk registration limit reached. Maximum 3 batches per hour.',
+    message: 'Bulk registration limit reached. Maximum 3 batches per hour.'
   },
-    skip: (req) => {
+  skip: (req) => {
     // Only rate-limit the actual write endpoint: POST /auth/bulk-register.
     // GET /bulk-register/template and GET /bulk-register/format are cheap reads.
     if (!req.path.includes('bulk-register')) return true; // not a bulk-register route
-    if (req.method !== 'POST') return true;               // read requests are fine
-    return false;                                         // rate-limit only the POST
-  },
+    if (req.method !== 'POST') return true; // read requests are fine
+    return false; // rate-limit only the POST
+  }
 });
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/upload', uploadLimiter, fileRouter);
 // Scope strict limits to credential endpoints only. Reads like GET /auth/profile,
 // /auth/colleges and /auth/logout must NOT consume the login budget.
-app.use('/auth/login',               loginLimiter);
-app.use('/auth/password',            loginLimiter);
-app.use('/auth/create-account',      signupLimiter);
-app.use('/auth/create-admin',        adminCreationLimiter);
+app.use('/auth/login', loginLimiter);
+app.use('/auth/password', loginLimiter);
+app.use('/auth/create-account', signupLimiter);
+app.use('/auth/create-admin', adminCreationLimiter);
 app.use('/auth/resend-verification', signupLimiter);
-app.use('/auth/forgot-password',     signupLimiter);
-app.use('/auth/reset-password',      loginLimiter);
-app.use('/auth',   authGeneralLimiter, bulkLimiter, usersRouter);
+app.use('/auth/forgot-password', signupLimiter);
+app.use('/auth/reset-password', loginLimiter);
+app.use('/auth', authGeneralLimiter, bulkLimiter, usersRouter);
 app.use('/college-admin', generalLimiter, collegeAdminRouter);
-app.use('/admin',                 generalLimiter, adminRouter);
-app.use('/super-admin',           generalLimiter, superAdminRouter);
-app.use('/reviewer',              generalLimiter, reviewerRouter);
-app.use('/teacher',               generalLimiter, teacherRouter);
-app.use('/student',               generalLimiter, studentRouter);
+app.use('/admin', generalLimiter, adminRouter);
+app.use('/super-admin', generalLimiter, superAdminRouter);
+app.use('/reviewer', generalLimiter, reviewerRouter);
+app.use('/teacher', generalLimiter, teacherRouter);
+app.use('/student', generalLimiter, studentRouter);
 app.use('/notifications', generalLimiter, notificationsRouter);
 
 // ─── Health check (responds even if DB is not yet connected) ──────────────────
@@ -301,7 +286,7 @@ const readinessHandler = (req, res) => {
     status: ready ? 'ready' : 'not_ready',
     db: dbReady ? 'connected' : 'not_connected',
     redis: isRedisEnabled() ? (redisReady ? 'connected' : 'not_connected') : 'disabled',
-    uptime: process.uptime(),
+    uptime: process.uptime()
   });
 };
 
@@ -321,27 +306,27 @@ app.use((err, req, res, next) => {
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({
       error: true,
-      message: 'File too large. Maximum allowed size is 25MB.',
+      message: 'File too large. Maximum allowed size is 25MB.'
     });
   }
 
   // Multer: file type filter rejection
-  if (err.message && (
-    err.message.includes('Invalid file type') ||
-    err.message.includes('File type not allowed')
-  )) {
+  if (err.message && (err.message.includes('Invalid file type') || err.message.includes('File type not allowed'))) {
     return res.status(400).json({
       error: true,
-      message: err.message,
+      message: err.message
     });
   }
 
   // CSRF failures
-  if (err.code === 'EBADCSRFTOKEN' || (err.status === 403 && err.message && err.message.toLowerCase().includes('csrf'))) {
+  if (
+    err.code === 'EBADCSRFTOKEN' ||
+    (err.status === 403 && err.message && err.message.toLowerCase().includes('csrf'))
+  ) {
     return res.status(403).json({
       error: true,
       message: 'Invalid or missing CSRF token.',
-      code: 'EBADCSRFTOKEN',
+      code: 'EBADCSRFTOKEN'
     });
   }
 
@@ -350,9 +335,7 @@ app.use((err, req, res, next) => {
   // the server log; the client gets a safe, generic message.
   res.status(err.status || 500).json({
     error: true,
-    message: err.status && err.status < 500
-      ? err.message
-      : 'An internal server error occurred.',
+    message: err.status && err.status < 500 ? err.message : 'An internal server error occurred.'
   });
 });
 
@@ -414,7 +397,7 @@ if (process.env.NODE_ENV !== 'test') {
       await mongoose.connect(process.env.MONGO_URI, {
         serverSelectionTimeoutMS: 5000,
         connectTimeoutMS: 10000,
-        socketTimeoutMS: 45000,
+        socketTimeoutMS: 45000
       });
       logger.info('Connected to MongoDB');
     } catch (err) {
@@ -435,7 +418,12 @@ if (process.env.NODE_ENV !== 'test') {
   if (isRedisEnabled()) {
     connectRedis()
       .then(() => logger.info('Connected to Redis'))
-      .catch((err) => logger.error({ err }, 'Redis connection failed; rate limit/revocation will use fallback behavior where available'));
+      .catch((err) =>
+        logger.error(
+          { err },
+          'Redis connection failed; rate limit/revocation will use fallback behavior where available'
+        )
+      );
   }
 
   mongoose.connection.on('disconnected', () => {

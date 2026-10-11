@@ -66,7 +66,7 @@ const AUDIT_ACTIONS = Object.freeze({
   OCR_MANUAL_REJECT: 'ocr_log.manual_reject',
   VQ_CORRECTION_SUBMITTED: 'verified_question.correction_submitted',
   VQ_CORRECTION_UPDATED: 'verified_question.correction_updated',
-  VQ_CORRECTION_DELETED: 'verified_question.correction_deleted',
+  VQ_CORRECTION_DELETED: 'verified_question.correction_deleted'
 });
 
 const AUDIT_ACTION_VALUES = Object.freeze(Object.values(AUDIT_ACTIONS));

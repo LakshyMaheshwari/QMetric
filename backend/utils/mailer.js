@@ -20,8 +20,8 @@ function getTransporter() {
       secure: Number(SMTP_PORT) === 465,
       auth: {
         user: SMTP_USER,
-        pass: SMTP_PASS,
-      },
+        pass: SMTP_PASS
+      }
     });
   } else {
     // Dev / no-SMTP fallback — logs the email instead of sending it
@@ -29,7 +29,7 @@ function getTransporter() {
       sendMail: async (mailOptions) => {
         logger.debug({ subject: mailOptions.subject }, 'Email notification simulated');
         return { messageId: 'simulated-id' };
-      },
+      }
     };
   }
 
@@ -51,7 +51,7 @@ async function sendReviewStatusEmail({ to, courseName, reviewStatus, comments })
       from,
       to,
       subject,
-      text,
+      text
     });
   } catch (error) {
     logger.error({ err: error }, 'Failed to send review status email');
@@ -62,17 +62,17 @@ async function sendReviewStatusEmail({ to, courseName, reviewStatus, comments })
  * Generic mail sender. Throws on failure (callers should wrap in try/catch).
  */
 async function sendMail({ to, subject, html, text, from }) {
-    const client = getTransporter();
-    return client.sendMail({
-        from: from || process.env.FROM_EMAIL || '"QMetric System" <noreply@qmetric.edu>',
-        to,
-        subject,
-        html,
-        text,
-    });
+  const client = getTransporter();
+  return client.sendMail({
+    from: from || process.env.FROM_EMAIL || '"QMetric System" <noreply@qmetric.edu>',
+    to,
+    subject,
+    html,
+    text
+  });
 }
 
 module.exports = {
   sendReviewStatusEmail,
-  sendMail,
+  sendMail
 };

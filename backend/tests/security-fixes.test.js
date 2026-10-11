@@ -13,7 +13,7 @@ const {
   createTestPaper,
   createCollegeAdmin,
   createSuperAdmin,
-  getCookieString,
+  getCookieString
 } = require('./helpers');
 
 describe('C1 — role scoping is default-deny', () => {
@@ -26,34 +26,28 @@ describe('C1 — role scoping is default-deny', () => {
     paper = await createTestPaper({ userId: teacher._id, collegeId: college._id });
   });
 
-  it('a student sees no papers on GET /teacher/papers (not everyone else\'s)', async () => {
-    const res = await request(app)
-      .get('/teacher/papers')
-      .set('Cookie', getCookieString(student));
+  it("a student sees no papers on GET /teacher/papers (not everyone else's)", async () => {
+    const res = await request(app).get('/teacher/papers').set('Cookie', getCookieString(student));
 
     expect(res.status).toBe(200);
     expect(res.body.papers).toEqual([]);
   });
 
-  it('a student cannot fetch another user\'s paper by id', async () => {
-    const res = await request(app)
-      .get(`/teacher/papers/${paper._id}`)
-      .set('Cookie', getCookieString(student));
+  it("a student cannot fetch another user's paper by id", async () => {
+    const res = await request(app).get(`/teacher/papers/${paper._id}`).set('Cookie', getCookieString(student));
 
     expect(res.status).toBe(404);
   });
 
   it('a teacher still sees their own papers (no regression)', async () => {
-    const res = await request(app)
-      .get('/teacher/papers')
-      .set('Cookie', getCookieString(teacher));
+    const res = await request(app).get('/teacher/papers').set('Cookie', getCookieString(teacher));
 
     expect(res.status).toBe(200);
     expect(res.body.papers).toHaveLength(1);
   });
 });
 
-describe('H1 — POST /admin/users is scoped to the caller\'s college', () => {
+describe("H1 — POST /admin/users is scoped to the caller's college", () => {
   it('a college admin cannot plant a user in another college', async () => {
     const collegeA = await createTestCollege({ name: 'College A' });
     const collegeB = await createTestCollege({ name: 'College B' });
@@ -70,7 +64,7 @@ describe('H1 — POST /admin/users is scoped to the caller\'s college', () => {
         email: 'planted@test.com',
         password: 'Password123',
         role: 'admin',
-        collegeId: String(collegeA._id), // attempted override — must be ignored
+        collegeId: String(collegeA._id) // attempted override — must be ignored
       });
 
     expect(res.status).toBe(201);
@@ -88,7 +82,7 @@ describe('H2/H3 — Bloom recommendations: authorization and data location', () 
     const paper = await createTestPaper({
       userId: teacher._id,
       collegeId: collegeA._id,
-      collectedData: [{ BloomRecommendations: { recommendations: [], bloomLevelOverview: {} } }],
+      collectedData: [{ BloomRecommendations: { recommendations: [], bloomLevelOverview: {} } }]
     });
 
     const res = await request(app)
@@ -109,10 +103,10 @@ describe('H2/H3 — Bloom recommendations: authorization and data location', () 
         {
           BloomRecommendations: {
             recommendations: [{ expectedLevel: 1, actualLevel: 1 }],
-            bloomLevelOverview: {},
-          },
-        },
-      ],
+            bloomLevelOverview: {}
+          }
+        }
+      ]
     });
 
     const res = await request(app)
@@ -124,19 +118,17 @@ describe('H2/H3 — Bloom recommendations: authorization and data location', () 
 });
 
 describe('H6 — independent-teacher affiliation requests are approvable', () => {
-  it('appears in the pending list and can be approved by that college\'s admin', async () => {
+  it("appears in the pending list and can be approved by that college's admin", async () => {
     const college = await createTestCollege();
     const admin = await createCollegeAdmin(college);
     const independentTeacher = await createTestUser({ role: 'teacher', collegeId: null });
 
     await User.findByIdAndUpdate(independentTeacher._id, {
       collegeApprovalStatus: 'pending',
-      pendingAffiliationRequest: { collegeId: college._id, requestedAt: new Date() },
+      pendingAffiliationRequest: { collegeId: college._id, requestedAt: new Date() }
     });
 
-    const list = await request(app)
-      .get('/college-admin/pending-teachers')
-      .set('Cookie', getCookieString(admin));
+    const list = await request(app).get('/college-admin/pending-teachers').set('Cookie', getCookieString(admin));
     expect(list.status).toBe(200);
     expect(list.body.teachers.map((t) => String(t._id))).toContain(String(independentTeacher._id));
 
@@ -159,12 +151,10 @@ describe('H9 — needs_revision papers can be resubmitted', () => {
     const paper = await createTestPaper({
       userId: teacher._id,
       collegeId: college._id,
-      reviewStatus: 'needs_revision',
+      reviewStatus: 'needs_revision'
     });
 
-    const res = await request(app)
-      .put(`/teacher/papers/${paper._id}/submit`)
-      .set('Cookie', getCookieString(teacher));
+    const res = await request(app).put(`/teacher/papers/${paper._id}/submit`).set('Cookie', getCookieString(teacher));
 
     expect(res.status).toBe(200);
     const updated = await Paper.findById(paper._id);
@@ -180,7 +170,7 @@ describe('H10 — reviewPaper has a state guard and a self-review guard', () => 
     const paper = await createTestPaper({
       userId: teacher._id,
       collegeId: college._id,
-      reviewStatus: 'draft',
+      reviewStatus: 'draft'
     });
 
     const res = await request(app)
@@ -197,7 +187,7 @@ describe('H10 — reviewPaper has a state guard and a self-review guard', () => 
     const paper = await createTestPaper({
       userId: reviewer._id,
       collegeId: college._id,
-      reviewStatus: 'pending',
+      reviewStatus: 'pending'
     });
 
     const res = await request(app)
@@ -215,7 +205,7 @@ describe('H12 — authenticated password change', () => {
     const teacher = await createTestUser({
       role: 'teacher',
       collegeId: college._id,
-      password: 'OldPassword123',
+      password: 'OldPassword123'
     });
     const oldCookie = getCookieString(teacher);
 
@@ -227,9 +217,7 @@ describe('H12 — authenticated password change', () => {
     expect(res.status).toBe(200);
 
     // Old token is now revoked, even though it hasn't expired
-    const reuse = await request(app)
-      .get('/auth/profile')
-      .set('Cookie', oldCookie);
+    const reuse = await request(app).get('/auth/profile').set('Cookie', oldCookie);
     expect(reuse.status).toBe(401);
   });
 
@@ -238,7 +226,7 @@ describe('H12 — authenticated password change', () => {
     const teacher = await createTestUser({
       role: 'teacher',
       collegeId: college._id,
-      password: 'OldPassword123',
+      password: 'OldPassword123'
     });
 
     const res = await request(app)
@@ -256,7 +244,7 @@ describe('Login timing / state-leak fix', () => {
     const teacher = await createTestUser({
       role: 'teacher',
       collegeId: college._id,
-      password: 'CorrectPassword123',
+      password: 'CorrectPassword123'
     });
     await User.findByIdAndUpdate(teacher._id, { isBlocked: true });
 
@@ -279,23 +267,21 @@ describe('Regex-injection fix in college lookup', () => {
   it('does not throw or match everything when collegeName contains regex metacharacters', async () => {
     await createTestCollege({ name: 'Normal College' });
 
-    const res = await request(app)
-      .post('/auth/create-account')
-      .send({
-        userName: 'regexuser',
-        fullName: 'Regex User',
-        email: 'regexuser@test.com',
-        password: 'TestPassword123',
-        phone: '9333333333',
-        role: 'teacher',
-        signupIntent: 'affiliated',
-        collegeName: '.*', // would match every college name if unescaped
-        position: 'Lecturer',
-        employeeId: 'EMP-REGEX1',
-        department: 'CS',
-        stream: 'Engineering',
-        turnstileToken: 'XXXX.DUMMY.TOKEN.XXXX',
-      });
+    const res = await request(app).post('/auth/create-account').send({
+      userName: 'regexuser',
+      fullName: 'Regex User',
+      email: 'regexuser@test.com',
+      password: 'TestPassword123',
+      phone: '9333333333',
+      role: 'teacher',
+      signupIntent: 'affiliated',
+      collegeName: '.*', // would match every college name if unescaped
+      position: 'Lecturer',
+      employeeId: 'EMP-REGEX1',
+      department: 'CS',
+      stream: 'Engineering',
+      turnstileToken: 'XXXX.DUMMY.TOKEN.XXXX'
+    });
 
     // Should fail cleanly with "college not recognized", not 500, and not
     // silently affiliate the user with "Normal College".
@@ -325,9 +311,9 @@ describe('H4/H5 — bulk register dryRun, rollbackOnError, and unknown colleges'
             department: 'CS',
             stream: 'Engineering',
             position: 'Professor',
-            collegeId: String(college._id),
-          },
-        ],
+            collegeId: String(college._id)
+          }
+        ]
       });
 
     expect(res.status).toBe(200);
@@ -354,9 +340,9 @@ describe('H4/H5 — bulk register dryRun, rollbackOnError, and unknown colleges'
             department: 'CS',
             stream: 'Engineering',
             position: 'Professor',
-            collegeName: 'Totally Unknown College',
-          },
-        ],
+            collegeName: 'Totally Unknown College'
+          }
+        ]
       });
 
     expect(res.status).toBe(207);

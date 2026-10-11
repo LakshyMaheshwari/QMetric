@@ -18,7 +18,7 @@ async function loadUserIfNeeded(req) {
       _id: getUserId(req),
       role: getUserRole(req),
       collegeId: getCollegeId(req),
-      isBlocked: req.user.isBlocked === true,
+      isBlocked: req.user.isBlocked === true
     };
   }
   // Fallback — only used if the route forgot to run authenticateToken
@@ -67,5 +67,5 @@ function requireRole(...roles) {
 
 module.exports = {
   requireSuperAdmin,
-  requireRole,
+  requireRole
 };

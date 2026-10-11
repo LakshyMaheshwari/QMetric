@@ -7,24 +7,24 @@
  */
 
 module.exports = {
-    COLLECTED_DATA: 'Collected Data',
-    COURSE_NAME: 'Course Name',
-    COURSE_CODE: 'Course Code',
-    COURSE_TEACHER: 'Course Teacher',
-    COLLEGE_NAME: 'College Name',
-    YEAR_OF_STUDY: 'Year Of Study',
-    BLOOMS_TAXONOMY_LEVEL: "Bloom's Taxonomy Level",
-    BLOOMS_VERBS: "Bloom's Verbs",
-    BLOOMS_HIGHEST_VERB: "Bloom's Highest Verb",
-    QUESTION_NO: 'Question No',
-    QUESTION_TYPE: 'Question Type',
+  COLLECTED_DATA: 'Collected Data',
+  COURSE_NAME: 'Course Name',
+  COURSE_CODE: 'Course Code',
+  COURSE_TEACHER: 'Course Teacher',
+  COLLEGE_NAME: 'College Name',
+  YEAR_OF_STUDY: 'Year Of Study',
+  BLOOMS_TAXONOMY_LEVEL: "Bloom's Taxonomy Level",
+  BLOOMS_VERBS: "Bloom's Verbs",
+  BLOOMS_HIGHEST_VERB: "Bloom's Highest Verb",
+  QUESTION_NO: 'Question No',
+  QUESTION_TYPE: 'Question Type',
 
-    DEFAULT_BLOOM_LEVEL_MAP: Object.freeze({
-        remember: 1,
-        understand: 2,
-        apply: 3,
-        analyze: 4,
-        evaluate: 5,
-        create: 6,
-    }),
+  DEFAULT_BLOOM_LEVEL_MAP: Object.freeze({
+    remember: 1,
+    understand: 2,
+    apply: 3,
+    analyze: 4,
+    evaluate: 5,
+    create: 6
+  })
 };

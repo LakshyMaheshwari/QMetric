@@ -4,10 +4,7 @@ const app = require('../index');
 const College = require('../Model/College');
 const CollegeApplication = require('../Model/CollegeApplication');
 const User = require('../Model/user');
-const {
-  createSuperAdmin,
-  getCookieString,
-} = require('./helpers');
+const { createSuperAdmin, getCookieString } = require('./helpers');
 
 describe('College Registration Applications', () => {
   let superAdmin;
@@ -27,13 +24,11 @@ describe('College Registration Applications', () => {
     contactName: 'Exam Cell Admin',
     contactEmail: 'examcell@qmetriccollege.test',
     contactPhone: '9876543210',
-    password: 'StrongPass123',
+    password: 'StrongPass123'
   };
 
   it('submits a public college application', async () => {
-    const res = await request(app)
-      .post('/auth/college-applications')
-      .send(validApplication);
+    const res = await request(app).post('/auth/college-applications').send(validApplication);
 
     expect(res.status).toBe(201);
     expect(res.body.error).toBe(false);
@@ -54,19 +49,16 @@ describe('College Registration Applications', () => {
       .post('/auth/college-applications')
       .send({
         ...validApplication,
-        contactEmail: 'different@qmetriccollege.test',
+        contactEmail: 'different@qmetriccollege.test'
       });
 
     expect(res.status).toBe(409);
   });
 
   it('returns the public status of an application without exposing the password', async () => {
-    const created = await request(app)
-      .post('/auth/college-applications')
-      .send(validApplication);
+    const created = await request(app).post('/auth/college-applications').send(validApplication);
 
-    const res = await request(app)
-      .get(`/auth/college-applications/${created.body.application._id}`);
+    const res = await request(app).get(`/auth/college-applications/${created.body.application._id}`);
 
     expect(res.status).toBe(200);
     expect(res.body.application.status).toBe('pending');
@@ -81,9 +73,7 @@ describe('College Registration Applications', () => {
   it('allows super admin to list pending applications', async () => {
     await request(app).post('/auth/college-applications').send(validApplication);
 
-    const res = await request(app)
-      .get('/super-admin/college-applications')
-      .set('Cookie', cookie);
+    const res = await request(app).get('/super-admin/college-applications').set('Cookie', cookie);
 
     expect(res.status).toBe(200);
     expect(res.body.error).toBe(false);
@@ -93,9 +83,7 @@ describe('College Registration Applications', () => {
   });
 
   it('approves an application and creates the college and admin account', async () => {
-    const created = await request(app)
-      .post('/auth/college-applications')
-      .send(validApplication);
+    const created = await request(app).post('/auth/college-applications').send(validApplication);
 
     const res = await request(app)
       .put(`/super-admin/college-applications/${created.body.application._id}/approve`)
@@ -123,9 +111,7 @@ describe('College Registration Applications', () => {
   });
 
   it('rejects an application only with a reason', async () => {
-    const created = await request(app)
-      .post('/auth/college-applications')
-      .send(validApplication);
+    const created = await request(app).post('/auth/college-applications').send(validApplication);
 
     const missingReason = await request(app)
       .put(`/super-admin/college-applications/${created.body.application._id}/reject`)

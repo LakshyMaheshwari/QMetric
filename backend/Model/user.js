@@ -1,262 +1,255 @@
 const mongoose = require('mongoose');
 
 // Required for every teacher, affiliated or not
-const isTeacher = function () { return this.role === 'teacher'; };
+const isTeacher = function () {
+  return this.role === 'teacher';
+};
 
 // Required only when the teacher is affiliated with a college
 const isAffiliatedTeacher = function () {
-    return this.role === 'teacher' && !!this.collegeId;
+  return this.role === 'teacher' && !!this.collegeId;
 };
 
-const pendingIdVerificationSchema = new mongoose.Schema({
+const pendingIdVerificationSchema = new mongoose.Schema(
+  {
     status: { type: String, default: null },
     confidence: { type: Number, default: null },
     extractedData: { type: mongoose.Schema.Types.Mixed, default: null },
     matchedFields: { type: mongoose.Schema.Types.Mixed, default: null },
-    updatedAt: { type: Date, default: null },
-}, { _id: false, strict: true });
+    updatedAt: { type: Date, default: null }
+  },
+  { _id: false, strict: true }
+);
 
-const userSchema = new mongoose.Schema({
+const userSchema = new mongoose.Schema(
+  {
     // --- Core fields (required for ALL roles) ---
     userName: {
-        type: String,
-        required: true,
-        trim: true,
-        minlength: 2,
-        maxlength: 50
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 2,
+      maxlength: 50
     },
     email: {
-        type: String,
-        required: true,
-        unique: true,
-        lowercase: true,
-        trim: true
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true
     },
     // Set on password change; tokens issued before this instant are rejected.
     passwordChangedAt: { type: Date, default: null },
     password: {
-        type: String,
-        required: true
+      type: String,
+      required: true
     },
     role: {
-        type: String,
-        enum: ['teacher', 'reviewer', 'admin', 'super_admin', 'student'],
-        default: 'teacher'
+      type: String,
+      enum: ['teacher', 'reviewer', 'admin', 'super_admin', 'student'],
+      default: 'teacher'
     },
     isBlocked: {
-        type: Boolean,
-        default: false
+      type: Boolean,
+      default: false
     },
     collegeId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'College',
-        required: false,
-        default: null
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'College',
+      required: false,
+      default: null
     },
 
     // --- Teacher-specific profile fields ---
     fullName: {
-        type: String,
-        required: isTeacher,
-        trim: true,
-        minlength: 2,
-        maxlength: 100,
-        default: ''
+      type: String,
+      required: isTeacher,
+      trim: true,
+      minlength: 2,
+      maxlength: 100,
+      default: ''
     },
     phone: {
-        type: String,
-        required: false,
-        match: [/^[0-9]{10}$/, 'Phone must be 10 digits'],
-        unique: true,
-        sparse: true,
+      type: String,
+      required: false,
+      match: [/^[0-9]{10}$/, 'Phone must be 10 digits'],
+      unique: true,
+      sparse: true
     },
     collegeName: {
-        type: String,
-        required: isAffiliatedTeacher,
-        trim: true,
-        default: ''
+      type: String,
+      required: isAffiliatedTeacher,
+      trim: true,
+      default: ''
     },
     position: {
-        type: String,
-        required: isTeacher,
-        enum: [
-            'Professor',
-            'Senior Professor',
-            'Associate Professor',
-            'Assistant Professor',
-            'Senior Lecturer',
-            'Lecturer',
-            'HoD',
-            'Dean',
-            'Director',
-            'Principal',
-            'Vice Principal',
-            'Academic Coordinator',
-            'Visiting Faculty',
-            'Research Faculty',
-            'Teaching Assistant',
-            'Other',
-            ''
-        ],
-        default: ''
+      type: String,
+      required: isTeacher,
+      enum: [
+        'Professor',
+        'Senior Professor',
+        'Associate Professor',
+        'Assistant Professor',
+        'Senior Lecturer',
+        'Lecturer',
+        'HoD',
+        'Dean',
+        'Director',
+        'Principal',
+        'Vice Principal',
+        'Academic Coordinator',
+        'Visiting Faculty',
+        'Research Faculty',
+        'Teaching Assistant',
+        'Other',
+        ''
+      ],
+      default: ''
     },
     employeeId: {
-        type: String,
-        required: false,
-        unique: true,
-        trim: true,
-        sparse: true,
+      type: String,
+      required: false,
+      unique: true,
+      trim: true,
+      sparse: true
     },
     department: {
-        type: String,
-        required: isAffiliatedTeacher,
-        trim: true,
-        default: ''
+      type: String,
+      required: isAffiliatedTeacher,
+      trim: true,
+      default: ''
     },
     stream: {
-        type: String,
-        required: isAffiliatedTeacher,
-        enum: [
-            'Engineering',
-            'Management',
-            'Science',
-            'Commerce',
-            'Arts',
-            'Law',
-            'Medicine',
-            'Other',
-            ''
-        ],
-        default: ''
+      type: String,
+      required: isAffiliatedTeacher,
+      enum: ['Engineering', 'Management', 'Science', 'Commerce', 'Arts', 'Law', 'Medicine', 'Other', ''],
+      default: ''
     },
     collegeIdPhoto: { type: String, required: false, default: '' },
     collegeIdPhotoPublicId: { type: String, required: false, default: null },
 
     // --- OCR ID Verification (teachers only — admins skip this) ---
     idVerification: {
-        status: {
-            type: String,
-            enum: ['verified', 'flagged', 'unverified', 'not_applicable'],
-            default: 'unverified'
-        },
-        extractedData: {
-            fullName:    { type: String, default: '' },
-            employeeId:  { type: String, default: '' },
-            collegeName: { type: String, default: '' },
-            department:  { type: String, default: '' }
-        },
-        matchedFields: {
-            type: [String],
-            default: []
-        },
-        confidence: {
-            type: Number,
-            default: 0,
-            min: 0,
-            max: 100
-        },
-        updatedAt: {
-            type: Date,
-            default: Date.now
-        }
+      status: {
+        type: String,
+        enum: ['verified', 'flagged', 'unverified', 'not_applicable'],
+        default: 'unverified'
+      },
+      extractedData: {
+        fullName: { type: String, default: '' },
+        employeeId: { type: String, default: '' },
+        collegeName: { type: String, default: '' },
+        department: { type: String, default: '' }
+      },
+      matchedFields: {
+        type: [String],
+        default: []
+      },
+      confidence: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 100
+      },
+      updatedAt: {
+        type: Date,
+        default: Date.now
+      }
     },
 
     // --- Email verification (Phase 2) ---
     emailVerified: {
-        type: Boolean,
-        default: false,
+      type: Boolean,
+      default: false
     },
     emailVerificationToken: {
-        type: String,
-        default: null,
-        select: false,
+      type: String,
+      default: null,
+      select: false
     },
     emailVerificationExpires: {
-        type: Date,
-        default: null,
-        select: false,
+      type: Date,
+      default: null,
+      select: false
     },
 
     // --- Password reset ---
     passwordResetToken: {
-        type: String,
-        default: null,
-        select: false,
+      type: String,
+      default: null,
+      select: false
     },
     passwordResetExpires: {
-        type: Date,
-        default: null,
-        select: false,
+      type: Date,
+      default: null,
+      select: false
     },
 
     // --- Refresh token (hashed, single active token per user) ---
     refreshTokenHash: {
-        type: String,
-        default: null,
-        select: false,
+      type: String,
+      default: null,
+      select: false
     },
     refreshTokenExpiresAt: {
-        type: Date,
-        default: null,
-        select: false,
+      type: Date,
+      default: null,
+      select: false
     },
 
     // --- College approval workflow (Phase A) ---
     collegeApprovalStatus: {
-    type: String,
-    enum: ['pending', 'approved', 'rejected', 'not_applicable'],
-    default: 'approved',
-    index: true,
-},
-    pendingAffiliationRequest: {
-        collegeId:      { type: mongoose.Schema.Types.ObjectId, ref: 'College', default: null },
-        requestedAt:    { type: Date, default: null },
-        idVerification: { type: pendingIdVerificationSchema, default: null },
+      type: String,
+      enum: ['pending', 'approved', 'rejected', 'not_applicable'],
+      default: 'approved',
+      index: true
     },
-
-}, { timestamps: true });
+    pendingAffiliationRequest: {
+      collegeId: { type: mongoose.Schema.Types.ObjectId, ref: 'College', default: null },
+      requestedAt: { type: Date, default: null },
+      idVerification: { type: pendingIdVerificationSchema, default: null }
+    }
+  },
+  { timestamps: true }
+);
 
 // Pre-save hook: Enforce role-based college rules
 userSchema.pre('save', function (next) {
-    if (this.role === 'super_admin') {
-        this.collegeId = null;
-        this.collegeName = '';
-        this.collegeApprovalStatus = 'not_applicable';
-    }
-    else if (this.role === 'student') {
-        this.collegeId = null;
-        this.collegeName = '';
+  if (this.role === 'super_admin') {
+    this.collegeId = null;
+    this.collegeName = '';
+    this.collegeApprovalStatus = 'not_applicable';
+  } else if (this.role === 'student') {
+    this.collegeId = null;
+    this.collegeName = '';
+    this.collegeApprovalStatus = 'approved';
+  } else if (this.role === 'teacher') {
+    if (this.collegeId) {
+      // Affiliated — must be admin-approved.
+      // Do NOT clobber an admin's decision.
+      if (!this.collegeApprovalStatus || this.collegeApprovalStatus === 'not_applicable') {
+        this.collegeApprovalStatus = 'pending';
+      }
+    } else if (this.pendingAffiliationRequest?.collegeId) {
+      // Independent teacher with an in-flight affiliation request — keep pending
+      this.collegeApprovalStatus = 'pending';
+    } else {
+      // Fully independent teacher — auto-approved, UNLESS the caller
+      // explicitly set 'pending' (preserve user intent / manual state)
+      if (!this.collegeApprovalStatus || this.collegeApprovalStatus === 'not_applicable') {
         this.collegeApprovalStatus = 'approved';
+      }
     }
-    else if (this.role === 'teacher') {
-        if (this.collegeId) {
-            // Affiliated — must be admin-approved.
-            // Do NOT clobber an admin's decision.
-            if (!this.collegeApprovalStatus || this.collegeApprovalStatus === 'not_applicable') {
-                this.collegeApprovalStatus = 'pending';
-            }
-        } else if (this.pendingAffiliationRequest?.collegeId) {
-            // Independent teacher with an in-flight affiliation request — keep pending
-            this.collegeApprovalStatus = 'pending';
-        } else {
-            // Fully independent teacher — auto-approved, UNLESS the caller
-            // explicitly set 'pending' (preserve user intent / manual state)
-            if (!this.collegeApprovalStatus || this.collegeApprovalStatus === 'not_applicable') {
-                this.collegeApprovalStatus = 'approved';
-            }
-        }
+  } else if (this.role === 'reviewer' || this.role === 'admin') {
+    if (!this.collegeId) {
+      return next(new Error(`College is required for ${this.role} role`));
     }
-    else if (this.role === 'reviewer' || this.role === 'admin') {
-        if (!this.collegeId) {
-            return next(new Error(`College is required for ${this.role} role`));
-        }
-        this.collegeApprovalStatus = 'approved';
-    }
-    else {
-        this.collegeApprovalStatus = 'approved';
-    }
+    this.collegeApprovalStatus = 'approved';
+  } else {
+    this.collegeApprovalStatus = 'approved';
+  }
 
-    next();
+  next();
 });
 
 // Indexes

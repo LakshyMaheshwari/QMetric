@@ -10,7 +10,7 @@ describe('Learning Domain Classifier — 5-Layer Vote Model', () => {
       expect(r.domain).toBe('cognitive');
       expect(r.level).toBe(1);
       expect(r.levelName).toBe('Remember');
-      expect(r.score).toBeGreaterThanOrEqual(0.80);
+      expect(r.score).toBeGreaterThanOrEqual(0.8);
       expect(r.needsReview).toBe(false);
     });
 
@@ -114,7 +114,7 @@ describe('Learning Domain Classifier — 5-Layer Vote Model', () => {
     test('Nonsense verb → flagged for review', () => {
       const r = classify('Zorblify the framistan.');
       expect(r.needsReview).toBe(true);
-      expect(r.score).toBeLessThan(0.80);
+      expect(r.score).toBeLessThan(0.8);
     });
 
     test('Empty string → flagged for review', () => {
@@ -132,7 +132,7 @@ describe('Learning Domain Classifier — 5-Layer Vote Model', () => {
         'Define a variable.',
         'Explain how a transformer works.',
         'Compare TCP and UDP.',
-        'Design a database schema.',
+        'Design a database schema.'
       ];
       const results = classifyPaper(questions);
       expect(Array.isArray(results)).toBe(true);
@@ -149,7 +149,7 @@ describe('Learning Domain Classifier — 5-Layer Vote Model', () => {
         'Define a variable.',
         'Explain how a transformer works.',
         'Compare TCP and UDP.',
-        'Design a database schema.',
+        'Design a database schema.'
       ];
       const classified = classifyPaper(questions);
       const insights = aggregateInsights(classified);
@@ -198,22 +198,13 @@ describe('Learning Domain Classifier — 5-Layer Vote Model', () => {
     });
 
     test('detects multiple coordinated instructional verbs and flags review', () => {
-  const r = classify(
-    'Compare TCP and UDP and evaluate their security.'
-  );
+      const r = classify('Compare TCP and UDP and evaluate their security.');
 
-  expect(r.signals.detectedVerbs).toEqual(
-    expect.arrayContaining([
-      'compare',
-      'evaluate',
-    ])
-  );
+      expect(r.signals.detectedVerbs).toEqual(expect.arrayContaining(['compare', 'evaluate']));
 
-  expect(
-    r.signals.multipleInstructionVerbs
-  ).toBe(true);
+      expect(r.signals.multipleInstructionVerbs).toBe(true);
 
-  expect(r.needsReview).toBe(true);
-});
+      expect(r.needsReview).toBe(true);
+    });
   });
 });

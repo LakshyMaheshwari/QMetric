@@ -10,7 +10,7 @@ const {
   validatePagination,
   validateQuestionIndex,
   validateSearch,
-  handleValidationErrors,
+  handleValidationErrors
 } = require('../middleware/validators');
 const verifiedQuestionController = require('../controllers/verifiedQuestionController');
 
@@ -318,10 +318,10 @@ router.delete(
  *       404: { description: Paper not found OR recommendations not yet generated }
  */
 router.get(
-    '/papers/:id/recommendations/bloom',
-    validatePaperId,
-    handleValidationErrors,
-    reviewerController.getBloomRecommendations
+  '/papers/:id/recommendations/bloom',
+  validatePaperId,
+  handleValidationErrors,
+  reviewerController.getBloomRecommendations
 );
 
 /**
@@ -340,12 +340,7 @@ router.get(
  *       403: { description: Forbidden }
  *       404: { description: Paper not found }
  */
-router.get(
-  '/papers/:id/metadata',
-  validatePaperId,
-  handleValidationErrors,
-  paperMetadataController.getPaperMetadata
-);
+router.get('/papers/:id/metadata', validatePaperId, handleValidationErrors, paperMetadataController.getPaperMetadata);
 
 /**
  * @swagger

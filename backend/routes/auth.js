@@ -321,7 +321,6 @@ router.post('/bulk-register', adminAuth, authController.bulkRegister);
  */
 router.get('/colleges', collegeController.getActiveColleges);
 
-
 /**
  * @swagger
  * /auth/college-applications:
@@ -415,9 +414,7 @@ router.post('/create-admin', adminAuth, authController.createAdmin);
  */
 router.post('/logout', async (req, res) => {
   try {
-    const token =
-      req.cookies?.accessToken ||
-      req.headers.authorization?.split(' ')[1];
+    const token = req.cookies?.accessToken || req.headers.authorization?.split(' ')[1];
 
     if (token && typeof token === 'string') {
       try {
@@ -438,10 +435,7 @@ router.post('/logout', async (req, res) => {
     if (typeof refreshToken === 'string' && refreshToken) {
       const crypto = require('node:crypto');
       const refreshTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
-      await User.updateOne(
-        { refreshTokenHash },
-        { $set: { refreshTokenHash: null, refreshTokenExpiresAt: null } }
-      );
+      await User.updateOne({ refreshTokenHash }, { $set: { refreshTokenHash: null, refreshTokenExpiresAt: null } });
     }
 
     const sameSite = process.env.COOKIE_SAME_SITE || 'lax';
@@ -450,13 +444,13 @@ router.post('/logout', async (req, res) => {
     res.clearCookie('accessToken', {
       httpOnly: true,
       secure,
-      sameSite,
+      sameSite
     });
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure,
       sameSite,
-      path: '/auth',
+      path: '/auth'
     });
 
     return res.json({ error: false, message: 'Logged out successfully' });

@@ -31,13 +31,13 @@
 
 // // Function to handle CO Penalty
 // function calculateCOPenalty(dataArray, CO_Map) {
-//     let C3 = 0;    
+//     let C3 = 0;
 
 //     dataArray.forEach(item => {
-//         const coKey = item[0]; 
+//         const coKey = item[0];
 //         const coNumber = coKey.replace('CO', '');
-//         const actualScore = CO_Map[coNumber] || 0; 
-//         const expectedWeight = item[1].weight;  
+//         const actualScore = CO_Map[coNumber] || 0;
+//         const expectedWeight = item[1].weight;
 //         const diff = (expectedWeight - actualScore) / expectedWeight || 0;
 
 //         if (diff > 0) {
@@ -45,10 +45,9 @@
 //         }
 //     });
 
-//     const COCount = Object.keys(CO_Map).length;  
-//     return COCount > 0 ? C3 / COCount : 0;  
-// }    
-
+//     const COCount = Object.keys(CO_Map).length;
+//     return COCount > 0 ? C3 / COCount : 0;
+// }
 
 // function obtainD(QHBTL, COBTL, returnRemark = false) {
 //     const D = QHBTL - COBTL;
@@ -71,7 +70,6 @@
 
 //     return returnRemark ? { qScore, remark } : qScore;
 // }
-
 
 // // Main Evaluation function
 // exports.Evaluate = (SequenceData, pre_data, Module_Hrs, bloomLevelMap) => {
@@ -110,7 +108,6 @@
 //     BT_Weights[4].name = level4Names.join(', ');
 
 // });
-
 
 //     // Handle module hours
 //     if (Module_Hrs && typeof Module_Hrs === 'object' && !Array.isArray(Module_Hrs)) {
@@ -152,7 +149,6 @@
 //         QP += qScore;
 //         QPMax += obtainD(1,COBTL);
 //         QPMin += obtainD(4,COBTL);
-
 
 //         const extractedVerb = i[paperFields.BLOOMS_VERBS] || "";
 //         // Get the highest verb (Bloom's level name) for this question
@@ -210,16 +206,15 @@
 
 //       // Generate recommendations and log them
 //     // const bloomRecommendations = generateBloomRecommendations(SequenceData, pre_data, bloomLevelMap, CO_Map);
-//     // console.log("Bloom Recommendations:", bloomRecommendations); 
+//     // console.log("Bloom Recommendations:", bloomRecommendations);
 
 //     const coRecommendations = generateCORecommendations(pre_data, CO_Map);
-//     console.log("CO Recommendations:", coRecommendations); 
+//     console.log("CO Recommendations:", coRecommendations);
 
 //     const moduleRecommendations = generateModuleRecommendations(ModuleWeights);
-//     console.log("Module Recommendations:", moduleRecommendations); 
+//     console.log("Module Recommendations:", moduleRecommendations);
 
 //     console.log("Question Recommendations:", questionRecommendations);
-
 
 //     return {
 //         QuestionData: SequenceData,
@@ -251,51 +246,51 @@ const { generateBloomRecommendations } = require('../recommendation/bloomRecomme
  * No-op if the sum is already 100 or if the input has no numeric weights.
  */
 function Normalize(seqData) {
-    const sum = seqData.reduce((acc, item) => acc + (+item.M), 0);
-    if (sum === 100) return seqData;
-    if (!sum || Number.isNaN(sum)) return seqData;
+  const sum = seqData.reduce((acc, item) => acc + +item.M, 0);
+  if (sum === 100) return seqData;
+  if (!sum || Number.isNaN(sum)) return seqData;
 
-    return seqData.map((item) => {
-        item.M = !Number.isNaN(item.M) ? (item.M / sum) * 100 : 0;
-        return item;
-    });
+  return seqData.map((item) => {
+    item.M = !Number.isNaN(item.M) ? (item.M / sum) * 100 : 0;
+    return item;
+  });
 }
 
 /**
  * Module Hours Penalty.
  */
 function calculateModulePenalty(ModuleWeights) {
-    let C2 = 0;
-    const n = ModuleWeights.length;
-    ModuleWeights.forEach((item) => {
-        const diff = (item.expected - item.actual) / item.expected;
-        if (diff >= 0) {
-            C2 += diff;
-        }
-    });
-    return C2 / n;
+  let C2 = 0;
+  const n = ModuleWeights.length;
+  ModuleWeights.forEach((item) => {
+    const diff = (item.expected - item.actual) / item.expected;
+    if (diff >= 0) {
+      C2 += diff;
+    }
+  });
+  return C2 / n;
 }
 
 /**
  * CO Penalty.
  */
 function calculateCOPenalty(dataArray, CO_Map) {
-    let C3 = 0;
+  let C3 = 0;
 
-    dataArray.forEach((item) => {
-        const coKey = item[0];
-        const coNumber = coKey.replace('CO', '');
-        const actualScore = CO_Map[coNumber] || 0;
-        const expectedWeight = item[1].weight;
-        const diff = (expectedWeight - actualScore) / expectedWeight || 0;
+  dataArray.forEach((item) => {
+    const coKey = item[0];
+    const coNumber = coKey.replace('CO', '');
+    const actualScore = CO_Map[coNumber] || 0;
+    const expectedWeight = item[1].weight;
+    const diff = (expectedWeight - actualScore) / expectedWeight || 0;
 
-        if (diff > 0) {
-            C3 += diff;
-        }
-    });
+    if (diff > 0) {
+      C3 += diff;
+    }
+  });
 
-    const COCount = Object.keys(CO_Map).length;
-    return COCount > 0 ? C3 / COCount : 0;
+  const COCount = Object.keys(CO_Map).length;
+  return COCount > 0 ? C3 / COCount : 0;
 }
 
 /**
@@ -303,22 +298,22 @@ function calculateCOPenalty(dataArray, CO_Map) {
  * Returns `{ qScore, remark }` when `returnRemark` is true, otherwise just `qScore`.
  */
 function obtainD(QHBTL, COBTL, returnRemark = false) {
-    const D = QHBTL - COBTL;
-    let qScore = 0;
-    let remark = '';
+  const D = QHBTL - COBTL;
+  let qScore = 0;
+  let remark = '';
 
-    if (D === 0 || D === -1) {
-        remark = 'Matches Expected Blooms Level';
-        qScore = 1;
-    } else if (D < -1) {
-        remark = 'Higher than Expected Blooms Level';
-        qScore = 2;
-    } else if (D >= 1) {
-        remark = 'Lower than Expected Blooms Level';
-        qScore = -1;
-    }
+  if (D === 0 || D === -1) {
+    remark = 'Matches Expected Blooms Level';
+    qScore = 1;
+  } else if (D < -1) {
+    remark = 'Higher than Expected Blooms Level';
+    qScore = 2;
+  } else if (D >= 1) {
+    remark = 'Lower than Expected Blooms Level';
+    qScore = -1;
+  }
 
-    return returnRemark ? { qScore, remark } : qScore;
+  return returnRemark ? { qScore, remark } : qScore;
 }
 
 /**
@@ -332,288 +327,271 @@ function obtainD(QHBTL, COBTL, returnRemark = false) {
  *                                for that paper are loaded and applied before scoring.
  */
 exports.Evaluate = async (SequenceData, pre_data, Module_Hrs, bloomLevelMap, options = {}) => {
-    const { paperId = null, collegeId = null } = options || {};
+  const { paperId = null, collegeId = null } = options || {};
 
-    const ModuleWeights = [];
-    let checkModule = true;
+  const ModuleWeights = [];
+  let checkModule = true;
 
-    const BT_Weights = {
-        1: { level: 1, name: '', weights: 0, marks: 0, BT_penalty: 0, No_Of_Questions: 0 },
-        2: { level: 2, name: '', weights: 0, marks: 0, BT_penalty: 0, No_Of_Questions: 0 },
-        3: { level: 3, name: '', weights: 0, marks: 0, BT_penalty: 0, No_Of_Questions: 0 },
-        4: { level: 4, name: '', weights: 0, marks: 0, BT_penalty: 0, No_Of_Questions: 0 },
-        5: { level: 5, name: '', weights: 0, marks: 0, BT_penalty: 0, No_Of_Questions: 0 },
-        6: { level: 6, name: '', weights: 0, marks: 0, BT_penalty: 0, No_Of_Questions: 0 },
-    };
+  const BT_Weights = {
+    1: { level: 1, name: '', weights: 0, marks: 0, BT_penalty: 0, No_Of_Questions: 0 },
+    2: { level: 2, name: '', weights: 0, marks: 0, BT_penalty: 0, No_Of_Questions: 0 },
+    3: { level: 3, name: '', weights: 0, marks: 0, BT_penalty: 0, No_Of_Questions: 0 },
+    4: { level: 4, name: '', weights: 0, marks: 0, BT_penalty: 0, No_Of_Questions: 0 },
+    5: { level: 5, name: '', weights: 0, marks: 0, BT_penalty: 0, No_Of_Questions: 0 },
+    6: { level: 6, name: '', weights: 0, marks: 0, BT_penalty: 0, No_Of_Questions: 0 }
+  };
 
-    // Reverse map: level number → list of Bloom names at that level
-    const levelToNameMap = {};
-    Object.entries(bloomLevelMap).forEach(([name, level]) => {
-        if (!levelToNameMap[level]) {
-            levelToNameMap[level] = [];
-        }
-        levelToNameMap[level].push(name);
-    });
-
-    // Set the human-readable names on BT_Weights
-    Object.keys(BT_Weights).forEach((level) => {
-        const levelNum = Number.parseInt(level, 10);
-        if (levelToNameMap[levelNum]) {
-            BT_Weights[levelNum].name = levelToNameMap[levelNum].join(', ');
-        }
-    });
-
-    // Sort pre_data by weight (descending)
-    const dataArray = Object.entries(pre_data).sort((a, b) => b[1].weight - a[1].weight);
-
-    // Fill BT_Weights based on the bloomLevelMap
-    dataArray.forEach(([co, data]) => {
-        const bloomKey = data.blooms[0]?.toLowerCase();
-        const bloomLevel = bloomLevelMap[bloomKey];
-        if (bloomLevel && bloomLevel >= 1 && bloomLevel <= 6) {
-            BT_Weights[bloomLevel].weights += data.weight;
-        }
-    });
-
-    // Handle module hours
-    if (Module_Hrs && typeof Module_Hrs === 'object' && !Array.isArray(Module_Hrs)) {
-        const totalHrs = Object.values(Module_Hrs).reduce((sum, hrs) => sum + (+hrs || 0), 0);
-
-        if (totalHrs > 0) {
-            Object.keys(Module_Hrs).forEach((module) => {
-                const moduleHours = +Module_Hrs[module];
-                ModuleWeights.push({
-                    expected: (moduleHours / totalHrs) * 100,
-                    actual: 0,
-                });
-            });
-        } else {
-            checkModule = false;
-        }
-    } else {
-        checkModule = false;
+  // Reverse map: level number → list of Bloom names at that level
+  const levelToNameMap = {};
+  Object.entries(bloomLevelMap).forEach(([name, level]) => {
+    if (!levelToNameMap[level]) {
+      levelToNameMap[level] = [];
     }
+    levelToNameMap[level].push(name);
+  });
 
-    SequenceData = Normalize(SequenceData);
-
-    // ─── Load VerifiedQuestion corrections for this paper ─────────────
-    // Corrections are keyed by array position (questionIndex) — the same
-    // 0-based index used by the forEach below.
-    const correctionMap = {};
-    if (paperId && mongoose.Types.ObjectId.isValid(String(paperId))) {
-        try {
-            const corrections = await VerifiedQuestion.find({ paperId }).lean();
-            corrections.forEach((c) => {
-                correctionMap[c.questionIndex] = {
-                    correctedLevel: c.correctedLevel,
-                    correctedDomain: c.correctedDomain,
-                    originalLevel: c.originalLevel,
-                    originalDomain: c.originalDomain,
-                    reason: c.reason || null,
-                };
-            });
-            if (corrections.length > 0) {
-            }
-        } catch (e) {
-            console.warn('[Evaluate] Failed to load corrections:', e.message);
-        }
+  // Set the human-readable names on BT_Weights
+  Object.keys(BT_Weights).forEach((level) => {
+    const levelNum = Number.parseInt(level, 10);
+    if (levelToNameMap[levelNum]) {
+      BT_Weights[levelNum].name = levelToNameMap[levelNum].join(', ');
     }
+  });
 
-    const QT_Map = {};
-    const CO_Map = {};
-    let QP = 0;
-    let QPMin = 0;
-    let QPMax = 0;
-    const questionRecommendations = [];
-    const appliedCorrections = [];
+  // Sort pre_data by weight (descending)
+  const dataArray = Object.entries(pre_data).sort((a, b) => b[1].weight - a[1].weight);
 
-    SequenceData.forEach((i, idx) => {
-        QT_Map[i[paperFields.QUESTION_TYPE]] = (QT_Map[i[paperFields.QUESTION_TYPE]] || 0) + 1;
+  // Fill BT_Weights based on the bloomLevelMap
+  dataArray.forEach(([co, data]) => {
+    const bloomKey = data.blooms[0]?.toLowerCase();
+    const bloomLevel = bloomLevelMap[bloomKey];
+    if (bloomLevel && bloomLevel >= 1 && bloomLevel <= 6) {
+      BT_Weights[bloomLevel].weights += data.weight;
+    }
+  });
 
-        const rawCO = String(i.CO ?? i[paperFields.COURSE_OUTCOME] ?? '1');
-        const coMatch = rawCO.match(/\d+/);
-        const co = coMatch ? Number.parseInt(coMatch[0], 10) : 1;
-        const coKey = `CO${co}`;
-        const coBloom = (pre_data[coKey]?.blooms?.[0] || '').toLowerCase();
-        const COBTL = bloomLevelMap[coBloom] || 6;
+  // Handle module hours
+  if (Module_Hrs && typeof Module_Hrs === 'object' && !Array.isArray(Module_Hrs)) {
+    const totalHrs = Object.values(Module_Hrs).reduce((sum, hrs) => sum + (+hrs || 0), 0);
 
-        // Ensure QHBTL is a valid level (1–6)
-        let QHBTL = Number.parseInt(i[paperFields.BLOOMS_TAXONOMY_LEVEL], 10);
-
-        if (Number.isNaN(QHBTL) || QHBTL < 1 || QHBTL > 6) {
-            console.warn(
-                `Warning: Invalid Bloom level ${i[paperFields.BLOOMS_TAXONOMY_LEVEL]} for question ${i[paperFields.QUESTION_NO]}, defaulting to 6`
-            );
-            QHBTL = 6;
-            i[paperFields.BLOOMS_TAXONOMY_LEVEL] = 6;
-        }
-
-        const autoClassifiedLevel = QHBTL;
-
-        // ─── Apply reviewer correction if one exists for this index ───────
-        // Schema allows correctedLevel up to 7, but BT_Weights only has keys 1..6.
-        // Clamp defensively so we never index a missing bucket.
-        const correction = correctionMap[idx];
-        if (correction) {
-            const clamped = Math.min(6, Math.max(1, correction.correctedLevel));
-            QHBTL = clamped;
-            i[paperFields.BLOOMS_TAXONOMY_LEVEL] = clamped;
-            i.wasCorrected = true;
-            i.correctionReason = correction.reason;
-
-            appliedCorrections.push({
-                questionIndex: idx,
-                autoClassifiedLevel,
-                correctedLevel: clamped,
-                correctedDomain: correction.correctedDomain || null,
-                levelChange: clamped - autoClassifiedLevel,
-                reason: correction.reason,
-            });
-        } else {
-            i.wasCorrected = false;
-        }
-
-        const { qScore, remark } = obtainD(QHBTL, COBTL, true);
-        i['Remark'] = remark;
-        QP += qScore;
-        QPMax += obtainD(1, COBTL);
-        QPMin += obtainD(6, COBTL);
-
-        const extractedVerb = i[paperFields.BLOOMS_VERBS] || '';
-        const highestVerb = i[paperFields.BLOOMS_HIGHEST_VERB] || 'N/A';
-        const bloomLevelName = BT_Weights[QHBTL].name || 'Unknown';
-
-        questionRecommendations.push({
-            QuestionData: i[paperFields.QUESTION_NO] || i.Question,
-            marks: +i.Marks,
-            co: coKey,
-            qScore: qScore,
-            extractedVerb: extractedVerb,
-            highestVerb: highestVerb,
-            bloomLevel: QHBTL,
-            bloomLevelName: bloomLevelName,
-            remark: remark,
+    if (totalHrs > 0) {
+      Object.keys(Module_Hrs).forEach((module) => {
+        const moduleHours = +Module_Hrs[module];
+        ModuleWeights.push({
+          expected: (moduleHours / totalHrs) * 100,
+          actual: 0
         });
+      });
+    } else {
+      checkModule = false;
+    }
+  } else {
+    checkModule = false;
+  }
 
-        BT_Weights[QHBTL].marks += (+i.Marks);
-        BT_Weights[QHBTL].No_Of_Questions++;
-        CO_Map[co] = (CO_Map[co] || 0) + (+i.Marks);
+  SequenceData = Normalize(SequenceData);
 
-        if (checkModule && i.Module) {
-            // Single unambiguous pattern — avoids catastrophic backtracking (S8786)
-            const match = String(i.Module).match(/\d+(?:\.\d+)?/);
-            if (match) {
-                const moduleNumber = Number.parseFloat(match[0]);
-                const moduleIndex = moduleNumber - 1;
-                if (ModuleWeights[moduleIndex]) {
-                    ModuleWeights[moduleIndex].actual += (+i.Marks);
-                }
-            }
-        }
+  // ─── Load VerifiedQuestion corrections for this paper ─────────────
+  // Corrections are keyed by array position (questionIndex) — the same
+  // 0-based index used by the forEach below.
+  const correctionMap = {};
+  if (paperId && mongoose.Types.ObjectId.isValid(String(paperId))) {
+    try {
+      const corrections = await VerifiedQuestion.find({ paperId }).lean();
+      corrections.forEach((c) => {
+        correctionMap[c.questionIndex] = {
+          correctedLevel: c.correctedLevel,
+          correctedDomain: c.correctedDomain,
+          originalLevel: c.originalLevel,
+          originalDomain: c.originalDomain,
+          reason: c.reason || null
+        };
+      });
+      if (corrections.length > 0) {
+      }
+    } catch (e) {
+      console.warn('[Evaluate] Failed to load corrections:', e.message);
+    }
+  }
+
+  const QT_Map = {};
+  const CO_Map = {};
+  let QP = 0;
+  let QPMin = 0;
+  let QPMax = 0;
+  const questionRecommendations = [];
+  const appliedCorrections = [];
+
+  SequenceData.forEach((i, idx) => {
+    QT_Map[i[paperFields.QUESTION_TYPE]] = (QT_Map[i[paperFields.QUESTION_TYPE]] || 0) + 1;
+
+    const rawCO = String(i.CO ?? i[paperFields.COURSE_OUTCOME] ?? '1');
+    const coMatch = rawCO.match(/\d+/);
+    const co = coMatch ? Number.parseInt(coMatch[0], 10) : 1;
+    const coKey = `CO${co}`;
+    const coBloom = (pre_data[coKey]?.blooms?.[0] || '').toLowerCase();
+    const COBTL = bloomLevelMap[coBloom] || 6;
+
+    // Ensure QHBTL is a valid level (1–6)
+    let QHBTL = Number.parseInt(i[paperFields.BLOOMS_TAXONOMY_LEVEL], 10);
+
+    if (Number.isNaN(QHBTL) || QHBTL < 1 || QHBTL > 6) {
+      console.warn(
+        `Warning: Invalid Bloom level ${i[paperFields.BLOOMS_TAXONOMY_LEVEL]} for question ${i[paperFields.QUESTION_NO]}, defaulting to 6`
+      );
+      QHBTL = 6;
+      i[paperFields.BLOOMS_TAXONOMY_LEVEL] = 6;
+    }
+
+    const autoClassifiedLevel = QHBTL;
+
+    // ─── Apply reviewer correction if one exists for this index ───────
+    // Schema allows correctedLevel up to 7, but BT_Weights only has keys 1..6.
+    // Clamp defensively so we never index a missing bucket.
+    const correction = correctionMap[idx];
+    if (correction) {
+      const clamped = Math.min(6, Math.max(1, correction.correctedLevel));
+      QHBTL = clamped;
+      i[paperFields.BLOOMS_TAXONOMY_LEVEL] = clamped;
+      i.wasCorrected = true;
+      i.correctionReason = correction.reason;
+
+      appliedCorrections.push({
+        questionIndex: idx,
+        autoClassifiedLevel,
+        correctedLevel: clamped,
+        correctedDomain: correction.correctedDomain || null,
+        levelChange: clamped - autoClassifiedLevel,
+        reason: correction.reason
+      });
+    } else {
+      i.wasCorrected = false;
+    }
+
+    const { qScore, remark } = obtainD(QHBTL, COBTL, true);
+    i['Remark'] = remark;
+    QP += qScore;
+    QPMax += obtainD(1, COBTL);
+    QPMin += obtainD(6, COBTL);
+
+    const extractedVerb = i[paperFields.BLOOMS_VERBS] || '';
+    const highestVerb = i[paperFields.BLOOMS_HIGHEST_VERB] || 'N/A';
+    const bloomLevelName = BT_Weights[QHBTL].name || 'Unknown';
+
+    questionRecommendations.push({
+      QuestionData: i[paperFields.QUESTION_NO] || i.Question,
+      marks: +i.Marks,
+      co: coKey,
+      qScore: qScore,
+      extractedVerb: extractedVerb,
+      highestVerb: highestVerb,
+      bloomLevel: QHBTL,
+      bloomLevelName: bloomLevelName,
+      remark: remark
     });
 
-    // Normalize QP score
-    const QP_Final = ((QP - QPMin) / ((QPMax - QPMin) || 1)) * 100;
+    BT_Weights[QHBTL].marks += +i.Marks;
+    BT_Weights[QHBTL].No_Of_Questions++;
+    CO_Map[co] = (CO_Map[co] || 0) + +i.Marks;
 
-    // Penalty calculations
-    const C2 = checkModule ? calculateModulePenalty(ModuleWeights) : 0;
-    const C3 = calculateCOPenalty(dataArray, CO_Map);
+    if (checkModule && i.Module) {
+      // Single unambiguous pattern — avoids catastrophic backtracking (S8786)
+      const match = String(i.Module).match(/\d+(?:\.\d+)?/);
+      if (match) {
+        const moduleNumber = Number.parseFloat(match[0]);
+        const moduleIndex = moduleNumber - 1;
+        if (ModuleWeights[moduleIndex]) {
+          ModuleWeights[moduleIndex].actual += +i.Marks;
+        }
+      }
+    }
+  });
 
-    const P_Final = checkModule ? (C2 + C3) / 2 : C3;
-    const PF_Percentage = (P_Final / 2) * 100;
+  // Normalize QP score
+  const QP_Final = ((QP - QPMin) / (QPMax - QPMin || 1)) * 100;
 
-    const FinalScore = Number.parseFloat(((QP_Final + (100 - PF_Percentage)) / 2).toFixed(2));
+  // Penalty calculations
+  const C2 = checkModule ? calculateModulePenalty(ModuleWeights) : 0;
+  const C3 = calculateCOPenalty(dataArray, CO_Map);
 
+  const P_Final = checkModule ? (C2 + C3) / 2 : C3;
+  const PF_Percentage = (P_Final / 2) * 100;
 
-    const coRecommendations = generateCORecommendations(pre_data, CO_Map);
+  const FinalScore = Number.parseFloat(((QP_Final + (100 - PF_Percentage)) / 2).toFixed(2));
 
-    const moduleRecommendations = generateModuleRecommendations(ModuleWeights);
+  const coRecommendations = generateCORecommendations(pre_data, CO_Map);
 
-    const bloomRecommendations = generateBloomRecommendations(
-        SequenceData,
-        pre_data,
-        bloomLevelMap,
-        CO_Map
-    );
+  const moduleRecommendations = generateModuleRecommendations(ModuleWeights);
 
+  const bloomRecommendations = generateBloomRecommendations(SequenceData, pre_data, bloomLevelMap, CO_Map);
 
-    // ─── Learning Domain Insights ─────────────────────────────
-// Global learned mappings apply everywhere.
-// College-specific mappings override global mappings.
-let learnedCache = {};
+  // ─── Learning Domain Insights ─────────────────────────────
+  // Global learned mappings apply everywhere.
+  // College-specific mappings override global mappings.
+  let learnedCache = {};
 
-try {
+  try {
     const globalLearned = await LearnedVerb.find({
-        collegeId: null,
+      collegeId: null
     }).lean();
 
     const collegeLearned =
-        collegeId && mongoose.Types.ObjectId.isValid(String(collegeId))
-            ? await LearnedVerb.find({ collegeId }).lean()
-            : [];
+      collegeId && mongoose.Types.ObjectId.isValid(String(collegeId))
+        ? await LearnedVerb.find({ collegeId }).lean()
+        : [];
 
     // Load global mappings first.
     for (const l of globalLearned) {
-        learnedCache[l.verb] = {
-            domain: l.domain,
-            level: l.level,
-            confidence: l.confidence,
-            collegeId: null,
-        };
+      learnedCache[l.verb] = {
+        domain: l.domain,
+        level: l.level,
+        confidence: l.confidence,
+        collegeId: null
+      };
     }
 
     // College-specific mappings always override global mappings.
     for (const l of collegeLearned) {
-        learnedCache[l.verb] = {
-            domain: l.domain,
-            level: l.level,
-            confidence: l.confidence,
-            collegeId: l.collegeId,
-        };
+      learnedCache[l.verb] = {
+        domain: l.domain,
+        level: l.level,
+        confidence: l.confidence,
+        collegeId: l.collegeId
+      };
     }
-} catch (e) {
+  } catch (e) {
     console.warn('LearnedVerb cache load failed:', e.message);
-}
+  }
 
-const questionTexts = SequenceData.map(
-    (q) => q.Question || q[paperFields.QUESTION_NO] || q.text || ''
-);
+  const questionTexts = SequenceData.map((q) => q.Question || q[paperFields.QUESTION_NO] || q.text || '');
 
-const domainClassifications = classifyPaper(
-    questionTexts,
-    learnedCache
-);
+  const domainClassifications = classifyPaper(questionTexts, learnedCache);
 
-const DomainInsights = aggregateInsights(domainClassifications);
+  const DomainInsights = aggregateInsights(domainClassifications);
 
-    // ─── Corrections summary ──────────────────────────────────
-    const correctionsSummary = {
-        totalApplied: appliedCorrections.length,
-        avgLevelChange: appliedCorrections.length
-            ? Number(
-                  (
-                      appliedCorrections.reduce((s, c) => s + c.levelChange, 0) /
-                      appliedCorrections.length
-                  ).toFixed(2)
-              )
-            : 0,
-        increasedCount: appliedCorrections.filter((c) => c.levelChange > 0).length,
-        decreasedCount: appliedCorrections.filter((c) => c.levelChange < 0).length,
-        unchangedCount: appliedCorrections.filter((c) => c.levelChange === 0).length,
-    };
+  // ─── Corrections summary ──────────────────────────────────
+  const correctionsSummary = {
+    totalApplied: appliedCorrections.length,
+    avgLevelChange: appliedCorrections.length
+      ? Number((appliedCorrections.reduce((s, c) => s + c.levelChange, 0) / appliedCorrections.length).toFixed(2))
+      : 0,
+    increasedCount: appliedCorrections.filter((c) => c.levelChange > 0).length,
+    decreasedCount: appliedCorrections.filter((c) => c.levelChange < 0).length,
+    unchangedCount: appliedCorrections.filter((c) => c.levelChange === 0).length
+  };
 
-    return {
-        QuestionData: SequenceData,
-        ModuleData: ModuleWeights,
-        BloomsData: BT_Weights,
-        COData: CO_Map,
-        FinalScore,
-        CORecommendations: coRecommendations,
-        ModuleRecommendations: moduleRecommendations,
-        QuestionRecommendations: questionRecommendations,
-        DomainInsights,
-        BloomRecommendations: bloomRecommendations,
-        appliedCorrections,
-        correctionsSummary,
-    };
+  return {
+    QuestionData: SequenceData,
+    ModuleData: ModuleWeights,
+    BloomsData: BT_Weights,
+    COData: CO_Map,
+    FinalScore,
+    CORecommendations: coRecommendations,
+    ModuleRecommendations: moduleRecommendations,
+    QuestionRecommendations: questionRecommendations,
+    DomainInsights,
+    BloomRecommendations: bloomRecommendations,
+    appliedCorrections,
+    correctionsSummary
+  };
 };

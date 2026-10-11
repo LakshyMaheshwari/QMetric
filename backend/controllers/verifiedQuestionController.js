@@ -41,24 +41,15 @@ function pickOriginalClassification(question) {
   if (!question || typeof question !== 'object') {
     return { domain: null, level: null, score: null };
   }
-  const domain =
-    question.domain ?? question.Domain ?? question.domainName ?? null;
-  const level =
-    question.bloomLevel ??
-    question['Bloom Level'] ??
-    question.bloom ??
-    question.level ??
-    null;
+  const domain = question.domain ?? question.Domain ?? question.domainName ?? null;
+  const level = question.bloomLevel ?? question['Bloom Level'] ?? question.bloom ?? question.level ?? null;
   const score = question.score ?? question.Score ?? null;
   return { domain, level, score };
 }
 
 function parsePagination(q) {
   const page = Math.max(1, Number.parseInt(q.page, 10) || 1);
-  const limit = Math.min(
-    MAX_PAGE_LIMIT,
-    Math.max(1, Number.parseInt(q.limit, 10) || DEFAULT_PAGE_LIMIT)
-  );
+  const limit = Math.min(MAX_PAGE_LIMIT, Math.max(1, Number.parseInt(q.limit, 10) || DEFAULT_PAGE_LIMIT));
   return { page, limit, skip: (page - 1) * limit };
 }
 
@@ -68,13 +59,7 @@ function parsePagination(q) {
 async function submitCorrection(req, res) {
   try {
     const { paperId } = req.params;
-    const {
-      questionIndex,
-      correctedDomain,
-      correctedLevel,
-      correctedLevelName,
-      reason,
-    } = req.body || {};
+    const { questionIndex, correctedDomain, correctedLevel, correctedLevelName, reason } = req.body || {};
 
     const userId = getUserId(req);
     if (!userId) {
@@ -92,40 +77,32 @@ async function submitCorrection(req, res) {
     if (!Number.isInteger(qIdx) || qIdx < 0) {
       return res.status(400).json({
         error: true,
-        message: 'questionIndex must be a non-negative integer',
+        message: 'questionIndex must be a non-negative integer'
       });
     }
     if (!VALID_DOMAINS.includes(correctedDomain)) {
       return res.status(400).json({
         error: true,
-        message: `correctedDomain must be one of: ${VALID_DOMAINS.join(', ')}`,
+        message: `correctedDomain must be one of: ${VALID_DOMAINS.join(', ')}`
       });
     }
     const lvl = Number(correctedLevel);
     if (!Number.isInteger(lvl) || lvl < MIN_LEVEL || lvl > MAX_LEVEL) {
       return res.status(400).json({
         error: true,
-        message: `correctedLevel must be an integer between ${MIN_LEVEL} and ${MAX_LEVEL}`,
+        message: `correctedLevel must be an integer between ${MIN_LEVEL} and ${MAX_LEVEL}`
       });
     }
-    if (
-      reason !== undefined &&
-      reason !== null &&
-      (typeof reason !== 'string' || reason.length > MAX_REASON_LENGTH)
-    ) {
+    if (reason !== undefined && reason !== null && (typeof reason !== 'string' || reason.length > MAX_REASON_LENGTH)) {
       return res.status(400).json({
         error: true,
-        message: `reason must be a string of at most ${MAX_REASON_LENGTH} characters`,
+        message: `reason must be a string of at most ${MAX_REASON_LENGTH} characters`
       });
     }
-    if (
-      correctedLevelName !== undefined &&
-      correctedLevelName !== null &&
-      typeof correctedLevelName !== 'string'
-    ) {
+    if (correctedLevelName !== undefined && correctedLevelName !== null && typeof correctedLevelName !== 'string') {
       return res.status(400).json({
         error: true,
-        message: 'correctedLevelName must be a string',
+        message: 'correctedLevelName must be a string'
       });
     }
 
@@ -139,17 +116,15 @@ async function submitCorrection(req, res) {
     if (!canAccessPaper(req.user, paper)) {
       return res.status(403).json({
         error: true,
-        message: 'Forbidden: paper belongs to another college',
+        message: 'Forbidden: paper belongs to another college'
       });
     }
 
-    const collected = Array.isArray(paper[paperFields.COLLECTED_DATA])
-      ? paper[paperFields.COLLECTED_DATA]
-      : [];
+    const collected = Array.isArray(paper[paperFields.COLLECTED_DATA]) ? paper[paperFields.COLLECTED_DATA] : [];
     if (qIdx >= collected.length) {
       return res.status(404).json({
         error: true,
-        message: `questionIndex ${qIdx} is out of range (paper has ${collected.length} questions)`,
+        message: `questionIndex ${qIdx} is out of range (paper has ${collected.length} questions)`
       });
     }
 
@@ -175,14 +150,14 @@ async function submitCorrection(req, res) {
             correctedLevelName: correctedLevelName ?? null,
             correctedBy: userId,
             correctedAt: Date.now(),
-            reason: reason ?? null,
-          },
+            reason: reason ?? null
+          }
         },
         {
           upsert: true,
           new: true,
           setDefaultsOnInsert: true,
-          session,
+          session
         }
       );
     });
@@ -195,15 +170,15 @@ async function submitCorrection(req, res) {
       changes: {
         oldValue: { domain: original.domain, level: original.level },
         newValue: { domain: correctedDomain, level: lvl },
-        fields: ['correctedDomain', 'correctedLevel'],
+        fields: ['correctedDomain', 'correctedLevel']
       },
-      request: req,
+      request: req
     });
 
     return res.status(existing ? 200 : 201).json({
       error: false,
       correctedQuestion,
-      message: existing ? 'Correction updated' : 'Correction submitted',
+      message: existing ? 'Correction updated' : 'Correction submitted'
     });
   } catch (err) {
     logger.error('[verifiedQuestion.submitCorrection]', err);
@@ -241,7 +216,7 @@ async function getCorrectionsForPaper(req, res) {
         .populate('correctedBy', 'fullName email')
         .populate({ path: 'paperId', select: { [paperFields.COURSE_NAME]: 1, teacher: 1 } })
         .lean(),
-      VerifiedQuestion.countDocuments({ paperId }),
+      VerifiedQuestion.countDocuments({ paperId })
     ]);
 
     return res.status(200).json({
@@ -252,8 +227,8 @@ async function getCorrectionsForPaper(req, res) {
         page,
         limit,
         total,
-        pages: Math.ceil(total / limit),
-      },
+        pages: Math.ceil(total / limit)
+      }
     });
   } catch (err) {
     logger.error('[verifiedQuestion.getCorrectionsForPaper]', err);
@@ -274,7 +249,7 @@ async function getSingleCorrection(req, res) {
     if (!Number.isInteger(qIdx) || qIdx < 0) {
       return res.status(400).json({
         error: true,
-        message: 'questionIndex must be a non-negative integer',
+        message: 'questionIndex must be a non-negative integer'
       });
     }
 
@@ -288,7 +263,7 @@ async function getSingleCorrection(req, res) {
 
     const correction = await VerifiedQuestion.findOne({
       paperId,
-      questionIndex: qIdx,
+      questionIndex: qIdx
     })
       .populate('correctedBy', 'fullName email')
       .lean();
@@ -310,8 +285,7 @@ async function getSingleCorrection(req, res) {
 async function updateCorrection(req, res) {
   try {
     const { paperId, questionIndex } = req.params;
-    const { correctedDomain, correctedLevel, correctedLevelName, reason } =
-      req.body || {};
+    const { correctedDomain, correctedLevel, correctedLevelName, reason } = req.body || {};
 
     const userId = getUserId(req);
     if (!userId) {
@@ -325,7 +299,7 @@ async function updateCorrection(req, res) {
     if (!Number.isInteger(qIdx) || qIdx < 0) {
       return res.status(400).json({
         error: true,
-        message: 'questionIndex must be a non-negative integer',
+        message: 'questionIndex must be a non-negative integer'
       });
     }
 
@@ -335,7 +309,7 @@ async function updateCorrection(req, res) {
       if (!VALID_DOMAINS.includes(correctedDomain)) {
         return res.status(400).json({
           error: true,
-          message: `correctedDomain must be one of: ${VALID_DOMAINS.join(', ')}`,
+          message: `correctedDomain must be one of: ${VALID_DOMAINS.join(', ')}`
         });
       }
       $set.correctedDomain = correctedDomain;
@@ -345,7 +319,7 @@ async function updateCorrection(req, res) {
       if (!Number.isInteger(lvl) || lvl < MIN_LEVEL || lvl > MAX_LEVEL) {
         return res.status(400).json({
           error: true,
-          message: `correctedLevel must be an integer between ${MIN_LEVEL} and ${MAX_LEVEL}`,
+          message: `correctedLevel must be an integer between ${MIN_LEVEL} and ${MAX_LEVEL}`
         });
       }
       $set.correctedLevel = lvl;
@@ -354,13 +328,10 @@ async function updateCorrection(req, res) {
       $set.correctedLevelName = correctedLevelName;
     }
     if (reason !== undefined) {
-      if (
-        reason !== null &&
-        (typeof reason !== 'string' || reason.length > MAX_REASON_LENGTH)
-      ) {
+      if (reason !== null && (typeof reason !== 'string' || reason.length > MAX_REASON_LENGTH)) {
         return res.status(400).json({
           error: true,
-          message: `reason must be a string of at most ${MAX_REASON_LENGTH} characters`,
+          message: `reason must be a string of at most ${MAX_REASON_LENGTH} characters`
         });
       }
       $set.reason = reason;
@@ -375,7 +346,7 @@ async function updateCorrection(req, res) {
     if (!isOwner && !isSuperAdmin(req)) {
       return res.status(403).json({
         error: true,
-        message: 'Forbidden: not the author of this correction',
+        message: 'Forbidden: not the author of this correction'
       });
     }
 
@@ -384,16 +355,12 @@ async function updateCorrection(req, res) {
       correctedDomain: existing.correctedDomain,
       correctedLevel: existing.correctedLevel,
       correctedLevelName: existing.correctedLevelName,
-      reason: existing.reason,
+      reason: existing.reason
     };
 
     // ---- Apply update ------------------------------------------------------
     const updated = await withTransaction(async (session) => {
-      return VerifiedQuestion.findOneAndUpdate(
-        { paperId, questionIndex: qIdx },
-        { $set },
-        { new: true, session }
-      );
+      return VerifiedQuestion.findOneAndUpdate({ paperId, questionIndex: qIdx }, { $set }, { new: true, session });
     });
 
     // ---- Audit (after commit) ---------------------------------------------
@@ -407,11 +374,11 @@ async function updateCorrection(req, res) {
           correctedDomain: updated.correctedDomain,
           correctedLevel: updated.correctedLevel,
           correctedLevelName: updated.correctedLevelName,
-          reason: updated.reason,
+          reason: updated.reason
         },
-        fields: Object.keys($set).filter(k => k !== 'correctedAt'),
+        fields: Object.keys($set).filter((k) => k !== 'correctedAt')
       },
-      request: req,
+      request: req
     });
 
     return res.status(200).json({ error: false, updated });
@@ -439,7 +406,7 @@ async function deleteCorrection(req, res) {
     if (!Number.isInteger(qIdx) || qIdx < 0) {
       return res.status(400).json({
         error: true,
-        message: 'questionIndex must be a non-negative integer',
+        message: 'questionIndex must be a non-negative integer'
       });
     }
 
@@ -451,17 +418,14 @@ async function deleteCorrection(req, res) {
     if (!isOwner && !isSuperAdmin(req)) {
       return res.status(403).json({
         error: true,
-        message: 'Forbidden: not the author of this correction',
+        message: 'Forbidden: not the author of this correction'
       });
     }
 
     const oldValue = existing.toObject();
 
     await withTransaction(async (session) => {
-      await VerifiedQuestion.deleteOne(
-        { paperId, questionIndex: qIdx },
-        { session }
-      );
+      await VerifiedQuestion.deleteOne({ paperId, questionIndex: qIdx }, { session });
     });
 
     await logAudit({
@@ -471,9 +435,9 @@ async function deleteCorrection(req, res) {
       changes: {
         oldValue,
         newValue: null,
-        fields: ['paperId', 'questionIndex'],
+        fields: ['paperId', 'questionIndex']
       },
-      request: req,
+      request: req
     });
 
     return res.status(200).json({ error: false, message: 'Correction deleted' });
@@ -488,5 +452,5 @@ module.exports = {
   getCorrectionsForPaper,
   getSingleCorrection,
   updateCorrection,
-  deleteCorrection,
+  deleteCorrection
 };

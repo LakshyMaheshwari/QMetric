@@ -5,37 +5,21 @@ const College = require('../Model/College');
  * User.role transition. Attach a session when called from a transaction.
  */
 async function syncCollegeRoleMembership({ collegeId, userId, oldRole, newRole, session }) {
-    if (!collegeId || !userId || oldRole === newRole) return;
+  if (!collegeId || !userId || oldRole === newRole) return;
 
-    const options = session ? { session } : {};
+  const options = session ? { session } : {};
 
-    if (oldRole === 'teacher' && newRole !== 'teacher') {
-        await College.updateOne(
-            { _id: collegeId, totalTeachers: { $gt: 0 } },
-            { $inc: { totalTeachers: -1 } },
-            options
-        );
-    } else if (oldRole !== 'teacher' && newRole === 'teacher') {
-        await College.updateOne(
-            { _id: collegeId },
-            { $inc: { totalTeachers: 1 } },
-            options
-        );
-    }
+  if (oldRole === 'teacher' && newRole !== 'teacher') {
+    await College.updateOne({ _id: collegeId, totalTeachers: { $gt: 0 } }, { $inc: { totalTeachers: -1 } }, options);
+  } else if (oldRole !== 'teacher' && newRole === 'teacher') {
+    await College.updateOne({ _id: collegeId }, { $inc: { totalTeachers: 1 } }, options);
+  }
 
-    if (oldRole === 'admin' && newRole !== 'admin') {
-        await College.updateOne(
-            { _id: collegeId },
-            { $pull: { adminIds: userId } },
-            options
-        );
-    } else if (oldRole !== 'admin' && newRole === 'admin') {
-        await College.updateOne(
-            { _id: collegeId },
-            { $addToSet: { adminIds: userId } },
-            options
-        );
-    }
+  if (oldRole === 'admin' && newRole !== 'admin') {
+    await College.updateOne({ _id: collegeId }, { $pull: { adminIds: userId } }, options);
+  } else if (oldRole !== 'admin' && newRole === 'admin') {
+    await College.updateOne({ _id: collegeId }, { $addToSet: { adminIds: userId } }, options);
+  }
 }
 
 module.exports = { syncCollegeRoleMembership };

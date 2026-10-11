@@ -8,7 +8,7 @@ const {
   createTestPaper,
   createSuperAdmin,
   createTestVerifiedQuestion,
-  getCookieString,
+  getCookieString
 } = require('./helpers');
 
 describe('VerifiedQuestion Corrections Endpoints', () => {
@@ -21,7 +21,7 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
     paper = await createTestPaper({
       userId: teacher._id,
       collegeId: college._id,
-      courseName: 'CS101',
+      courseName: 'CS101'
     });
     reviewerCookie = getCookieString(reviewer);
   });
@@ -36,7 +36,7 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
           correctedDomain: 'cognitive',
           correctedLevel: 3,
           correctedLevelName: 'Apply',
-          reason: 'Application level problem',
+          reason: 'Application level problem'
         });
 
       expect(res.status).toBe(201);
@@ -58,7 +58,7 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
         .send({
           questionIndex: 0,
           correctedDomain: 'cognitive',
-          correctedLevel: 99,
+          correctedLevel: 99
         });
 
       expect(res.status).toBe(400);
@@ -73,7 +73,7 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
         .send({
           questionIndex: 0,
           correctedDomain: 'invalid_domain',
-          correctedLevel: 2,
+          correctedLevel: 2
         });
 
       expect(res.status).toBe(400);
@@ -82,13 +82,11 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
     });
 
     it('rejects unauthenticated request', async () => {
-      const res = await request(app)
-        .post(`/reviewer/papers/${paper._id}/corrections`)
-        .send({
-          questionIndex: 0,
-          correctedDomain: 'cognitive',
-          correctedLevel: 2,
-        });
+      const res = await request(app).post(`/reviewer/papers/${paper._id}/corrections`).send({
+        questionIndex: 0,
+        correctedDomain: 'cognitive',
+        correctedLevel: 2
+      });
 
       expect(res.status).toBe(401);
       expect(res.body.error).toBe(true);
@@ -98,18 +96,15 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
       const otherCollege = await createTestCollege();
       const otherReviewer = await createTestUser({
         role: 'reviewer',
-        collegeId: otherCollege._id,
+        collegeId: otherCollege._id
       });
       const otherCookie = getCookieString(otherReviewer);
 
-      const res = await request(app)
-        .post(`/reviewer/papers/${paper._id}/corrections`)
-        .set('Cookie', otherCookie)
-        .send({
-          questionIndex: 0,
-          correctedDomain: 'cognitive',
-          correctedLevel: 2,
-        });
+      const res = await request(app).post(`/reviewer/papers/${paper._id}/corrections`).set('Cookie', otherCookie).send({
+        questionIndex: 0,
+        correctedDomain: 'cognitive',
+        correctedLevel: 2
+      });
 
       expect(res.status).toBe(403);
       expect(res.body.error).toBe(true);
@@ -123,7 +118,7 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
           questionIndex: 0,
           correctedDomain: 'cognitive',
           correctedLevel: 2,
-          reason: 'Initial classification was slightly low',
+          reason: 'Initial classification was slightly low'
         });
 
       expect(res1.status).toBe(201);
@@ -136,7 +131,7 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
           questionIndex: 0,
           correctedDomain: 'cognitive',
           correctedLevel: 4,
-          reason: 'Actually requires analysis',
+          reason: 'Actually requires analysis'
         });
 
       expect([200, 201]).toContain(res2.status);
@@ -144,13 +139,13 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
 
       const count = await VerifiedQuestion.countDocuments({
         paperId: paper._id,
-        questionIndex: 0,
+        questionIndex: 0
       });
       expect(count).toBe(1);
 
       const updated = await VerifiedQuestion.findOne({
         paperId: paper._id,
-        questionIndex: 0,
+        questionIndex: 0
       });
       expect(updated.correctedLevel).toBe(4);
       expect(updated.reason).toBe('Actually requires analysis');
@@ -162,12 +157,12 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
       await createTestVerifiedQuestion({
         paperId: paper._id,
         questionIndex: 0,
-        correctedBy: reviewer._id,
+        correctedBy: reviewer._id
       });
       await createTestVerifiedQuestion({
         paperId: paper._id,
         questionIndex: 1,
-        correctedBy: reviewer._id,
+        correctedBy: reviewer._id
       });
 
       const res = await request(app)
@@ -200,7 +195,7 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
         paperId: paper._id,
         questionIndex: 0,
         correctedLevel: 2,
-        correctedBy: reviewer._id,
+        correctedBy: reviewer._id
       });
 
       const res = await request(app)
@@ -208,7 +203,7 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
         .set('Cookie', reviewerCookie)
         .send({
           correctedLevel: 5,
-          reason: 'Author updated correction',
+          reason: 'Author updated correction'
         });
 
       expect(res.status).toBe(200);
@@ -216,7 +211,7 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
 
       const updated = await VerifiedQuestion.findOne({
         paperId: paper._id,
-        questionIndex: 0,
+        questionIndex: 0
       });
       expect(updated.correctedLevel).toBe(5);
       expect(updated.reason).toBe('Author updated correction');
@@ -227,12 +222,12 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
         paperId: paper._id,
         questionIndex: 0,
         correctedLevel: 2,
-        correctedBy: reviewer._id,
+        correctedBy: reviewer._id
       });
 
       const otherReviewer = await createTestUser({
         role: 'reviewer',
-        collegeId: college._id,
+        collegeId: college._id
       });
       const otherCookie = getCookieString(otherReviewer);
 
@@ -240,7 +235,7 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
         .put(`/reviewer/papers/${paper._id}/corrections/0`)
         .set('Cookie', otherCookie)
         .send({
-          correctedLevel: 4,
+          correctedLevel: 4
         });
 
       expect(res.status).toBe(403);
@@ -248,7 +243,7 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
 
       const unchanged = await VerifiedQuestion.findOne({
         paperId: paper._id,
-        questionIndex: 0,
+        questionIndex: 0
       });
       expect(unchanged.correctedLevel).toBe(2);
     });
@@ -258,7 +253,7 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
         paperId: paper._id,
         questionIndex: 0,
         correctedLevel: 2,
-        correctedBy: reviewer._id,
+        correctedBy: reviewer._id
       });
 
       const superAdmin = await createSuperAdmin();
@@ -269,7 +264,7 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
         .set('Cookie', superAdminCookie)
         .send({
           correctedLevel: 6,
-          reason: 'Super admin override',
+          reason: 'Super admin override'
         });
 
       expect(res.status).toBe(200);
@@ -277,7 +272,7 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
 
       const updated = await VerifiedQuestion.findOne({
         paperId: paper._id,
-        questionIndex: 0,
+        questionIndex: 0
       });
       expect(updated.correctedLevel).toBe(6);
       expect(updated.reason).toBe('Super admin override');
@@ -289,7 +284,7 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
       await createTestVerifiedQuestion({
         paperId: paper._id,
         questionIndex: 0,
-        correctedBy: reviewer._id,
+        correctedBy: reviewer._id
       });
 
       const res = await request(app)
@@ -301,7 +296,7 @@ describe('VerifiedQuestion Corrections Endpoints', () => {
 
       const inDb = await VerifiedQuestion.findOne({
         paperId: paper._id,
-        questionIndex: 0,
+        questionIndex: 0
       });
       expect(inDb).toBeNull();
     });

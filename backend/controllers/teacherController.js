@@ -3,7 +3,15 @@ const logger = require('../config/logger');
 const Paper = require('../Model/PaperInfo');
 const User = require('../Model/user');
 const { paginate, getPaginationMeta } = require('../utils/pagination');
-const { getUserId, getUserRole, getCollegeId, isTeacher, isReviewer, isAdmin, isSuperAdmin } = require('../utils/currentUser');
+const {
+  getUserId,
+  getUserRole,
+  getCollegeId,
+  isTeacher,
+  isReviewer,
+  isAdmin,
+  isSuperAdmin
+} = require('../utils/currentUser');
 const { createNotification } = require('./notificationController');
 const { logAudit } = require('../utils/auditLog');
 
@@ -57,7 +65,7 @@ exports.getMyPapers = async (req, res) => {
         .skip(skip)
         .limit(limit)
         .lean(),
-      Paper.countDocuments(query),
+      Paper.countDocuments(query)
     ]);
 
     // Count by status for stats — aggregation requires real ObjectIds
@@ -72,9 +80,9 @@ exports.getMyPapers = async (req, res) => {
       {
         $group: {
           _id: '$reviewStatus',
-          count: { $sum: 1 },
-        },
-      },
+          count: { $sum: 1 }
+        }
+      }
     ]);
 
     const formattedStats = {
@@ -83,14 +91,14 @@ exports.getMyPapers = async (req, res) => {
       pending: stats.find((s) => s._id === 'pending')?.count || 0,
       approved: stats.find((s) => s._id === 'approved')?.count || 0,
       rejected: stats.find((s) => s._id === 'rejected')?.count || 0,
-      needsRevision: stats.find((s) => s._id === 'needs_revision')?.count || 0,
+      needsRevision: stats.find((s) => s._id === 'needs_revision')?.count || 0
     };
 
     res.json({
       error: false,
       papers,
       stats: formattedStats,
-      pagination: getPaginationMeta(total, page, limit),
+      pagination: getPaginationMeta(total, page, limit)
     });
   } catch (error) {
     logger.error('Error fetching papers:', error);
@@ -151,7 +159,7 @@ exports.submitPaperForReview = async (req, res) => {
       }
       return res.status(400).json({
         error: true,
-        message: `Cannot submit paper with status: ${existing.reviewStatus}. Only draft or needs_revision papers can be submitted.`,
+        message: `Cannot submit paper with status: ${existing.reviewStatus}. Only draft or needs_revision papers can be submitted.`
       });
     }
 
@@ -162,7 +170,7 @@ exports.submitPaperForReview = async (req, res) => {
 
       User.find({
         collegeId: paper.collegeId,
-        role: { $in: ['reviewer', 'admin'] },
+        role: { $in: ['reviewer', 'admin'] }
       })
         .select('_id')
         .lean()
@@ -175,19 +183,17 @@ exports.submitPaperForReview = async (req, res) => {
               title: 'Paper ready for review',
               message: `"${courseName}" was submitted and is awaiting review.`,
               relatedDocId: paper._id,
-              actionUrl: `/reviewer/papers/${paper._id}`,
+              actionUrl: `/reviewer/papers/${paper._id}`
             }).catch(() => {});
           }
         })
-        .catch((err) =>
-          logger.error('[notification.paperSubmitted]', err.message)
-        );
+        .catch((err) => logger.error('[notification.paperSubmitted]', err.message));
     }
 
     res.json({
       error: false,
       message: 'Paper submitted for review successfully',
-      paper,
+      paper
     });
   } catch (err) {
     logger.error('Submit error:', err);
@@ -225,7 +231,7 @@ exports.updatePaper = async (req, res) => {
     if (!['draft', 'needs_revision'].includes(paper.reviewStatus)) {
       return res.status(400).json({
         error: true,
-        message: `Cannot edit paper with status: ${paper.reviewStatus}. Only draft or needs_revision papers can be edited.`,
+        message: `Cannot edit paper with status: ${paper.reviewStatus}. Only draft or needs_revision papers can be edited.`
       });
     }
 
@@ -276,7 +282,7 @@ exports.deletePaper = async (req, res) => {
     if (role !== 'super_admin' && !['draft', 'needs_revision'].includes(paper.reviewStatus)) {
       return res.status(400).json({
         error: true,
-        message: `Cannot delete paper with status: ${paper.reviewStatus}. Only draft or needs_revision papers can be deleted.`,
+        message: `Cannot delete paper with status: ${paper.reviewStatus}. Only draft or needs_revision papers can be deleted.`
       });
     }
 
@@ -313,7 +319,7 @@ exports.resendPaperReviewEmail = async (req, res) => {
     if (paper.reviewStatus !== 'pending') {
       return res.status(400).json({
         error: true,
-        message: `Cannot resend review email — paper status is "${paper.reviewStatus}", expected "pending".`,
+        message: `Cannot resend review email — paper status is "${paper.reviewStatus}", expected "pending".`
       });
     }
 
@@ -323,7 +329,7 @@ exports.resendPaperReviewEmail = async (req, res) => {
 
     const reviewers = await User.find({
       collegeId: paper.collegeId,
-      role: { $in: ['reviewer', 'admin'] },
+      role: { $in: ['reviewer', 'admin'] }
     })
       .select('email fullName')
       .lean();
@@ -341,15 +347,17 @@ exports.resendPaperReviewEmail = async (req, res) => {
     const emailResults = await Promise.allSettled(
       reviewers
         .filter((r) => r.email)
-        .map((r) => emailService.sendReviewerAssignedEmail({
-          to: r.email,
-          reviewerName: r.fullName,
-          paperTitle: courseName,
-          courseCode,
-          teacherName,
-          questionCount,
-          paperId: paper._id,
-        }))
+        .map((r) =>
+          emailService.sendReviewerAssignedEmail({
+            to: r.email,
+            reviewerName: r.fullName,
+            paperTitle: courseName,
+            courseCode,
+            teacherName,
+            questionCount,
+            paperId: paper._id
+          })
+        )
     );
     const sentCount = emailResults.filter(
       (result) => result.status === 'fulfilled' && result.value?.success !== false
@@ -361,7 +369,7 @@ exports.resendPaperReviewEmail = async (req, res) => {
         action: 'RESEND_REVIEW_EMAIL',
         resource: `Paper:${paper._id}`,
         changes: { newValue: { sentCount }, fields: ['reviewEmail'] },
-        request: req,
+        request: req
       });
     } catch (auditErr) {
       logger.error('Audit log failed (non-blocking):', auditErr.message);
@@ -370,7 +378,7 @@ exports.resendPaperReviewEmail = async (req, res) => {
     return res.json({
       error: false,
       message: `Resent review request to ${sentCount} reviewer(s).`,
-      sentCount,
+      sentCount
     });
   } catch (err) {
     logger.error('resendPaperReviewEmail error:', err);
