@@ -1,7 +1,20 @@
 const mongoose = require('mongoose');
 
-// Helper: field is required only for teachers (not for admins/reviewers)
-const teacherOnly = function () { return this.role === 'teacher'; };
+// Required for every teacher, affiliated or not
+const isTeacher = function () { return this.role === 'teacher'; };
+
+// Required only when the teacher is affiliated with a college
+const isAffiliatedTeacher = function () {
+    return this.role === 'teacher' && !!this.collegeId;
+};
+
+const pendingIdVerificationSchema = new mongoose.Schema({
+    status: { type: String, default: null },
+    confidence: { type: Number, default: null },
+    extractedData: { type: mongoose.Schema.Types.Mixed, default: null },
+    matchedFields: { type: mongoose.Schema.Types.Mixed, default: null },
+    updatedAt: { type: Date, default: null },
+}, { _id: false, strict: true });
 
 const userSchema = new mongoose.Schema({
     // --- Core fields (required for ALL roles) ---
@@ -19,24 +32,32 @@ const userSchema = new mongoose.Schema({
         lowercase: true,
         trim: true
     },
+    // Set on password change; tokens issued before this instant are rejected.
+    passwordChangedAt: { type: Date, default: null },
     password: {
         type: String,
         required: true
     },
     role: {
         type: String,
-        enum: ['teacher', 'reviewer', 'admin'],
+        enum: ['teacher', 'reviewer', 'admin', 'super_admin', 'student'],
         default: 'teacher'
     },
     isBlocked: {
         type: Boolean,
         default: false
     },
+    collegeId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'College',
+        required: false,
+        default: null
+    },
 
-    // --- Teacher-specific profile fields (NOT required for admin/reviewer) ---
+    // --- Teacher-specific profile fields ---
     fullName: {
         type: String,
-        required: teacherOnly,
+        required: isTeacher,
         trim: true,
         minlength: 2,
         maxlength: 100,
@@ -44,29 +65,38 @@ const userSchema = new mongoose.Schema({
     },
     phone: {
         type: String,
-        required: false,      // Optional — teachers fill this via register form
+        required: false,
         match: [/^[0-9]{10}$/, 'Phone must be 10 digits'],
         unique: true,
-        sparse: true,         // Allows multiple null values (admins won't have phone)
-        default: null
+        sparse: true,
     },
     collegeName: {
         type: String,
-        required: teacherOnly,
+        required: isAffiliatedTeacher,
         trim: true,
         default: ''
     },
     position: {
         type: String,
-        required: teacherOnly,
+        required: isTeacher,
         enum: [
             'Professor',
+            'Senior Professor',
             'Associate Professor',
             'Assistant Professor',
+            'Senior Lecturer',
             'Lecturer',
             'HoD',
+            'Dean',
+            'Director',
+            'Principal',
+            'Vice Principal',
+            'Academic Coordinator',
+            'Visiting Faculty',
+            'Research Faculty',
+            'Teaching Assistant',
             'Other',
-            ''              // Allow empty for non-teacher roles
+            ''
         ],
         default: ''
     },
@@ -75,18 +105,17 @@ const userSchema = new mongoose.Schema({
         required: false,
         unique: true,
         trim: true,
-        sparse: true,         // Allows multiple null/missing values
-        default: null
+        sparse: true,
     },
     department: {
         type: String,
-        required: teacherOnly,
+        required: isAffiliatedTeacher,
         trim: true,
         default: ''
     },
     stream: {
         type: String,
-        required: teacherOnly,
+        required: isAffiliatedTeacher,
         enum: [
             'Engineering',
             'Management',
@@ -96,15 +125,12 @@ const userSchema = new mongoose.Schema({
             'Law',
             'Medicine',
             'Other',
-            ''              // Allow empty for non-teacher roles
+            ''
         ],
         default: ''
     },
-    collegeIdPhoto: {
-        type: String,         // Cloudinary secure_url
-        required: teacherOnly,
-        default: ''
-    },
+    collegeIdPhoto: { type: String, required: false, default: '' },
+    collegeIdPhotoPublicId: { type: String, required: false, default: null },
 
     // --- OCR ID Verification (teachers only — admins skip this) ---
     idVerification: {
@@ -133,13 +159,113 @@ const userSchema = new mongoose.Schema({
             type: Date,
             default: Date.now
         }
-    }
+    },
+
+    // --- Email verification (Phase 2) ---
+    emailVerified: {
+        type: Boolean,
+        default: false,
+    },
+    emailVerificationToken: {
+        type: String,
+        default: null,
+        select: false,
+    },
+    emailVerificationExpires: {
+        type: Date,
+        default: null,
+        select: false,
+    },
+
+    // --- Password reset ---
+    passwordResetToken: {
+        type: String,
+        default: null,
+        select: false,
+    },
+    passwordResetExpires: {
+        type: Date,
+        default: null,
+        select: false,
+    },
+
+    // --- Refresh token (hashed, single active token per user) ---
+    refreshTokenHash: {
+        type: String,
+        default: null,
+        select: false,
+    },
+    refreshTokenExpiresAt: {
+        type: Date,
+        default: null,
+        select: false,
+    },
+
+    // --- College approval workflow (Phase A) ---
+    collegeApprovalStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected', 'not_applicable'],
+    default: 'approved',
+    index: true,
+},
+    pendingAffiliationRequest: {
+        collegeId:      { type: mongoose.Schema.Types.ObjectId, ref: 'College', default: null },
+        requestedAt:    { type: Date, default: null },
+        idVerification: { type: pendingIdVerificationSchema, default: null },
+    },
 
 }, { timestamps: true });
 
-// Indexes for faster lookups
+// Pre-save hook: Enforce role-based college rules
+userSchema.pre('save', function (next) {
+    if (this.role === 'super_admin') {
+        this.collegeId = null;
+        this.collegeName = '';
+        this.collegeApprovalStatus = 'not_applicable';
+    }
+    else if (this.role === 'student') {
+        this.collegeId = null;
+        this.collegeName = '';
+        this.collegeApprovalStatus = 'approved';
+    }
+    else if (this.role === 'teacher') {
+        if (this.collegeId) {
+            // Affiliated — must be admin-approved.
+            // Do NOT clobber an admin's decision.
+            if (!this.collegeApprovalStatus || this.collegeApprovalStatus === 'not_applicable') {
+                this.collegeApprovalStatus = 'pending';
+            }
+        } else if (this.pendingAffiliationRequest?.collegeId) {
+            // Independent teacher with an in-flight affiliation request — keep pending
+            this.collegeApprovalStatus = 'pending';
+        } else {
+            // Fully independent teacher — auto-approved, UNLESS the caller
+            // explicitly set 'pending' (preserve user intent / manual state)
+            if (!this.collegeApprovalStatus || this.collegeApprovalStatus === 'not_applicable') {
+                this.collegeApprovalStatus = 'approved';
+            }
+        }
+    }
+    else if (this.role === 'reviewer' || this.role === 'admin') {
+        if (!this.collegeId) {
+            return next(new Error(`College is required for ${this.role} role`));
+        }
+        this.collegeApprovalStatus = 'approved';
+    }
+    else {
+        this.collegeApprovalStatus = 'approved';
+    }
+
+    next();
+});
+
+// Indexes
+userSchema.index({ collegeId: 1 });
 userSchema.index({ employeeId: 1, collegeName: 1 });
-userSchema.index({ email: 1 });
-userSchema.index({ phone: 1 });
+userSchema.index({ collegeId: 1, collegeApprovalStatus: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ createdAt: -1 });
+userSchema.index({ collegeId: 1, role: 1, isBlocked: 1 });
+userSchema.index({ collegeApprovalStatus: 1, createdAt: -1 });
 
 module.exports = mongoose.model('User', userSchema);

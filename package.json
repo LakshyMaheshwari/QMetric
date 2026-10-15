@@ -4,5 +4,9 @@
   "description": "QMetric project",
   "scripts": {
     "build": "cd frontend/Aceternity-UI-React && npm run build"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.4"
   }
 }

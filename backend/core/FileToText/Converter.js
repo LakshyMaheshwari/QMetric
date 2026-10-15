@@ -1,9 +1,9 @@
-const fs    = require('fs');
-const path  = require('path');
-const pdf   = require('pdf-parse');
-const mammoth = require('mammoth');
-const csv   = require('csv-parser');
-const xlsx  = require('xlsx');
+const fs        = require('node:fs');
+const logger = require('../../config/logger');
+const pdf       = require('pdf-parse');
+const mammoth   = require('mammoth');
+const csv       = require('csv-parser');
+const xlsx      = require('xlsx');
 const Tesseract = require('tesseract.js');
 
 // ─── PDF ──────────────────────────────────────────────────────────────────────
@@ -24,12 +24,12 @@ async function convertWordToText(inputFilePath, outputTextFilePath) {
         fs.writeFileSync(outputTextFilePath, text);
         return text;
     } catch (error) {
-        console.error('Error converting Word document to text:', error);
+        logger.error('Error converting Word document to text:', error);
         throw error;
     }
 }
 
-// ─── CSV — FIXED: stream wrapped in a Promise so async callers get the result ─
+// ─── CSV — stream wrapped in a Promise so async callers get the result ────────
 async function convertCSVToText(inputFilePath, outputTextFilePath) {
     return new Promise((resolve, reject) => {
         const rows = [];

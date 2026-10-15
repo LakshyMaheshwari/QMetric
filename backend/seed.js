@@ -1,3 +1,5 @@
+const logger = require('./config/logger');
+
 /**
  * Seed Script for Test Users
  * 
@@ -16,8 +18,8 @@ const User = require('./Model/user');
 const testUsers = [
   {
     userName: 'TestUser1',
-    email: 'test@user1.com',
-    password: 'password123',
+    email: process.env.SEED_USER1_EMAIL || 'test@user1.com',
+    password: process.env.SEED_USER1_PASSWORD || 'change-me-in-production',
     fullName: 'Dr. John Doe',
     phone: '9876543210',
     collegeName: 'National Institute of Technology',
@@ -41,8 +43,8 @@ const testUsers = [
   },
   {
     userName: 'TestUser2',
-    email: 'test@user2.com',
-    password: 'password123',
+    email: process.env.SEED_USER2_EMAIL || 'test@user2.com',
+    password: process.env.SEED_USER2_PASSWORD || 'change-me-in-production',
     fullName: 'Prof. Jane Smith',
     phone: '9876543211',
     collegeName: 'Indian Institute of Technology',
@@ -66,8 +68,8 @@ const testUsers = [
   },
   {
     userName: 'TestUser3',
-    email: 'test@user3.com',
-    password: 'password123',
+    email: process.env.SEED_USER3_EMAIL || 'test@user3.com',
+    password: process.env.SEED_USER3_PASSWORD || 'change-me-in-production',
     fullName: 'Dr. Alan Turing',
     phone: '9876543212',
     collegeName: 'Delhi University',
@@ -91,8 +93,8 @@ const testUsers = [
   },
   {
     userName: 'TestUser4',
-    email: 'test@user4.com',
-    password: 'password123',
+    email: process.env.SEED_USER4_EMAIL || 'test@user4.com',
+    password: process.env.SEED_USER4_PASSWORD || 'change-me-in-production',
     fullName: 'Prof. Ada Lovelace',
     phone: '9876543213',
     collegeName: 'BITS Pilani',
@@ -116,8 +118,8 @@ const testUsers = [
   },
   {
     userName: 'TestUser5',
-    email: 'test@user5.com',
-    password: 'password123',
+    email: process.env.SEED_USER5_EMAIL || 'test@user5.com',
+    password: process.env.SEED_USER5_PASSWORD || 'change-me-in-production',
     fullName: 'Dr. Grace Hopper',
     phone: '9876543214',
     collegeName: 'Anna University',
@@ -149,7 +151,7 @@ async function seedUsers() {
       useUnifiedTopology: true,
     });
 
-    console.log('✅ Connected to MongoDB');
+    logger.info('✅ Connected to MongoDB');
 
     // Seed each test user
     for (const userData of testUsers) {
@@ -165,21 +167,21 @@ async function seedUsers() {
         });
 
         await newUser.save();
-        console.log(`✅ User ${userData.email} created successfully`);
+        logger.info(`✅ User ${userData.email} created successfully`);
       } else {
-        console.log(`⚠️ User ${userData.email} already exists - skipping`);
+        logger.info(`⚠️ User ${userData.email} already exists - skipping`);
       }
     }
 
-    console.log('\nSeeding complete!');
-    console.log('\nTest Accounts:');
+    logger.info('\nSeeding complete!');
+    logger.info('\nTest Accounts:');
     testUsers.forEach(user => {
-      console.log(`  - Email: ${user.email}, Password: ${user.password}`);
+      logger.info(`  - Email: ${user.email}`);
     });
 
     process.exit(0);
   } catch (error) {
-    console.error('❌ Error seeding users:', error.message);
+    logger.error('❌ Error seeding users:', error.message);
     process.exit(1);
   }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Turnstile } from '@marsidev/react-turnstile';
-import { FileText, Menu, X, User, Mail, Lock, Eye, EyeOff, Home, BarChart3, Users, Shield, MessageSquare } from 'lucide-react';
+import { FileText, Menu, X, User, Mail, Lock, Eye, EyeOff, Home, BarChart3, Users, Shield, Building2, Building, ClipboardCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AccessRestrictionModal from './AccessRestrictionModal';
 import useAccessRestriction from './hooks/useAccessRestriction';
@@ -10,7 +10,7 @@ import apiClient from '../api/client';
 const TURNSTILE_SITE_KEY = process.env.REACT_APP_TURNSTILE_SITE_KEY || "1x00000000000000000000AA";
 
 const Navbar = () => {
-  const { user, login: authLogin, logout: authLogout } = useAuth();
+  const { user, login: authLogin, logout: authLogout, blockedMessage, clearBlockedMessage } = useAuth();
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -109,7 +109,7 @@ const Navbar = () => {
       });
 
       const data = response.data;
-      authLogin(data.accessToken, data.user);
+      authLogin(data.user);
       setIsLoginModalOpen(false);
       setFormData({ userName: '', email: '', password: '', confirmPassword: '' });
       turnstileRef.current?.reset();
@@ -186,17 +186,6 @@ const Navbar = () => {
                 <Users className="w-4 h-4" />
                 <span>Credits</span>
               </button>
-
-              {/* ── Feedback Link (only for logged-in users) ── */}
-              {user && (
-                <button
-                  onClick={() => navigateTo('/feedback')}
-                  className="relative px-5 py-2 text-lg font-semibold transition-all rounded-lg text-gray-300 hover:text-orange-500 flex items-center space-x-1"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  <span>Feedback</span>
-                </button>
-              )}
             </div>
 
             {/* Login / Avatar - Desktop */}
@@ -230,13 +219,40 @@ const Navbar = () => {
                         <User className="w-4 h-4" />
                         <span>Profile</span>
                       </button>
+                      {user.role === 'super_admin' && (
+                        <button
+                          onClick={() => { setShowUserMenu(false); navigateTo('/super-admin'); }}
+                          className="w-full text-left px-4 py-2 text-blue-300 hover:bg-blue-500/10 hover:text-blue-200 transition-colors flex items-center space-x-2"
+                        >
+                          <Building2 className="w-4 h-4" />
+                          <span>Super Admin Dashboard</span>
+                        </button>
+                      )}
                       {user.role === 'admin' && (
                         <button
-                          onClick={() => { setShowUserMenu(false); navigateTo('/admin'); }}
-                          className="w-full text-left px-4 py-2 text-purple-300 hover:bg-purple-500/10 hover:text-purple-200 transition-colors flex items-center space-x-2"
+                          onClick={() => { setShowUserMenu(false); navigateTo('/college-admin'); }}
+                          className="w-full text-left px-4 py-2 text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200 transition-colors flex items-center space-x-2"
                         >
-                          <Shield className="w-4 h-4" />
-                          <span>Admin Dashboard</span>
+                          <Building className="w-4 h-4" />
+                          <span>College Dashboard</span>
+                        </button>
+                      )}
+                      {(user.role === 'reviewer' || user.role === 'admin') && (
+                        <button
+                          onClick={() => { setShowUserMenu(false); navigateTo('/reviewer'); }}
+                          className="w-full text-left px-4 py-2 text-teal-300 hover:bg-teal-500/10 hover:text-teal-200 transition-colors flex items-center space-x-2"
+                        >
+                          <ClipboardCheck className="w-4 h-4" />
+                          <span>Review Papers</span>
+                        </button>
+                      )}
+                      {(user.role === 'teacher' || user.role === 'reviewer' || user.role === 'admin') && (
+                        <button
+                          onClick={() => { setShowUserMenu(false); navigateTo('/teacher'); }}
+                          className="w-full text-left px-4 py-2 text-indigo-300 hover:bg-indigo-500/10 hover:text-indigo-200 transition-colors flex items-center space-x-2"
+                        >
+                          <FileText className="w-4 h-4" />
+                          <span>My Papers</span>
                         </button>
                       )}
                       <button
@@ -245,13 +261,6 @@ const Navbar = () => {
                       >
                         <Users className="w-4 h-4" />
                         <span>Credits</span>
-                      </button>
-                      <button
-                        onClick={() => { setShowUserMenu(false); navigateTo('/feedback'); }}
-                        className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex items-center space-x-2"
-                      >
-                        <MessageSquare className="w-4 h-4" />
-                        <span>Feedback</span>
                       </button>
                       <button
                         onClick={handleLogout}
@@ -317,17 +326,6 @@ const Navbar = () => {
                 <span>Credits</span>
               </button>
 
-              {/* ── Feedback Link (Mobile, logged-in only) ── */}
-              {user && (
-                <button
-                  onClick={() => { setIsMenuOpen(false); navigateTo('/feedback'); }}
-                  className="w-full text-left relative px-5 py-2 text-lg font-semibold transition-all rounded-lg text-gray-300 hover:text-orange-500 flex items-center space-x-2"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  <span>Feedback</span>
-                </button>
-              )}
-
               {user ? (
                 <div className="space-y-2">
                   <div className="px-4 py-2 border-b border-gray-600">
@@ -348,13 +346,40 @@ const Navbar = () => {
                     <User className="w-4 h-4" />
                     <span>Profile</span>
                   </button>
+                  {user.role === 'super_admin' && (
+                    <button
+                      onClick={() => { setIsMenuOpen(false); navigateTo('/super-admin'); }}
+                      className="w-full text-left px-4 py-2 text-blue-300 hover:bg-blue-500/10 hover:text-blue-200 transition-colors rounded-lg flex items-center space-x-2"
+                    >
+                      <Building2 className="w-4 h-4" />
+                      <span>Super Admin Dashboard</span>
+                    </button>
+                  )}
                   {user.role === 'admin' && (
                     <button
-                      onClick={() => { setIsMenuOpen(false); navigateTo('/admin'); }}
-                      className="w-full text-left px-4 py-2 text-purple-300 hover:bg-purple-500/10 hover:text-purple-200 transition-colors rounded-lg flex items-center space-x-2"
+                      onClick={() => { setIsMenuOpen(false); navigateTo('/college-admin'); }}
+                      className="w-full text-left px-4 py-2 text-emerald-300 hover:bg-emerald-500/10 hover:text-emerald-200 transition-colors rounded-lg flex items-center space-x-2"
                     >
-                      <Shield className="w-4 h-4" />
-                      <span>Admin Dashboard</span>
+                      <Building className="w-4 h-4" />
+                      <span>College Dashboard</span>
+                    </button>
+                  )}
+                  {(user.role === 'reviewer' || user.role === 'admin') && (
+                    <button
+                      onClick={() => { setIsMenuOpen(false); navigateTo('/reviewer'); }}
+                      className="w-full text-left px-4 py-2 text-teal-300 hover:bg-teal-500/10 hover:text-teal-200 transition-colors rounded-lg flex items-center space-x-2"
+                    >
+                      <ClipboardCheck className="w-4 h-4" />
+                      <span>Review Papers</span>
+                    </button>
+                  )}
+                  {(user.role === 'teacher' || user.role === 'reviewer' || user.role === 'admin') && (
+                    <button
+                      onClick={() => { setIsMenuOpen(false); navigateTo('/teacher'); }}
+                      className="w-full text-left px-4 py-2 text-indigo-300 hover:bg-indigo-500/10 hover:text-indigo-200 transition-colors rounded-lg flex items-center space-x-2"
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>My Papers</span>
                     </button>
                   )}
                   <button
@@ -520,6 +545,38 @@ const Navbar = () => {
               <p className="text-xs text-gray-500">
                 By continuing, you agree to our Terms of Service and Privacy Policy.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Blocked Account Modal */}
+      {blockedMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-gray-900 border border-red-500/50 rounded-2xl p-6 sm:p-8 w-full max-w-md shadow-2xl animate__animated animate__fadeIn">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-500/25">
+                <Shield className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Account Blocked</h3>
+              <p className="text-gray-300 text-sm mb-4 leading-relaxed">
+                {blockedMessage}
+              </p>
+              <div className="p-3 bg-red-950/40 border border-red-800/40 rounded-xl mb-6 text-left">
+                <p className="text-xs text-red-300">
+                  Your access has been restricted by an administrator. Please contact your institution administrator or support for assistance.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  clearBlockedMessage();
+                  navigateTo('/');
+                }}
+                className="w-full py-3 bg-gradient-to-r from-red-500 to-orange-500 text-white font-semibold rounded-lg shadow-lg hover:scale-105 transition-transform duration-200"
+              >
+                Understood
+              </button>
             </div>
           </div>
         </div>
