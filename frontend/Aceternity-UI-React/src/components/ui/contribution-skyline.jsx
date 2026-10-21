@@ -885,16 +885,24 @@ export default function ContributionSkyline({
           <div
             role="group"
             aria-label="Chart view"
-            className="relative inline-flex rounded-md border p-0.5"
-            style={{ borderColor: 'var(--color-border, #e5e5e5)' }}
+            className="relative inline-flex items-center rounded-lg p-0.5 backdrop-blur-md transition-all duration-300 shadow-sm"
+            style={{
+              background: theme.dark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+              border: `1px solid ${theme.dark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.1)'}`,
+            }}
           >
             <span
               aria-hidden="true"
-              className="absolute top-0.5 bottom-0.5 left-0.5 w-8 rounded transition-transform duration-500 motion-reduce:transition-none"
+              className="absolute top-0.5 bottom-0.5 left-0.5 w-8 rounded-md transition-all duration-300"
               style={{
-                background: 'var(--color-foreground, #171717)',
+                background: theme.dark
+                  ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.12))'
+                  : 'var(--color-foreground, #171717)',
                 transform: is3d ? 'translateX(100%)' : 'translateX(0)',
                 transitionTimingFunction: ease,
+                boxShadow: theme.dark
+                  ? '0 2px 6px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(255,255,255,0.2)'
+                  : '0 1px 3px rgba(0,0,0,0.2)',
               }}
             />
             {['2d', '3d'].map((v) => (
@@ -905,10 +913,10 @@ export default function ContributionSkyline({
                 aria-label={v === '2d' ? 'Flat heat map' : '3D skyline'}
                 title={v === '2d' ? 'Flat heat map' : '3D skyline'}
                 onClick={() => setView(v)}
-                className="relative z-10 grid h-7 w-8 cursor-pointer place-items-center rounded border-0 bg-transparent p-0 transition-colors duration-500 focus-visible:outline-2 focus-visible:outline-offset-2 motion-reduce:transition-none"
+                className="relative z-10 grid h-7 w-8 cursor-pointer place-items-center rounded-md border-0 bg-transparent p-0 transition-all duration-300 active:scale-90 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-1 motion-reduce:transition-none"
                 style={{
-                  color: view === v ? 'var(--color-background, #ffffff)' : MUTED,
-                  outlineColor: 'var(--color-foreground, #171717)',
+                  color: view === v ? (theme.dark ? '#ffffff' : 'var(--color-background, #ffffff)') : (theme.dark ? '#a1a1aa' : MUTED),
+                  outlineColor: theme.dark ? '#a855f7' : 'var(--color-foreground, #171717)',
                 }}
               >
                 {v === '2d' ? <GridIcon /> : <CubeIcon />}
@@ -918,7 +926,7 @@ export default function ContributionSkyline({
         )}
       </header>
 
-      <div className="relative rounded-lg border" style={{ borderColor: 'var(--color-border, #e5e5e5)' }}>
+      <div className="relative rounded-lg border" style={{ borderColor: theme.dark ? 'rgba(255, 255, 255, 0.08)' : 'var(--color-border, #e5e5e5)' }}>
         <div className="relative px-3 pt-3 sm:px-4 sm:pt-4">
           <div
             ref={stageRef}

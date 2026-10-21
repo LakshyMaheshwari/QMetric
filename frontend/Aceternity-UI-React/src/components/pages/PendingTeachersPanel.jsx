@@ -61,64 +61,82 @@ export default function PendingTeachersPanel() {
   };
 
   return (
-    <section className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl mb-8">
+    <section className="bg-white border border-[#E8E2D7] rounded-2xl p-6 shadow-sm mb-8" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
         <div>
-          <div className="flex items-center gap-2 text-white font-semibold text-lg">
-            <Clock3 className="w-5 h-5 text-yellow-400" /> Pending Teacher Approvals
+          <div className="flex items-center gap-2 text-[#111827] font-semibold text-lg">
+            <Clock3 className="w-5 h-5 text-amber-500" /> Pending Teacher Approvals
           </div>
-          <p className="text-xs text-zinc-500 mt-1">Review teachers who registered or requested affiliation with your college.</p>
+          <p className="text-xs text-[#78716C] mt-1">Review teachers who registered or requested affiliation with your college.</p>
         </div>
-        <button onClick={fetchPendingTeachers} disabled={loading} className="p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700">
+        <button
+          onClick={fetchPendingTeachers}
+          disabled={loading}
+          className="p-2 rounded-xl bg-[#FAF7F2] border border-[#E8E2D7] text-[#57534E] hover:bg-neutral-100 transition-colors"
+          title="Refresh pending teachers"
+        >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
-      {error && <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>}
-      {success && <div className="mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-sm">{success}</div>}
+      {error && <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium">{error}</div>}
+      {success && <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-medium">{success}</div>}
 
       <div className="relative mb-4 max-w-md">
-        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search teacher name or email..." className="w-full pl-9 pr-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-sm text-white" />
+        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#A8A29E]" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search teacher name or email..."
+          className="w-full pl-9 pr-4 py-2.5 bg-[#FAF7F2] border border-[#E8E2D7] rounded-xl text-sm text-[#111827] placeholder:text-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all"
+        />
       </div>
 
       {loading && teachers.length === 0 ? (
-        <p className="text-sm text-zinc-500">Loading pending requests...</p>
+        <p className="text-sm text-[#78716C]">Loading pending requests...</p>
       ) : teachers.length === 0 ? (
-        <div className="py-8 text-center text-zinc-500 border border-dashed border-zinc-800 rounded-xl">No pending teacher requests.</div>
+        <div className="py-8 text-center text-[#78716C] border border-dashed border-[#E8E2D7] rounded-xl">No pending teacher requests.</div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-zinc-300">
-            <thead className="text-xs uppercase text-zinc-500 border-b border-zinc-800">
+          <table className="w-full text-left text-sm text-[#57534E]">
+            <thead className="text-xs uppercase font-semibold text-[#78716C] bg-[#FAF7F2] border-b border-[#E8E2D7]">
               <tr>
-                <th className="py-3 px-3">Teacher</th>
-                <th className="py-3 px-3">Position</th>
-                <th className="py-3 px-3">Department</th>
-                <th className="py-3 px-3">Verification</th>
-                <th className="py-3 px-3 text-right">Actions</th>
+                <th className="py-3 px-4">Teacher</th>
+                <th className="py-3 px-4">Position</th>
+                <th className="py-3 px-4">Department</th>
+                <th className="py-3 px-4">Verification</th>
+                <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/70">
+            <tbody className="divide-y divide-[#F2ECE1]">
               {teachers.map((teacher) => (
-                <tr key={teacher._id} className="hover:bg-zinc-800/30">
-                  <td className="py-3 px-3">
-                    <div className="font-medium text-white">{teacher.fullName || teacher.userName}</div>
-                    <div className="text-xs text-zinc-500">{teacher.email}</div>
+                <tr key={teacher._id} className="hover:bg-[#FAF7F2]/60 transition-colors">
+                  <td className="py-3 px-4">
+                    <div className="font-medium text-[#111827]">{teacher.fullName || teacher.userName}</div>
+                    <div className="text-xs text-[#78716C]">{teacher.email}</div>
                   </td>
-                  <td className="py-3 px-3 text-xs text-zinc-400">{teacher.position || '—'}</td>
-                  <td className="py-3 px-3 text-xs text-zinc-400">{teacher.department || '—'}</td>
-                  <td className="py-3 px-3 text-xs">
-                    <span className="inline-flex items-center gap-1 text-zinc-300">
+                  <td className="py-3 px-4 text-xs text-[#57534E]">{teacher.position || '—'}</td>
+                  <td className="py-3 px-4 text-xs text-[#57534E]">{teacher.department || '—'}</td>
+                  <td className="py-3 px-4 text-xs">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-[#57534E] border border-[#E8E2D7]">
                       {teacher.idVerification?.status || 'unverified'}
                     </span>
                   </td>
-                  <td className="py-3 px-3">
+                  <td className="py-3 px-4">
                     <div className="flex justify-end gap-2">
-                      <button onClick={() => approve(teacher)} disabled={actionId === teacher._id} className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-green-600/20 border border-green-600/30 text-green-400 hover:bg-green-600 hover:text-white disabled:opacity-50">
-                        <CheckCircle className="w-4 h-4" /> Approve
+                      <button
+                        onClick={() => approve(teacher)}
+                        disabled={actionId === teacher._id}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold hover:bg-emerald-100 disabled:opacity-50 transition-colors shadow-sm"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" /> Approve
                       </button>
-                      <button onClick={() => reject(teacher)} disabled={actionId === teacher._id} className="inline-flex items-center gap-1 px-3 py-2 rounded-lg bg-red-600/20 border border-red-600/30 text-red-400 hover:bg-red-600 hover:text-white disabled:opacity-50">
-                        <XCircle className="w-4 h-4" /> Reject
+                      <button
+                        onClick={() => reject(teacher)}
+                        disabled={actionId === teacher._id}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold hover:bg-red-100 disabled:opacity-50 transition-colors shadow-sm"
+                      >
+                        <XCircle className="w-3.5 h-3.5" /> Reject
                       </button>
                     </div>
                   </td>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Award, Users, Lightbulb, Code2, Layout, Shield, ChevronRight, Star } from 'lucide-react';
+import { Award, Users, Lightbulb, Code2, Layout, Shield, ChevronRight, Star, ArrowLeft } from 'lucide-react';
 
 const sections = [
   {
@@ -8,10 +8,10 @@ const sections = [
     icon: <Shield className="w-6 h-6" />,
     title: 'Governing & Advisory Layer',
     subtitle: 'Strategic oversight, academic rigor, and compliance',
-    color: 'from-blue-500 to-blue-600',
-    lightColor: 'from-blue-50 to-blue-100',
-    borderColor: 'border-blue-200',
-    textColor: 'text-blue-600',
+    color: 'from-orange-500 to-amber-600',
+    lightColor: 'from-orange-50/60 to-amber-50/40',
+    borderColor: 'border-orange-200/70',
+    textColor: 'text-orange-600',
     members: [
       {
         name: 'Dr. Anant J. Umbarkar',
@@ -30,10 +30,10 @@ const sections = [
     icon: <Lightbulb className="w-6 h-6" />,
     title: 'Research & Innovation Leadership',
     subtitle: 'Core research direction and innovation pipeline',
-    color: 'from-purple-500 to-purple-600',
-    lightColor: 'from-purple-50 to-purple-100',
-    borderColor: 'border-purple-200',
-    textColor: 'text-purple-600',
+    color: 'from-orange-500 to-orange-600',
+    lightColor: 'from-orange-50/60 to-orange-100/30',
+    borderColor: 'border-orange-200/70',
+    textColor: 'text-orange-600',
     members: [
       { name: 'Dr. Anant J. Umbarkar', role: 'Founder / Chief Mentor', badge: 'PI' },
       { name: 'Admuthe Sir', role: 'Co-PI', badge: 'Co-PI' },
@@ -56,10 +56,10 @@ const sections = [
     icon: <Award className="w-6 h-6" />,
     title: 'Product & Program Management',
     subtitle: 'Translating research into deployable products',
-    color: 'from-indigo-500 to-indigo-600',
-    lightColor: 'from-indigo-50 to-indigo-100',
-    borderColor: 'border-indigo-200',
-    textColor: 'text-indigo-600',
+    color: 'from-amber-500 to-orange-500',
+    lightColor: 'from-amber-50/60 to-orange-50/40',
+    borderColor: 'border-amber-200/70',
+    textColor: 'text-amber-700',
     members: [
       { name: 'Dr. Anant J. Umbarkar', role: 'Founder / Chief Mentor', badge: 'PI' },
       { name: 'Admuthe Sir', role: 'Co-PI', badge: 'Co-PI' },
@@ -81,10 +81,10 @@ const sections = [
     icon: <Layout className="w-6 h-6" />,
     title: 'Design & User Experience Team',
     subtitle: 'Interface design, accessibility, and user validation',
-    color: 'from-pink-500 to-rose-500',
-    lightColor: 'from-pink-50 to-rose-100',
-    borderColor: 'border-pink-200',
-    textColor: 'text-pink-600',
+    color: 'from-orange-600 to-red-500',
+    lightColor: 'from-orange-50/60 to-rose-50/30',
+    borderColor: 'border-orange-200/70',
+    textColor: 'text-orange-600',
     members: [
       { name: 'Mr. Virendra Patil', role: 'Improved algorithm logic (Flexible Bloom\'s Level)', badge: 'Dev' },
       { name: 'Ms. Kranti A. Varekar', role: 'Corrected optimal result equation', badge: 'Dev' },
@@ -101,30 +101,30 @@ const sections = [
   {
     id: 'engineering',
     icon: <Code2 className="w-6 h-6" />,
-    title: 'Engineering & Development Team',
-    subtitle: 'Building scalable, secure, and modular systems',
-    color: 'from-teal-500 to-cyan-600',
-    lightColor: 'from-teal-50 to-cyan-100',
-    borderColor: 'border-teal-200',
-    textColor: 'text-teal-600',
+    title: 'Software Development & Systems Engineering',
+    subtitle: 'Architecture, core algorithms, and deployment',
+    color: 'from-orange-500 to-amber-600',
+    lightColor: 'from-orange-50/60 to-amber-50/40',
+    borderColor: 'border-orange-200/70',
+    textColor: 'text-orange-600',
     members: [
-      { name: 'Mr. Virendra Patil', role: 'Full-stack Developer', badge: 'Full-stack' },
-      { name: 'Ms. Kranti A. Varekar', role: 'Frontend Developer', badge: 'Frontend' },
-      { name: 'Mr. Utkarsh', role: 'Full-stack Developer', badge: 'Full-stack' },
-      { name: 'Mr. Om R. Kulsange', role: 'Backend Developer', badge: 'Backend' },
-      { name: 'Ms. Elizabeth S. Pawar', role: 'Backend Developer', badge: 'Backend' },
+      { name: 'Mr. Virendra Patil', role: 'Backend & ML Algorithms', badge: 'Dev' },
+      { name: 'Ms. Kranti A. Varekar', role: 'Algorithm Optimization', badge: 'Dev' },
+      { name: 'Mr. Utkarsh', role: 'Full-stack Platform Architecture', badge: 'Lead' },
+      { name: 'Mr. Om R. Kulsange', role: 'Frontend & UI Engineering', badge: 'Lead' },
+      { name: 'Ms. Elizabeth S. Pawar', role: 'Frontend & API Integration', badge: 'Lead' },
     ],
     responsibilities: [
-      'Translating research algorithms into software',
-      'Scalable, secure, and modular development',
-      'Integration of experimental models into production',
+      'Core cognitive parsing and Bloom taxonomy engine',
+      'Cloud deployment, databases, and microservices',
+      'Security, validation, and real-time report generation',
     ],
   },
 ];
 
 function BadgePill({ label, colorClass }) {
   return (
-    <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${colorClass} ml-2 whitespace-nowrap`}>
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${colorClass}`}>
       {label}
     </span>
   );
@@ -132,48 +132,48 @@ function BadgePill({ label, colorClass }) {
 
 function SectionCard({ section, isOpen, onToggle }) {
   return (
-    <div className={`rounded-2xl border ${section.borderColor} bg-white/70 backdrop-blur-sm shadow-md overflow-hidden transition-all`}>
+    <div className="rounded-2xl border border-[#E8E2D7] bg-white shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
       {/* Header */}
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-white/80 transition-colors"
+        className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-neutral-50/60 transition-colors"
       >
         <div className="flex items-center gap-4">
-          <div className={`p-2 rounded-xl bg-gradient-to-br ${section.color} text-white shadow`}>
+          <div className={`p-2.5 rounded-xl bg-gradient-to-br ${section.color} text-white shadow-md shadow-orange-500/20`}>
             {section.icon}
           </div>
           <div>
-            <h3 className="text-lg font-bold text-gray-800">{section.title}</h3>
-            <p className="text-sm text-gray-500">{section.subtitle}</p>
+            <h3 className="text-lg font-bold text-[#111827]">{section.title}</h3>
+            <p className="text-sm text-[#57534E]">{section.subtitle}</p>
           </div>
         </div>
         <ChevronRight
-          className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`}
+          className={`w-5 h-5 text-neutral-400 transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`}
         />
       </button>
 
       {/* Body */}
       {isOpen && (
-        <div className={`px-6 pb-6 bg-gradient-to-br ${section.lightColor}`}>
+        <div className={`px-6 pb-6 pt-2 bg-gradient-to-br ${section.lightColor} border-t border-[#F2ECE1]`}>
           {/* Members grid */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
             {section.members.map((m, i) => (
               <div
                 key={i}
-                className="flex items-start gap-3 bg-white/80 rounded-xl p-3 border border-white shadow-sm"
+                className="flex items-start gap-3 bg-white rounded-xl p-3.5 border border-[#E8E2D7] shadow-sm"
               >
-                <div className={`mt-0.5 w-2 h-2 rounded-full bg-gradient-to-br ${section.color} flex-shrink-0 mt-2`} />
+                <div className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0 mt-2" />
                 <div>
-                  <div className="flex flex-wrap items-center gap-1">
-                    <span className="text-sm font-semibold text-gray-800">{m.name}</span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-sm font-bold text-[#111827]">{m.name}</span>
                     {m.badge && (
                       <BadgePill
                         label={m.badge}
-                        colorClass={`${section.textColor} bg-white border border-current/20`}
+                        colorClass="text-orange-700 bg-orange-100/80 border border-orange-200"
                       />
                     )}
                   </div>
-                  <p className="text-xs text-gray-500 mt-0.5">{m.role}</p>
+                  <p className="text-xs text-[#57534E] mt-0.5">{m.role}</p>
                 </div>
               </div>
             ))}
@@ -181,15 +181,15 @@ function SectionCard({ section, isOpen, onToggle }) {
 
           {/* Responsibilities */}
           {section.responsibilities && (
-            <div className="mb-4">
-              <h4 className={`text-xs font-bold uppercase tracking-widest ${section.textColor} mb-2`}>
-                Responsibilities
+            <div className="mb-4 bg-white/70 rounded-xl p-4 border border-[#E8E2D7]">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-orange-600 mb-2.5">
+                Core Responsibilities
               </h4>
-              <ul className="space-y-1">
+              <ul className="space-y-1.5">
                 {section.responsibilities.map((r, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                    <Star className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${section.textColor}`} />
-                    {r}
+                  <li key={i} className="flex items-start gap-2 text-sm text-[#374151]">
+                    <Star className="w-3.5 h-3.5 mt-1 flex-shrink-0 text-orange-500" />
+                    <span>{r}</span>
                   </li>
                 ))}
               </ul>
@@ -198,40 +198,40 @@ function SectionCard({ section, isOpen, onToggle }) {
 
           {/* Patent block */}
           {section.patent && (
-            <div className="mt-2 bg-white/90 rounded-xl p-4 border border-purple-100 shadow-sm">
-              <h4 className="text-xs font-bold uppercase tracking-widest text-purple-600 mb-3">
-                Patent Details
+            <div className="mt-2 bg-white rounded-xl p-4 border border-orange-200/80 shadow-sm">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-orange-600 mb-3">
+                Patent & Intellectual Property Details
               </h4>
               <div className="grid sm:grid-cols-3 gap-4 text-sm">
                 <div>
-                  <p className="font-semibold text-gray-700 mb-1">Inventors</p>
+                  <p className="font-semibold text-[#111827] mb-1">Inventors</p>
                   {section.patent.inventors.map((n, i) => (
-                    <p key={i} className="text-gray-500 text-xs">{n}</p>
+                    <p key={i} className="text-[#57534E] text-xs">{n}</p>
                   ))}
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-700 mb-1">Applicants</p>
+                  <p className="font-semibold text-[#111827] mb-1">Applicants</p>
                   {section.patent.applicants.map((n, i) => (
-                    <p key={i} className="text-gray-500 text-xs">{n}</p>
+                    <p key={i} className="text-[#57534E] text-xs">{n}</p>
                   ))}
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-700 mb-1">Sub-Contributors</p>
+                  <p className="font-semibold text-[#111827] mb-1">Sub-Contributors</p>
                   {section.patent.subContributors.map((n, i) => (
-                    <p key={i} className="text-gray-500 text-xs">{n}</p>
+                    <p key={i} className="text-[#57534E] text-xs">{n}</p>
                   ))}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Single member contributions (governing section) */}
+          {/* Single member contributions */}
           {section.members[0]?.contributions && (
-            <ul className="space-y-1 mt-2">
+            <ul className="space-y-1.5 mt-2 bg-white/70 rounded-xl p-4 border border-[#E8E2D7]">
               {section.members[0].contributions.map((c, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                  <Star className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${section.textColor}`} />
-                  {c}
+                <li key={i} className="flex items-start gap-2 text-sm text-[#374151]">
+                  <Star className="w-3.5 h-3.5 mt-1 flex-shrink-0 text-orange-500" />
+                  <span>{c}</span>
                 </li>
               ))}
             </ul>
@@ -250,30 +250,29 @@ export default function CreditsPage() {
     setOpenSections((prev) => ({ ...prev, [id]: !prev[id] }));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-purple-50">
+    <div className="min-h-screen bg-[#FAF7F2] pt-20 pb-16">
       {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-100/30 to-purple-100/30" />
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-          <div className="inline-flex items-center gap-2 bg-white/70 backdrop-blur-sm border border-gray-200 rounded-full px-4 py-1.5 text-sm font-medium text-gray-600 mb-6 shadow-sm">
-            <Users className="w-4 h-4 text-blue-500" />
-            QMetric Team
+      <section className="relative overflow-hidden py-14">
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="inline-flex items-center gap-2 bg-white border border-[#E8E2D7] rounded-full px-4 py-1.5 text-xs font-bold text-orange-600 mb-6 shadow-sm">
+            <Users className="w-3.5 h-3.5" />
+            Institutional Credits
           </div>
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-800 mb-4">
+          <h1 className="text-4xl md:text-5xl font-extrabold text-[#111827] mb-4 tracking-tight">
             Credits &{' '}
-            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
               Contributions
             </span>
           </h1>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
-            QMetric is the result of collaborative effort across research, design, and engineering.
-            This page recognizes every individual who made it possible.
+          <p className="text-base text-[#57534E] max-w-2xl mx-auto leading-relaxed">
+            QMetric represents a collective multi-year research and engineering endeavor.
+            We proudly honor and recognize every contributor, researcher, and engineer behind the project.
           </p>
         </div>
       </section>
 
       {/* Sections */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-24 space-y-4">
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
         {sections.map((section) => (
           <SectionCard
             key={section.id}
@@ -284,25 +283,26 @@ export default function CreditsPage() {
         ))}
 
         {/* Declaration */}
-        <div className="mt-8 rounded-2xl border border-gray-200 bg-white/70 backdrop-blur-sm shadow-md p-8 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white mb-4 shadow-lg">
+        <div className="mt-8 rounded-2xl border border-[#E8E2D7] bg-white shadow-sm p-8 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 text-white mb-4 shadow-lg shadow-orange-500/20">
             <Shield className="w-6 h-6" />
           </div>
-          <h3 className="text-xl font-bold text-gray-800 mb-3">Declaration</h3>
-          <p className="text-gray-600 max-w-2xl mx-auto text-sm leading-relaxed">
-            This Major Academic Project has been carried out under the guidance and supervision
-            of the above-mentioned contributors. All work complies with institutional academic
-            standards, ethical research practices, and originality requirements.
+          <h3 className="text-xl font-bold text-[#111827] mb-3">Institutional Academic Declaration</h3>
+          <p className="text-[#57534E] max-w-2xl mx-auto text-sm leading-relaxed">
+            This Major Academic Project has been carried out under the direct guidance and supervision
+            of the faculty mentors and team leads above. All evaluation models strictly comply with
+            national accreditation guidelines (NBA/NAAC) and ethical academic benchmarks.
           </p>
         </div>
 
         {/* Back link */}
-        <div className="text-center pt-4">
+        <div className="text-center pt-8">
           <button
             onClick={() => navigate('/')}
-            className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-blue-600 transition-colors"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-[#57534E] hover:text-orange-600 transition-colors"
           >
-            ← Back to Home
+            <ArrowLeft className="w-4 h-4" />
+            Back to Home
           </button>
         </div>
       </section>

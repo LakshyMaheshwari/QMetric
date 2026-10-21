@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../../api/client';
-import { Building2, CheckCircle, Search, ShieldCheck } from 'lucide-react';
+import { Building2, CheckCircle, Search, ShieldCheck, ArrowLeft } from 'lucide-react';
 
 const initialForm = {
   collegeName: '',
@@ -104,47 +104,47 @@ export default function CollegeRegistrationPage() {
     }
   };
 
-  const inputClass = 'w-full px-4 py-2.5 rounded-lg bg-neutral-900 border border-neutral-700 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500';
+  const inputClass = 'w-full px-4 py-2.5 rounded-xl bg-[#FAF7F2] border border-[#E8E2D7] text-[#111827] placeholder-[#A8A29E] text-sm focus:outline-none focus:border-orange-500 transition-all font-medium';
 
   return (
-    <div className="min-h-screen bg-black flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 mt-16">
-      <div className="max-w-4xl w-full mx-auto space-y-8 bg-zinc-900 p-8 rounded-xl shadow-2xl border border-zinc-800">
+    <div className="min-h-screen bg-[#FAF7F2] flex flex-col justify-center py-20 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl w-full mx-auto space-y-8 bg-white p-8 md:p-10 rounded-2xl shadow-sm border border-[#E8E2D7]">
         <div className="text-center">
-          <div className="inline-flex items-center gap-2 text-blue-400 mb-3">
-            <Building2 className="w-6 h-6" />
-            <span className="font-semibold">College / Exam Cell Registration</span>
+          <div className="inline-flex items-center gap-2 bg-orange-50 border border-orange-200 text-orange-700 px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider mb-3">
+            <Building2 className="w-4 h-4" />
+            <span>Institutional Exam Cell Portal</span>
           </div>
-          <h1 className="text-3xl font-extrabold text-white">Register Your College</h1>
-          <p className="mt-2 text-sm text-neutral-400">
-            Submit your institution for Super Admin review. Approval creates the college tenant and the first college admin account.
+          <h1 className="text-3xl md:text-4xl font-black text-[#111827] tracking-tight">Register Your College</h1>
+          <p className="mt-2 text-sm text-[#57534E] max-w-xl mx-auto">
+            Submit your institution for accreditation and system onboarding. Approval sets up your autonomous college domain and admin exam cell.
           </p>
         </div>
 
-        {error && <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded text-sm">{error}</div>}
+        {error && <div className="bg-red-50 border border-red-200 text-red-700 p-3.5 rounded-xl text-sm font-medium">{error}</div>}
 
         {application ? (
           <div className="space-y-5">
-            <div className="bg-green-500/10 border border-green-500/30 text-green-300 p-5 rounded-xl">
-              <div className="flex items-center gap-2 font-semibold mb-2">
-                <CheckCircle className="w-5 h-5" /> Application submitted successfully
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 p-6 rounded-2xl">
+              <div className="flex items-center gap-2 font-bold text-base mb-2 text-emerald-800">
+                <CheckCircle className="w-5 h-5 text-emerald-600" /> Application submitted successfully!
               </div>
-              <p className="text-sm text-green-200/80">
-                Save this application ID. You can use it below to check the status later.
+              <p className="text-sm text-emerald-800/90 leading-relaxed">
+                Please securely store your application ID. You can verify review and approval status anytime using the tracker below.
               </p>
-              <div className="mt-3 p-3 bg-black/30 rounded-lg font-mono text-sm break-all text-white">
+              <div className="mt-3 p-3.5 bg-white border border-emerald-200 rounded-xl font-mono text-sm break-all text-[#111827] font-bold">
                 {application._id}
               </div>
-              <p className="mt-3 text-sm">Current status: <span className="font-semibold uppercase">{application.status}</span></p>
+              <p className="mt-3 text-xs font-semibold text-emerald-800">Current status: <span className="uppercase px-2 py-0.5 bg-emerald-100 rounded-md font-bold text-emerald-900">{application.status}</span></p>
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Link to="/register" className="px-4 py-2.5 rounded-lg border border-zinc-700 text-zinc-300 hover:bg-zinc-800">
+              <Link to="/register" className="px-5 py-2.5 rounded-full border border-[#E8E2D7] bg-[#FAF7F2] text-[#111827] hover:bg-neutral-100 text-sm font-semibold transition-all">
                 Register a User Account
               </Link>
               <button
                 type="button"
                 onClick={() => setApplication(null)}
-                className="px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium"
+                className="px-5 py-2.5 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold text-sm shadow-md shadow-orange-500/25 transition-all"
               >
                 Submit Another Application
               </button>
@@ -153,63 +153,77 @@ export default function CollegeRegistrationPage() {
         ) : (
           <form onSubmit={submitApplication} className="space-y-6" noValidate>
             <div>
-              <h2 className="text-lg font-semibold text-white mb-3">Institution Details</h2>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-orange-600 mb-3 flex items-center gap-2">
+                <span>01</span> Institution Details
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <input className={inputClass} placeholder="College / Institution Name *" value={form.collegeName} onChange={(e) => updateField('collegeName', e.target.value)} />
-                <input className={inputClass} placeholder="College Code *" value={form.collegeCode} onChange={(e) => updateField('collegeCode', e.target.value.toUpperCase())} />
-                <input className={`${inputClass} md:col-span-2`} placeholder="Address" value={form.address} onChange={(e) => updateField('address', e.target.value)} />
+                <input className={inputClass} placeholder="College Code (e.g., WCE) *" value={form.collegeCode} onChange={(e) => updateField('collegeCode', e.target.value.toUpperCase())} />
+                <input className={`${inputClass} md:col-span-2`} placeholder="Campus Address" value={form.address} onChange={(e) => updateField('address', e.target.value)} />
                 <input className={inputClass} placeholder="City" value={form.city} onChange={(e) => updateField('city', e.target.value)} />
                 <input className={inputClass} placeholder="State" value={form.state} onChange={(e) => updateField('state', e.target.value)} />
               </div>
             </div>
 
             <div>
-              <h2 className="text-lg font-semibold text-white mb-3">Exam Cell / Admin Contact</h2>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-orange-600 mb-3 flex items-center gap-2">
+                <span>02</span> Exam Cell / Admin Contact
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <input className={inputClass} placeholder="Contact Person Name *" value={form.contactName} onChange={(e) => updateField('contactName', e.target.value)} />
-                <input className={inputClass} type="email" placeholder="Official Email *" value={form.contactEmail} onChange={(e) => updateField('contactEmail', e.target.value)} />
-                <input className={inputClass} type="tel" placeholder="10-digit Phone *" value={form.contactPhone} onChange={(e) => updateField('contactPhone', e.target.value.replace(/\D/g, '').slice(0, 10))} />
+                <input className={inputClass} type="email" placeholder="Official Institutional Email *" value={form.contactEmail} onChange={(e) => updateField('contactEmail', e.target.value)} />
+                <input className={inputClass} type="tel" placeholder="10-digit Phone Number *" value={form.contactPhone} onChange={(e) => updateField('contactPhone', e.target.value.replace(/\D/g, '').slice(0, 10))} />
               </div>
             </div>
 
             <div>
-              <h2 className="text-lg font-semibold text-white mb-3">Initial Admin Login</h2>
-              <p className="text-xs text-neutral-500 mb-3">This password is stored securely and will be used for the college admin account if the application is approved.</p>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-orange-600 mb-1 flex items-center gap-2">
+                <span>03</span> Initial College Admin Credentials
+              </h2>
+              <p className="text-xs text-[#78716C] mb-3">This password is encrypted and will become active once Super Admin authorizes the institution application.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <input className={inputClass} type="password" placeholder="Create Password *" value={form.password} onChange={(e) => updateField('password', e.target.value)} />
                 <input className={inputClass} type="password" placeholder="Confirm Password *" value={form.confirmPassword} onChange={(e) => updateField('confirmPassword', e.target.value)} />
               </div>
             </div>
 
-            <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 rounded-xl font-semibold disabled:opacity-60">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-3.5 rounded-full font-bold text-sm shadow-md shadow-orange-500/25 hover:shadow-orange-500/40 transition-all disabled:opacity-60"
+            >
               {loading ? 'Submitting Application...' : 'Submit College Registration'}
             </button>
           </form>
         )}
 
-        <div className="border-t border-zinc-800 pt-6">
-          <div className="flex items-center gap-2 text-white font-semibold mb-3">
-            <Search className="w-5 h-5 text-blue-400" /> Check Application Status
+        <div className="border-t border-[#E8E2D7] pt-6">
+          <div className="flex items-center gap-2 text-[#111827] font-bold text-sm mb-3">
+            <Search className="w-4 h-4 text-orange-500" /> Check Application Status
           </div>
           <form onSubmit={lookupApplication} className="flex flex-col sm:flex-row gap-3">
             <input className={`${inputClass} flex-1`} placeholder="Paste application ID" value={lookupId} onChange={(e) => setLookupId(e.target.value)} />
-            <button type="submit" disabled={lookupLoading} className="px-5 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white hover:bg-zinc-700 disabled:opacity-60">
+            <button
+              type="submit"
+              disabled={lookupLoading}
+              className="px-6 py-2.5 rounded-full bg-white border border-[#E8E2D7] hover:border-orange-300 text-[#111827] text-sm font-bold shadow-sm transition-all disabled:opacity-60"
+            >
               {lookupLoading ? 'Checking...' : 'Check Status'}
             </button>
           </form>
-          {lookupError && <p className="mt-2 text-sm text-red-400">{lookupError}</p>}
+          {lookupError && <p className="mt-2 text-xs font-semibold text-red-600">{lookupError}</p>}
           {lookupResult && (
-            <div className="mt-4 p-4 rounded-xl bg-zinc-950 border border-zinc-800 text-sm space-y-2">
-              <div className="flex items-center gap-2 text-white font-semibold"><ShieldCheck className="w-4 h-4 text-blue-400" /> {lookupResult.collegeName}</div>
-              <div className="text-zinc-400">Code: <span className="text-zinc-200">{lookupResult.collegeCode}</span></div>
-              <div className="text-zinc-400">Status: <span className="text-zinc-200 uppercase font-semibold">{lookupResult.status}</span></div>
-              {lookupResult.rejectionReason && <div className="text-red-400">Reason: {lookupResult.rejectionReason}</div>}
+            <div className="mt-4 p-4 rounded-xl bg-[#FAF7F2] border border-[#E8E2D7] text-sm space-y-2">
+              <div className="flex items-center gap-2 text-[#111827] font-bold"><ShieldCheck className="w-4 h-4 text-emerald-600" /> {lookupResult.collegeName}</div>
+              <div className="text-[#57534E]">Code: <span className="text-[#111827] font-bold">{lookupResult.collegeCode}</span></div>
+              <div className="text-[#57534E]">Status: <span className="uppercase font-bold text-orange-600">{lookupResult.status}</span></div>
+              {lookupResult.rejectionReason && <div className="text-red-600 text-xs mt-1">Reason: {lookupResult.rejectionReason}</div>}
             </div>
           )}
         </div>
 
-        <p className="text-center text-xs text-neutral-500">
-          Already have an account? <Link to="/register" className="text-blue-400 hover:text-blue-300">Register as a user</Link>
+        <p className="text-center text-xs text-[#78716C]">
+          Already have a college account? <Link to="/register" className="text-orange-600 hover:text-orange-700 font-bold hover:underline">Register individual teacher account</Link>
         </p>
       </div>
     </div>

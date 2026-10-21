@@ -26,11 +26,8 @@ const ReviewerDashboard = () => {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, pages: 1 });
 
-  // Guard: allow reviewer, admin, or super_admin
   useEffect(() => {
-    if (user && !['reviewer', 'admin', 'super_admin'].includes(user.role)) {
-      navigate('/dashboard');
-    }
+    if (user && !['reviewer', 'admin', 'super_admin'].includes(user.role)) navigate('/dashboard');
   }, [user, navigate]);
 
   const fetchData = useCallback(async () => {
@@ -47,9 +44,7 @@ const ReviewerDashboard = () => {
 
       if (papersRes.data && !papersRes.data.error) {
         setPapers(papersRes.data.papers || []);
-        if (papersRes.data.pagination) {
-          setPagination(papersRes.data.pagination);
-        }
+        if (papersRes.data.pagination) setPagination(papersRes.data.pagination);
       } else {
         setMessage({ text: papersRes.data?.message || 'Failed to fetch papers', type: 'error' });
       }
@@ -58,11 +53,7 @@ const ReviewerDashboard = () => {
         setStats(statsRes.data.stats || statsRes.data);
       }
     } catch (error) {
-      console.error('Error fetching reviewer data:', error);
-      setMessage({
-        text: error.response?.data?.message || 'Failed to load reviewer records. Check connection.',
-        type: 'error',
-      });
+      setMessage({ text: error.response?.data?.message || 'Failed to load reviewer records.', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -71,12 +62,8 @@ const ReviewerDashboard = () => {
   const fetchPendingCount = useCallback(async () => {
     try {
       const response = await apiClient.get('/reviewer/pending-count');
-      if (response.data && !response.data.error) {
-        setPendingCount(response.data.pending || 0);
-      }
-    } catch (error) {
-      // Silent fail for badge
-    }
+      if (response.data && !response.data.error) setPendingCount(response.data.pending || 0);
+    } catch (error) {}
   }, []);
 
   useEffect(() => {
@@ -84,10 +71,7 @@ const ReviewerDashboard = () => {
     fetchPendingCount();
   }, [fetchData, fetchPendingCount]);
 
-  const handleReview = (paper) => {
-    setSelectedPaper(paper);
-    setShowReviewModal(true);
-  };
+  const handleReview = (paper) => { setSelectedPaper(paper); setShowReviewModal(true); };
 
   const handleReviewComplete = (updatedPaper) => {
     setShowReviewModal(false);
@@ -103,31 +87,10 @@ const ReviewerDashboard = () => {
 
   const getStatusBadge = (status) => {
     switch (status) {
-      case 'approved':
-        return {
-          bg: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
-          icon: <CheckCircle2 className="w-3.5 h-3.5" />,
-          label: 'Approved',
-        };
-      case 'rejected':
-        return {
-          bg: 'bg-red-500/10 border-red-500/30 text-red-400',
-          icon: <XCircle className="w-3.5 h-3.5" />,
-          label: 'Rejected',
-        };
-      case 'needs_revision':
-        return {
-          bg: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
-          icon: <RotateCcw className="w-3.5 h-3.5" />,
-          label: 'Needs Revision',
-        };
-      case 'pending':
-      default:
-        return {
-          bg: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
-          icon: <Clock className="w-3.5 h-3.5" />,
-          label: 'Pending',
-        };
+      case 'approved':       return { bg: 'bg-emerald-100 border-emerald-200 text-emerald-700', icon: <CheckCircle2 className="w-3.5 h-3.5" />, label: 'Approved' };
+      case 'rejected':       return { bg: 'bg-red-100 border-red-200 text-red-700',             icon: <XCircle className="w-3.5 h-3.5" />,     label: 'Rejected' };
+      case 'needs_revision': return { bg: 'bg-amber-100 border-amber-200 text-amber-700',       icon: <RotateCcw className="w-3.5 h-3.5" />,   label: 'Needs Revision' };
+      default:               return { bg: 'bg-yellow-50 border-yellow-200 text-yellow-700',     icon: <Clock className="w-3.5 h-3.5" />,       label: 'Pending' };
     }
   };
 
@@ -135,7 +98,7 @@ const ReviewerDashboard = () => {
 
   if (loading && papers.length === 0) {
     return (
-      <div className="min-h-screen bg-black text-white p-4 sm:p-6 lg:p-8 pt-24">
+      <div className="min-h-screen bg-[#FAF7F2] pt-20 px-4">
         <div className="max-w-7xl mx-auto">
           <DashboardSkeleton cards={6} tableRows={8} tableCols={5} />
         </div>
@@ -144,160 +107,103 @@ const ReviewerDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 sm:p-6 lg:p-8 pt-24">
+    <div className="min-h-screen bg-[#FAF7F2] pt-20 pb-10 px-4" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>
       {loading && papers.length > 0 && (
-        <div className="fixed top-0 left-0 right-0 h-1 bg-blue-500 animate-pulse z-50" />
+        <div className="fixed top-0 left-0 right-0 h-1 bg-orange-500 animate-pulse z-50" />
       )}
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Top Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-zinc-900/60 border border-zinc-800/80 p-6 rounded-2xl backdrop-blur-md">
+
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-[#E8E2D7] p-6 rounded-2xl shadow-sm">
           <div>
-            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase tracking-wider flex items-center gap-1.5">
-                <Building className="w-3 h-3" />
-                {collegeNameDisplay}
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200 uppercase tracking-wider flex items-center gap-1.5">
+                <Building className="w-3 h-3" />{collegeNameDisplay}
               </span>
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 capitalize">
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 border border-purple-200 capitalize">
                 Reviewer Portal
               </span>
               {pendingCount > 0 && (
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 animate-pulse flex items-center gap-1">
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200 animate-pulse flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   {pendingCount} paper{pendingCount > 1 ? 's' : ''} pending review
                 </span>
               )}
             </div>
-
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#111827] flex items-center gap-2.5">
               📋 Paper Reviewer Dashboard
             </h1>
-            <p className="text-sm text-zinc-400 mt-1">
-              Welcome, <span className="text-zinc-200 font-medium">{user?.fullName || user?.userName}</span>. Audit assessments, examine Bloom taxonomy compliance, and submit feedback.
+            <p className="text-sm text-[#57534E] mt-1">
+              Welcome, <span className="text-[#111827] font-semibold">{user?.fullName || user?.userName}</span>. Audit assessments, examine Bloom taxonomy compliance, and submit feedback.
             </p>
           </div>
-
-          <div className="flex items-center gap-3 self-start md:self-auto">
-            <button
-              onClick={() => { fetchData(); fetchPendingCount(); }}
-              disabled={loading}
-              className="p-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition-colors border border-zinc-700 flex items-center justify-center"
-              title="Refresh papers"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-400' : ''}`} />
-            </button>
-          </div>
+          <button
+            onClick={() => { fetchData(); fetchPendingCount(); }}
+            disabled={loading}
+            className="p-2.5 bg-[#FAF7F2] hover:bg-neutral-100 text-[#57534E] hover:text-orange-600 rounded-xl transition-all border border-[#E8E2D7] hover:border-orange-300 flex items-center justify-center shadow-sm"
+            title="Refresh papers"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-orange-500' : ''}`} />
+          </button>
         </div>
 
         {/* Message Banner */}
         {message.text && (
-          <div
-            className={`p-4 rounded-xl border text-sm flex items-center justify-between transition-all ${
-              message.type === 'success'
-                ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                : 'bg-red-500/10 border-red-500/30 text-red-400'
-            }`}
-          >
+          <div className={`p-4 rounded-xl border text-sm flex items-center justify-between ${
+            message.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+              : 'bg-red-50 border-red-200 text-red-700'
+          }`}>
             <div className="flex items-center gap-2">
-              {message.type === 'success' ? (
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-              ) : (
-                <AlertCircle className="w-4 h-4 shrink-0" />
-              )}
+              {message.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
               <span>{message.text}</span>
             </div>
-            <button onClick={() => setMessage({ text: '', type: '' })} className="hover:text-white">
-              <X className="w-4 h-4" />
-            </button>
+            <button onClick={() => setMessage({ text: '', type: '' })} className="hover:opacity-70"><X className="w-4 h-4" /></button>
           </div>
         )}
 
         {/* Stats Grid */}
         {stats && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-            <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 shadow-md">
-              <div className="flex items-center justify-between text-zinc-400 mb-1.5">
-                <span className="text-xs font-medium uppercase tracking-wider">Pending</span>
-                <Clock className="w-4 h-4 text-yellow-400" />
+            {[
+              { label: 'Pending',    val: stats.pending ?? 0,     icon: Clock,        color: 'bg-amber-50 border-amber-200', iconColor: 'text-amber-600', valColor: 'text-amber-800',   sub: 'Awaiting audit' },
+              { label: 'Approved',   val: stats.approved ?? 0,    icon: CheckCircle2, color: 'bg-emerald-50 border-emerald-200', iconColor: 'text-emerald-600', valColor: 'text-emerald-800', sub: 'Validated' },
+              { label: 'Revision',   val: stats.needsRevision ?? 0, icon: RotateCcw,  color: 'bg-orange-50 border-orange-200', iconColor: 'text-orange-600', valColor: 'text-orange-800', sub: 'Changes requested' },
+              { label: 'Rejected',   val: stats.rejected ?? 0,    icon: XCircle,      color: 'bg-red-50 border-red-200',    iconColor: 'text-red-600',    valColor: 'text-red-800',     sub: 'Non-compliant' },
+              { label: 'Total',      val: stats.total ?? 0,       icon: FileText,     color: 'bg-white border-[#E8E2D7]',   iconColor: 'text-orange-500', valColor: 'text-[#111827]',   sub: 'College papers' },
+              { label: 'My Reviews', val: stats.myReviews ?? 0,   icon: UserCheck,    color: 'bg-purple-50 border-purple-200', iconColor: 'text-purple-600', valColor: 'text-purple-800', sub: 'Reviewed by you' },
+            ].map(({ label, val, icon: Icon, color, iconColor, valColor, sub }) => (
+              <div key={label} className={`p-4 rounded-2xl border ${color} shadow-sm`}>
+                <div className="flex items-center justify-between text-[#57534E] mb-1.5">
+                  <span className="text-xs font-semibold uppercase tracking-wider">{label}</span>
+                  <Icon className={`w-4 h-4 ${iconColor}`} />
+                </div>
+                <div className={`text-2xl font-bold ${valColor}`}>{val}</div>
+                <p className="text-[11px] text-[#78716C] mt-1">{sub}</p>
               </div>
-              <div className="text-2xl font-bold text-yellow-400">{stats.pending ?? 0}</div>
-              <p className="text-[11px] text-zinc-500 mt-1">Awaiting audit</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 shadow-md">
-              <div className="flex items-center justify-between text-zinc-400 mb-1.5">
-                <span className="text-xs font-medium uppercase tracking-wider">Approved</span>
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              </div>
-              <div className="text-2xl font-bold text-emerald-400">{stats.approved ?? 0}</div>
-              <p className="text-[11px] text-zinc-500 mt-1">Validated</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 shadow-md">
-              <div className="flex items-center justify-between text-zinc-400 mb-1.5">
-                <span className="text-xs font-medium uppercase tracking-wider">Revision</span>
-                <RotateCcw className="w-4 h-4 text-amber-400" />
-              </div>
-              <div className="text-2xl font-bold text-amber-400">{stats.needsRevision ?? 0}</div>
-              <p className="text-[11px] text-zinc-500 mt-1">Changes requested</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 shadow-md">
-              <div className="flex items-center justify-between text-zinc-400 mb-1.5">
-                <span className="text-xs font-medium uppercase tracking-wider">Rejected</span>
-                <XCircle className="w-4 h-4 text-red-400" />
-              </div>
-              <div className="text-2xl font-bold text-red-400">{stats.rejected ?? 0}</div>
-              <p className="text-[11px] text-zinc-500 mt-1">Non-compliant</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 shadow-md">
-              <div className="flex items-center justify-between text-zinc-400 mb-1.5">
-                <span className="text-xs font-medium uppercase tracking-wider">Total</span>
-                <FileText className="w-4 h-4 text-blue-400" />
-              </div>
-              <div className="text-2xl font-bold text-white">{stats.total ?? 0}</div>
-              <p className="text-[11px] text-zinc-500 mt-1">College papers</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 shadow-md">
-              <div className="flex items-center justify-between text-zinc-400 mb-1.5">
-                <span className="text-xs font-medium uppercase tracking-wider">My Reviews</span>
-                <UserCheck className="w-4 h-4 text-purple-400" />
-              </div>
-              <div className="text-2xl font-bold text-purple-400">{stats.myReviews ?? 0}</div>
-              <p className="text-[11px] text-zinc-500 mt-1">Reviewed by you</p>
-            </div>
+            ))}
           </div>
         )}
 
-        {/* Filters and Controls */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-zinc-900 p-4 rounded-2xl border border-zinc-800">
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-[#E8E2D7] shadow-sm">
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-            {/* Search Input */}
             <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#A8A29E]" />
               <input
                 type="text"
                 placeholder="Search course, code, teacher..."
                 value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full pl-9 pr-4 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500 transition-colors"
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                className="w-full pl-9 pr-4 py-2.5 bg-[#FAF7F2] border border-[#E8E2D7] rounded-xl text-sm text-[#111827] placeholder-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-orange-400/30 focus:border-orange-400 transition-all"
               />
             </div>
-
-            {/* Status Filter */}
             <div className="flex items-center gap-2 w-full sm:w-auto">
-              <Filter className="w-4 h-4 text-zinc-400 hidden sm:block" />
+              <Filter className="w-4 h-4 text-[#A8A29E] hidden sm:block" />
               <select
                 value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full sm:w-auto px-3.5 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-sm text-zinc-300 focus:outline-none focus:border-blue-500 transition-colors"
+                onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+                className="w-full sm:w-auto px-3.5 py-2.5 bg-[#FAF7F2] border border-[#E8E2D7] rounded-xl text-sm text-[#111827] focus:outline-none focus:ring-2 focus:ring-orange-400/30 focus:border-orange-400 transition-all"
               >
                 <option value="all">All Review Statuses</option>
                 <option value="pending">⏳ Pending Review</option>
@@ -307,33 +213,32 @@ const ReviewerDashboard = () => {
               </select>
             </div>
           </div>
-
-          <div className="text-xs text-zinc-400 whitespace-nowrap self-end sm:self-auto">
-            Showing <strong className="text-white">{papers.length}</strong> {papers.length === 1 ? 'paper' : 'papers'}
+          <div className="text-xs text-[#57534E] whitespace-nowrap self-end sm:self-auto">
+            Showing <strong className="text-[#111827]">{papers.length}</strong> {papers.length === 1 ? 'paper' : 'papers'}
           </div>
         </div>
 
         {/* Papers Table */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
+        <div className="bg-white border border-[#E8E2D7] rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-zinc-400">
-              <thead className="bg-zinc-950/80 text-xs uppercase tracking-wider text-zinc-400 border-b border-zinc-800">
+            <table className="w-full text-left text-sm text-[#57534E]">
+              <thead className="bg-[#FAF7F2] text-xs uppercase tracking-wider text-[#57534E] border-b border-[#E8E2D7]">
                 <tr>
-                  <th className="py-4 px-6 font-medium">Course / Subject</th>
-                  <th className="py-4 px-6 font-medium">Uploaded By</th>
-                  <th className="py-4 px-6 font-medium">Questions</th>
-                  <th className="py-4 px-6 font-medium">Quality Score</th>
-                  <th className="py-4 px-6 font-medium">Review Status</th>
-                  <th className="py-4 px-6 font-medium text-right">Action</th>
+                  <th className="py-4 px-6 font-semibold">Course / Subject</th>
+                  <th className="py-4 px-6 font-semibold">Uploaded By</th>
+                  <th className="py-4 px-6 font-semibold">Questions</th>
+                  <th className="py-4 px-6 font-semibold">Quality Score</th>
+                  <th className="py-4 px-6 font-semibold">Review Status</th>
+                  <th className="py-4 px-6 font-semibold text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60">
+              <tbody className="divide-y divide-[#F2ECE1]">
                 {papers.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="py-16 text-center text-zinc-500">
-                      <FileText className="w-10 h-10 mx-auto text-zinc-600 mb-3" />
-                      <p className="text-base font-medium text-zinc-300">No papers found</p>
-                      <p className="text-xs text-zinc-500 mt-1">
+                    <td colSpan="6" className="py-16 text-center text-[#57534E]">
+                      <FileText className="w-10 h-10 mx-auto text-orange-300 mb-3" />
+                      <p className="text-base font-semibold text-[#111827]">No papers found</p>
+                      <p className="text-xs text-[#78716C] mt-1">
                         {statusFilter !== 'all'
                           ? `There are no papers with status "${statusFilter.replace('_', ' ')}" in your college.`
                           : 'No question papers have been uploaded yet in your college.'}
@@ -347,146 +252,84 @@ const ReviewerDashboard = () => {
                     const courseCode = paper.courseCode || paper['Course Code'] || '';
                     const teacherName = paper.userId?.fullName || paper.userId?.userName || paper['Course Teacher'] || 'Unknown';
                     const department = paper.userId?.department || paper.branch || paper['Branch'] || '';
-                    const getQuestionsCount = (paper) => {
-  const collectedDataQuestions = Array.isArray(paper?.questions)
-    ? paper.questions.flatMap((item) =>
-        Array.isArray(item?.QuestionData)
-          ? item.QuestionData
-          : []
-      )
-    : [];
 
-  if (collectedDataQuestions.length > 0) {
-    return collectedDataQuestions.length;
-  }
+                    const getQuestionsCount = (p) => {
+                      const collectedDataQuestions = Array.isArray(p?.questions)
+                        ? p.questions.flatMap((item) => Array.isArray(item?.QuestionData) ? item.QuestionData : [])
+                        : [];
+                      if (collectedDataQuestions.length > 0) return collectedDataQuestions.length;
+                      if (Array.isArray(p?.questions)) return p.questions.length;
+                      const rawQuestions = p?.['Collected Data']?.[0]?.QuestionData;
+                      return Array.isArray(rawQuestions) ? rawQuestions.length : 0;
+                    };
 
-  if (Array.isArray(paper?.questions)) {
-    return paper.questions.length;
-  }
-
-  const rawQuestions =
-    paper?.['Collected Data']?.[0]?.QuestionData;
-
-  return Array.isArray(rawQuestions)
-    ? rawQuestions.length
-    : 0;
-};
-
-const questionsCount =
-  getQuestionsCount(paper);
-
-const qualityScore = Number(
-  paper?.qualityScore ??
-    paper?.['Collected Data']?.[0]?.FinalScore ??
-    0
-);
-
-const isPending =
-  !paper.reviewStatus ||
-  paper.reviewStatus === 'pending';
+                    const questionsCount = getQuestionsCount(paper);
+                    const qualityScore = Number(paper?.qualityScore ?? paper?.['Collected Data']?.[0]?.FinalScore ?? 0);
+                    const isPending = !paper.reviewStatus || paper.reviewStatus === 'pending';
 
                     return (
-                      <tr
-                        key={paper._id}
-                        className={`hover:bg-zinc-800/40 transition-colors ${
-                          isPending ? 'bg-yellow-500/[0.02]' : ''
-                        }`}
-                      >
-                        {/* Course / Subject */}
+                      <tr key={paper._id} className={`hover:bg-[#FAF7F2]/60 transition-colors ${isPending ? 'bg-amber-50/30' : ''}`}>
                         <td className="py-4 px-6">
                           <div className="flex items-start gap-2.5">
-                            <div className="p-2 rounded-lg bg-zinc-800/80 text-zinc-400 mt-0.5">
-                              <BookOpen className="w-4 h-4 text-indigo-400" />
+                            <div className="p-2 rounded-lg bg-orange-50 text-orange-500 mt-0.5 flex-shrink-0">
+                              <BookOpen className="w-4 h-4" />
                             </div>
                             <div>
-                              <div className="font-semibold text-white flex items-center gap-2">
-                                {courseTitle}
-                              </div>
-                              <div className="text-xs text-zinc-400 flex items-center gap-2 mt-0.5">
+                              <div className="font-semibold text-[#111827]">{courseTitle}</div>
+                              <div className="text-xs text-[#78716C] flex items-center gap-2 mt-0.5">
                                 {courseCode && (
-                                  <span className="font-mono text-zinc-400 bg-zinc-800 px-1.5 py-0.5 rounded text-[11px]">
+                                  <span className="font-mono bg-[#FAF7F2] border border-[#E8E2D7] px-1.5 py-0.5 rounded text-[11px]">
                                     {courseCode}
                                   </span>
                                 )}
-                                {paper.semester && (
-                                  <span>Sem {paper.semester}</span>
-                                )}
+                                {paper.semester && <span>Sem {paper.semester}</span>}
                               </div>
                             </div>
                           </div>
                         </td>
-
-                        {/* Uploaded By */}
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-2">
-                            <User className="w-3.5 h-3.5 text-zinc-500" />
-                            <span className="font-medium text-zinc-200">{teacherName}</span>
+                            <User className="w-3.5 h-3.5 text-[#A8A29E]" />
+                            <span className="font-medium text-[#111827]">{teacherName}</span>
                           </div>
-                          {department && (
-                            <div className="text-xs text-zinc-500 mt-0.5">{department}</div>
-                          )}
+                          {department && <div className="text-xs text-[#78716C] mt-0.5">{department}</div>}
                         </td>
-
-                        {/* Questions count */}
                         <td className="py-4 px-6">
-                          <span className="text-zinc-300 font-medium">{questionsCount}</span>
-                          <span className="text-zinc-500 text-xs ml-1">items</span>
+                          <span className="text-[#111827] font-semibold">{questionsCount}</span>
+                          <span className="text-[#78716C] text-xs ml-1">items</span>
                         </td>
-
-                        {/* Quality Score */}
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-1.5">
-                            <Award className="w-3.5 h-3.5 text-zinc-400" />
-                            <span
-                              className={`font-semibold text-sm ${
-                                qualityScore >= 75
-                                  ? 'text-emerald-400'
-                                  : qualityScore >= 50
-                                  ? 'text-yellow-400'
-                                  : 'text-red-400'
-                              }`}
-                            >
+                            <Award className="w-3.5 h-3.5 text-[#A8A29E]" />
+                            <span className={`font-semibold text-sm ${
+                              qualityScore >= 75 ? 'text-emerald-600' :
+                              qualityScore >= 50 ? 'text-amber-600' : 'text-red-600'
+                            }`}>
                               {qualityScore}%
                             </span>
                           </div>
                         </td>
-
-                        {/* Status */}
                         <td className="py-4 px-6">
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${statusBadge.bg}`}
-                          >
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${statusBadge.bg}`}>
                             {statusBadge.icon}
                             <span>{statusBadge.label}</span>
                           </span>
                           {paper.reviewedBy && (
-                            <div className="text-[11px] text-zinc-500 mt-1">
+                            <div className="text-[11px] text-[#78716C] mt-1">
                               by {paper.reviewedBy.fullName || paper.reviewedBy.userName || 'Reviewer'}
                             </div>
                           )}
                         </td>
-
-                        {/* Action */}
                         <td className="py-4 px-6 text-right">
                           <button
                             onClick={() => handleReview(paper)}
-                            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                               isPending
-                                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md shadow-blue-500/20'
-                                : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700'
+                                ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md shadow-orange-500/20 hover:shadow-orange-500/35 hover:scale-[1.02]'
+                                : 'bg-[#FAF7F2] hover:bg-neutral-100 text-[#57534E] border border-[#E8E2D7]'
                             }`}
                           >
-                            {isPending ? (
-                              <>
-                                <span>📝</span>
-                                <span>Review</span>
-                              </>
-                            ) : (
-                              <>
-                                <span>👁️</span>
-                                <span>View</span>
-                              </>
-                            )}
+                            {isPending ? <>📝 <span>Review</span></> : <>👁️ <span>View</span></>}
                           </button>
                         </td>
                       </tr>
@@ -497,25 +340,16 @@ const isPending =
             </table>
           </div>
 
-          {/* Pagination if needed */}
           {pagination.pages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-zinc-800 bg-zinc-950/40 text-xs">
-              <span className="text-zinc-400">
-                Page {pagination.page} of {pagination.pages}
-              </span>
+            <div className="flex items-center justify-between px-6 py-4 border-t border-[#E8E2D7] bg-[#FAF7F2]/60 text-xs">
+              <span className="text-[#57534E]">Page {pagination.page} of {pagination.pages}</span>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  className="px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 disabled:opacity-40 hover:bg-zinc-700 transition-colors"
-                >
+                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
+                  className="px-3 py-1.5 rounded-xl bg-white border border-[#E8E2D7] text-[#57534E] hover:text-orange-600 hover:border-orange-300 disabled:opacity-40 transition-all font-medium">
                   Previous
                 </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(pagination.pages, p + 1))}
-                  disabled={page >= pagination.pages}
-                  className="px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 disabled:opacity-40 hover:bg-zinc-700 transition-colors"
-                >
+                <button onClick={() => setPage((p) => Math.min(pagination.pages, p + 1))} disabled={page >= pagination.pages}
+                  className="px-3 py-1.5 rounded-xl bg-white border border-[#E8E2D7] text-[#57534E] hover:text-orange-600 hover:border-orange-300 disabled:opacity-40 transition-all font-medium">
                   Next
                 </button>
               </div>
@@ -524,14 +358,10 @@ const isPending =
         </div>
       </div>
 
-      {/* Review Paper Modal */}
       {showReviewModal && selectedPaper && (
         <ReviewPaperModal
           paper={selectedPaper}
-          onClose={() => {
-            setShowReviewModal(false);
-            setSelectedPaper(null);
-          }}
+          onClose={() => { setShowReviewModal(false); setSelectedPaper(null); }}
           onComplete={handleReviewComplete}
         />
       )}

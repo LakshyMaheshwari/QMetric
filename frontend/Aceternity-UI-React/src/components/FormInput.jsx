@@ -16,16 +16,16 @@ export default function FormInput({
   disabled,
   ...rest
 }) {
-  const baseClasses = `w-full px-4 py-2.5 rounded-lg bg-neutral-900 border ${
-    error ? 'border-red-500' : 'border-neutral-700'
-  } text-white placeholder-neutral-500 focus:outline-none focus:ring-2 ${
-    error ? 'focus:ring-red-500' : 'focus:ring-blue-500'
-  } transition-colors ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`;
+  const baseClasses = `w-full px-4 py-2.5 rounded-xl bg-[#FAF7F2] border ${
+    error ? 'border-red-500 focus:border-red-500' : 'border-[#E8E2D7] focus:border-orange-500 focus:bg-white'
+  } text-[#111827] placeholder-[#A8A29E] text-sm focus:outline-none transition-all ${
+    disabled ? 'opacity-60 cursor-not-allowed bg-stone-100' : ''
+  }`;
 
   return (
     <div className="mb-4">
       {label && (
-        <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+        <label className="block text-xs font-bold uppercase tracking-wider text-[#374151] mb-2">
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}
         </label>
@@ -61,7 +61,7 @@ export default function FormInput({
       )}
 
       {error && (
-        <p className="mt-1 text-sm text-red-500" role="alert">
+        <p className="mt-1 text-xs text-red-500 font-medium" role="alert">
           {error.message}
         </p>
       )}

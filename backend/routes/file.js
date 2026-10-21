@@ -33,6 +33,13 @@ if (!fs.existsSync(uploadDir)) {
 // ─── Multer configuration ─────────────────────────────────────────────────────
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
+    // Re-create the directory on every request in case the OS cleaned it up
+    // while the server was running (common on Windows temp directories).
+    try {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    } catch (mkdirErr) {
+      return cb(mkdirErr);
+    }
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
@@ -45,8 +52,8 @@ const storage = multer.diskStorage({
   }
 });
 
-// Allowed file types
-const ALLOWED_EXTENSIONS = ['.xlsx', '.xls', '.csv'];
+// Allowed file types — CSV only
+const ALLOWED_EXTENSIONS = ['.csv'];
 
 // ─── File size limit (S5693 — intentionally exceeds the 8 MB Sonar default) ──
 // QMetric accepts Excel/CSV question papers, which routinely exceed 8 MB
@@ -63,7 +70,7 @@ const fileFilter = (req, file, cb) => {
   const ext = path.extname(file.originalname).toLowerCase();
 
   if (!ALLOWED_EXTENSIONS.includes(ext)) {
-    return cb(new Error(`File type not allowed: ${ext}. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}`));
+    return cb(new Error(`File type not allowed: ${ext}. Only CSV files (.csv) are supported.`));
   }
 
   cb(null, true);

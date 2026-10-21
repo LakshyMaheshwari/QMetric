@@ -7,6 +7,7 @@ import apiClient from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
 import { loginSchema } from "../../schemas/validationSchemas";
 import FormInput from "../FormInput";
+import { InteractiveHoverButton } from "../ui/interactive-hover-button";
 
 const TURNSTILE_SITE_KEY = process.env.REACT_APP_TURNSTILE_SITE_KEY || "1x00000000000000000000AA";
 
@@ -63,6 +64,8 @@ export function SignupFormDemo() {
       setTurnstileToken("");
     }
   };
+
+  // ─── BottomGradient removed - using InteractiveHoverButton instead ───
 
   return (
     <div className="max-w-md w-full mx-auto rounded-none md:rounded-2xl p-4 md:p-8 shadow-input bg-black bg-opacity-60">
@@ -124,14 +127,16 @@ export function SignupFormDemo() {
           />
         </div>
 
-        <button
-          className="bg-gradient-to-br relative group/btn from-black dark:from-zinc-900 dark:to-zinc-900 to-neutral-600 block dark:bg-zinc-800 w-full text-white rounded-md h-10 font-medium shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] dark:shadow-[0px_1px_0px_0px_var(--zinc-800)_inset,0px_-1px_0px_0px_var(--zinc-800)_inset] disabled:opacity-50"
+        <InteractiveHoverButton
           type="submit"
+          fullWidth
+          size="md"
+          variant="primary"
+          loading={isSubmitting}
           disabled={isSubmitting || !turnstileToken}
         >
-          {isSubmitting ? "Signing in..." : "Sign In →"}
-          <BottomGradient />
-        </button>
+          Sign In
+        </InteractiveHoverButton>
       </form>
 
     </div>

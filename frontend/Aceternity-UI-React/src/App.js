@@ -20,9 +20,10 @@ import SuperAdminDashboard from "./components/pages/SuperAdminDashboard";
 import CollegeDetailPage from "./components/pages/CollegeDetailPage";
 import ReviewerDashboard from "./components/pages/ReviewerDashboard";
 import TeacherDashboard from "./components/pages/TeacherDashboard";
-import TeamPage from "./components/pages/TeamPage";
+import FeedbackPage from "./components/pages/FeedbackPage";
 import CollegeApplications from "./components/pages/CollegeApplications";
 import AllPapersPage from './components/pages/AllPapersPage';
+import QPQAJourneyTrial from "./components/pages/QPQAJourneyTrial";
 import NotFound from "./components/pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
@@ -32,18 +33,20 @@ import { ensureCsrfToken } from "./api/client";
 function App() {
   return (
     <AuthProvider>
-      <div className="bg-black min-h-screen text-white">
+      <div className="min-h-screen">
         <Navbar />
         <ScrollToTop />
         <Routes>
           {/* Public Routes - NO guard */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LandingPage />} />
+          <Route path="/" element={<QPQAJourneyTrial />} />
+          <Route path="/login" element={<QPQAJourneyTrial />} />
+          <Route path="/landing-old" element={<LandingPage />} />
           <Route path="/components" element={<Components />} />
           <Route path="/credits" element={<CreditsPage />} />
-          <Route path="/team" element={<TeamPage />} />
+          <Route path="/feedback" element={<FeedbackPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/register-college" element={<CollegeRegistrationPage />} />
+          <Route path="/qpqa-journey" element={<QPQAJourneyTrial />} />
 
           {/* Protected - Any authenticated user */}
           <Route path="/profile" element={

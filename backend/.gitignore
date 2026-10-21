@@ -1,6 +1,38 @@
-node_modules
-uploads
-app.js
+# ─── Dependencies ────────────────────────────────────────────────────────────
+node_modules/
+
+# ─── Environment / Secrets ───────────────────────────────────────────────────
 .env
-Person.js
+.env.*
+!.env.example
+
+# ─── Build outputs ───────────────────────────────────────────────────────────
+dist/
+build/
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+
+# ─── Upload / runtime temp files ─────────────────────────────────────────────
+uploads/
+Converted/
+
+# ─── Backup / temp ───────────────────────────────────────────────────────────
 *.bak
+*.tmp
+*.temp
+*.orig
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── Test artifacts ──────────────────────────────────────────────────────────
+/coverage
+/test-results.json
+test-results/
+
+# ─── Old / legacy files staged by mistake ────────────────────────────────────
+app.js
+Person.js

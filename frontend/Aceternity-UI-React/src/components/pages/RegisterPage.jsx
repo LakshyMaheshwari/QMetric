@@ -7,6 +7,7 @@ import { registerSchema } from "../../schemas/validationSchemas";
 import FormInput from "../FormInput";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { InteractiveHoverButton } from "../ui/interactive-hover-button";
 
 const TURNSTILE_SITE_KEY = process.env.REACT_APP_TURNSTILE_SITE_KEY;
 
@@ -315,26 +316,26 @@ export default function RegisterPage() {
   };
 
   const selectClass =
-    "w-full px-4 py-2.5 rounded-lg bg-neutral-900 border border-neutral-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500";
+    "w-full px-4 py-2.5 rounded-xl bg-[#FAF7F2] border border-[#E8E2D7] text-[#111827] focus:outline-none focus:border-orange-500 text-sm font-medium transition-all";
 
   return (
-    <div className="min-h-screen bg-black flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 mt-16">
-      <div className="max-w-3xl w-full mx-auto space-y-8 bg-zinc-900 p-8 rounded-xl shadow-2xl border border-zinc-800">
+    <div className="min-h-screen bg-[#FAF7F2] flex flex-col justify-center py-20 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl w-full mx-auto space-y-8 bg-white p-8 md:p-10 rounded-2xl shadow-sm border border-[#E8E2D7]">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-white">
+          <h2 className="mt-2 text-center text-3xl font-black text-[#111827] tracking-tight">
             Create an Account
           </h2>
 
-          <p className="mt-2 text-center text-sm text-neutral-400">
-            Register for QMetric to access the dashboard.
+          <p className="mt-2 text-center text-sm text-[#57534E]">
+            Register for QMetric to access the academic analysis dashboard.
           </p>
 
-          <p className="mt-3 text-center text-sm text-blue-400">
+          <p className="mt-3 text-center text-sm">
             <Link
               to="/register-college"
-              className="hover:text-blue-300"
+              className="text-orange-600 hover:text-orange-700 font-bold hover:underline"
             >
-              Are you a college / exam cell? Register your college
+              Are you a college / exam cell? Register your institution &rarr;
             </Link>
           </p>
         </div>
@@ -359,7 +360,7 @@ export default function RegisterPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* ─── Common account fields ─────────────────────── */}
             <div className="mb-4 md:col-span-2">
-              <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#374151] mb-2">
                 Account Type <span className="text-red-500">*</span>
               </label>
 
@@ -436,7 +437,7 @@ export default function RegisterPage() {
             {role === "teacher" && (
               <>
                 <div className="mb-4 md:col-span-2">
-                  <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[#374151] mb-2">
                     Teacher Affiliation{" "}
                     <span className="text-red-500">*</span>
                   </label>
@@ -457,7 +458,7 @@ export default function RegisterPage() {
                     </option>
                   </select>
 
-                  <p className="mt-1 text-xs text-neutral-400">
+                  <p className="mt-1.5 text-xs text-[#78716C]">
                     Affiliated teachers can use the college review
                     workflow. Independent teachers can analyze papers
                     without college review routing.
@@ -467,7 +468,7 @@ export default function RegisterPage() {
                 {/* ─── Affiliated college selection ──────────── */}
                 {signupIntent === "affiliated" && (
                   <div className="mb-4 md:col-span-2">
-                    <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#374151] mb-2">
                       Select Registered College{" "}
                       <span className="text-red-500">*</span>
                     </label>
@@ -571,7 +572,7 @@ export default function RegisterPage() {
                 {/* ─── College ID photo ──────────────────────── */}
                 {signupIntent === "affiliated" && (
                   <div className="md:col-span-2 mb-4">
-                    <label className="block text-sm font-medium text-neutral-300 mb-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#374151] mb-2">
                       College ID Photo{" "}
                       <span className="text-red-500">*</span>
                     </label>
@@ -584,10 +585,10 @@ export default function RegisterPage() {
                           e.target.files?.[0] || null
                         )
                       }
-                      className="w-full px-4 py-2.5 rounded-lg bg-neutral-900 border border-neutral-700 text-white"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[#FAF7F2] border border-[#E8E2D7] text-[#111827] text-sm"
                     />
 
-                    <p className="text-xs text-neutral-400 mt-1">
+                    <p className="text-xs text-[#78716C] mt-1.5">
                       Please upload a clear image of your college
                       ID card for verification.
                     </p>
@@ -617,7 +618,7 @@ export default function RegisterPage() {
                 );
               }}
               options={{
-                theme: "dark",
+                theme: "light",
                 size: "normal",
               }}
             />
@@ -625,17 +626,16 @@ export default function RegisterPage() {
 
           {/* ─── Submit ──────────────────────────────────────── */}
           <div>
-            <button
+            <InteractiveHoverButton
               type="submit"
-              disabled={
-                isSubmitting || !turnstileToken
-              }
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-black bg-white hover:bg-neutral-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white focus:ring-offset-black disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              fullWidth
+              size="md"
+              variant="orange"
+              loading={isSubmitting}
+              disabled={isSubmitting || !turnstileToken}
             >
-              {isSubmitting
-                ? "Registering…"
-                : "Register"}
-            </button>
+              Register Account
+            </InteractiveHoverButton>
           </div>
         </form>
       </div>

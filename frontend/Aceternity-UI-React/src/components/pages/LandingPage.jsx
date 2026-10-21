@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, BarChart3, ArrowRight, Eye, Target, BookOpen, Brain } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { InteractiveHoverButton } from '../ui/interactive-hover-button';
 
 
 export default function LandingPage() {
@@ -81,6 +82,17 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
 
+      {/* Comparison Banner */}
+      <div className="bg-orange-500/15 border-b border-orange-500/30 py-3 px-4 text-center text-xs text-orange-300 font-semibold flex items-center justify-center gap-2">
+        <span>⚡ You are viewing the Classic Landing Page for comparison.</span>
+        <button
+          onClick={() => navigate('/')}
+          className="underline hover:text-white font-bold ml-1 transition-colors"
+        >
+          Switch to New Interactive QPQA Railway Journey &rarr;
+        </button>
+      </div>
+
       {/* ── HERO ── */}
       <section className="relative overflow-hidden">
         {/* Background glows */}
@@ -108,21 +120,22 @@ export default function LandingPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <button
+            <InteractiveHoverButton
               onClick={handleAnalyzeClick}
               disabled={!user}
-              className={`group bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-4 rounded-xl text-lg font-semibold shadow-2xl shadow-blue-500/25 transition-all duration-200 flex items-center gap-2
-                ${user ? 'hover:scale-105 hover:shadow-blue-500/40' : 'opacity-50 cursor-not-allowed'}`}
+              variant="primary"
+              size="lg"
+              rightIcon={<ArrowRight className="w-5 h-5" />}
             >
               Analyze Question Paper
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-            <button
-              className="border border-gray-700 text-gray-300 px-8 py-4 rounded-xl text-lg font-semibold hover:bg-gray-800/60 hover:border-gray-600 transition-all flex items-center gap-2"
+            </InteractiveHoverButton>
+            <InteractiveHoverButton
+              variant="outline"
+              size="lg"
+              leftIcon={<Eye className="w-5 h-5" />}
             >
-              <Eye className="w-5 h-5" />
               Watch Demo
-            </button>
+            </InteractiveHoverButton>
           </div>
 
           {/* Stat pills */}
@@ -240,17 +253,20 @@ export default function LandingPage() {
                 Join engineering institutions that trust our systematic approach to question paper quality analysis
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <button
+                <InteractiveHoverButton
                   onClick={handleAnalyzeClick}
                   disabled={!user}
-                  className={`bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-4 rounded-xl text-lg font-semibold shadow-2xl shadow-blue-500/25 transition-all
-                    ${user ? 'hover:scale-105' : 'opacity-50 cursor-not-allowed'}`}
+                  variant="primary"
+                  size="lg"
                 >
                   Upload Question Paper
-                </button>
-                <button className="border border-gray-600 text-gray-300 px-8 py-4 rounded-xl text-lg font-semibold hover:bg-gray-800/60 hover:border-gray-500 transition-all">
+                </InteractiveHoverButton>
+                <InteractiveHoverButton
+                  variant="outline"
+                  size="lg"
+                >
                   View Sample Report
-                </button>
+                </InteractiveHoverButton>
               </div>
             </div>
           </div>

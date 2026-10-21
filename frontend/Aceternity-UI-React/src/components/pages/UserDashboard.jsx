@@ -6,6 +6,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { InteractiveHoverButton } from '../ui/interactive-hover-button';
 
 export default function UserDashboard() {
   const { user, logout: authLogout, isAuthenticated } = useAuth();
@@ -24,7 +25,6 @@ export default function UserDashboard() {
 
       const papersList = response.data?.papers || response.data?.data || (Array.isArray(response.data) ? response.data : []);
 
-      // Now it's actually an array we can slice
       const recentFive = Array.isArray(papersList)
         ? papersList.slice(0, 5)
         : [];
@@ -40,15 +40,12 @@ export default function UserDashboard() {
       }
     } catch (error) {
       console.error('Failed to fetch papers:', error);
-      // Empty instead of fake
       setRecentPapers([]);
       setStats({ totalPapers: 0 });
     } finally {
       setLoading(false);
     }
   };
-
-  const fetchDashboardData = fetchPapers;
 
   useEffect(() => {
     if (user?.role === 'super_admin') {
@@ -59,8 +56,6 @@ export default function UserDashboard() {
   }, [user, navigate]);
 
   useEffect(() => {
-    // These roles have dedicated dashboards; avoid an unnecessary
-    // /teacher/papers request before the redirect runs.
     if (['reviewer', 'admin', 'super_admin'].includes(user?.role)) return;
     fetchPapers();
   }, [user]);
@@ -71,99 +66,140 @@ export default function UserDashboard() {
   };
 
   const quickActions = [
-    { icon: <Upload className="w-6 h-6" />, title: 'Upload New Paper', description: 'Analyze a new question paper', action: () => navigate('/upload'), color: 'from-blue-500 to-purple-600', glow: 'shadow-blue-500/30' },
-    { icon: <BookOpen className="w-6 h-6" />, title: 'View All Papers', description: 'Browse your paper collection', action: () => navigate('/papers'), color: 'from-teal-500 to-emerald-600', glow: 'shadow-teal-500/30' },
-    { icon: <BarChart3 className="w-6 h-6" />, title: 'Analytics', description: 'View detailed analytics', action: () => { if (recentPapers.length > 0 && recentPapers[0]._id) { navigate(`/result/${recentPapers[0]._id}`); } else { navigate('/papers'); } }, color: 'from-orange-500 to-red-600', glow: 'shadow-orange-500/30' },
-    { icon: <FileText className="w-6 h-6" />, title: user?.role === 'student' ? 'Become a Teacher' : 'Total Papers', description: user?.role === 'student' ? 'Choose independent or college-affiliated teacher access' : `${stats.totalPapers} paper${stats.totalPapers !== 1 ? 's' : ''} uploaded`, action: () => navigate(user?.role === 'student' ? '/profile' : '/papers'), color: 'from-indigo-500 to-blue-600', glow: 'shadow-indigo-500/30' },
+    {
+      icon: <Upload className="w-6 h-6" />,
+      title: 'Upload New Paper',
+      description: 'Analyze a new question paper',
+      action: () => navigate('/upload'),
+      color: 'from-orange-500 to-orange-600',
+      badge: 'Analysis',
+    },
+    {
+      icon: <BookOpen className="w-6 h-6" />,
+      title: 'View All Papers',
+      description: 'Browse your repository collection',
+      action: () => navigate('/papers'),
+      color: 'from-amber-500 to-orange-500',
+      badge: 'Repository',
+    },
+    {
+      icon: <BarChart3 className="w-6 h-6" />,
+      title: 'Analytics & Reports',
+      description: 'View detailed question paper analytics',
+      action: () => {
+        if (recentPapers.length > 0 && recentPapers[0]._id) {
+          navigate(`/result/${recentPapers[0]._id}`);
+        } else {
+          navigate('/papers');
+        }
+      },
+      color: 'from-orange-600 to-red-500',
+      badge: 'Insights',
+    },
+    {
+      icon: <FileText className="w-6 h-6" />,
+      title: user?.role === 'student' ? 'Become a Teacher' : 'Total Papers',
+      description: user?.role === 'student' ? 'Choose independent or college-affiliated teacher access' : `${stats.totalPapers} paper${stats.totalPapers !== 1 ? 's' : ''} uploaded`,
+      action: () => navigate(user?.role === 'student' ? '/profile' : '/papers'),
+      color: 'from-stone-700 to-stone-900',
+      badge: 'Account',
+    },
   ];
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-14 h-14 rounded-full border-4 border-blue-500/30 border-t-blue-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-400 text-sm">Loading your dashboard...</p>
+          <div className="w-12 h-12 rounded-full border-4 border-orange-200 border-t-orange-600 animate-spin mx-auto mb-4" />
+          <p className="text-[#57534E] text-sm font-medium">Loading your dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-
-      {/* ── Ambient glows ── */}
-      <div className="fixed -top-40 -left-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="fixed top-0 right-0 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
-
-      {/* ── HEADER ── */}
-      <header className="sticky top-0 z-40 bg-gray-900/80 backdrop-blur-md border-b border-gray-800">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate('/')}
-                className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center hover:scale-105 transition-transform shadow-lg shadow-blue-500/25"
-              >
-                <Brain className="w-5 h-5 text-white" />
-              </button>
-              <div>
-                <h1 className="text-xl font-bold text-white">Dashboard</h1>
-                <p className="text-xs text-gray-400">Welcome back, <span className="text-blue-400">{user?.userName || user?.name || 'User'}</span></p>
-              </div>
+    <div className="min-h-screen bg-[#FAF7F2] pt-20 pb-16">
+      {/* ── Subheader / User Banner ── */}
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white border border-[#E8E2D7] rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20 text-white font-bold text-xl">
+              {user?.userName ? user.userName.charAt(0).toUpperCase() : <User className="w-7 h-7" />}
             </div>
-
-            <div className="flex items-center gap-3">
-              <button onClick={() => navigate('/')} className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors" title="Home">
-                <Home className="w-5 h-5" />
-              </button>
-              <button onClick={() => { setLoading(true); fetchPapers(); }} className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors" title="Refresh">
-                <RefreshCw className="w-5 h-5" />
-              </button>
-
-              {/* User pill */}
-              <div className="flex items-center gap-3 bg-gray-800/80 border border-gray-700/60 rounded-xl px-4 py-2">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
-                  <User className="w-4 h-4 text-white" />
-                </div>
-                <div className="text-left">
-                  <div className="text-sm font-semibold text-white">{user?.userName || user?.name || 'User'}</div>
-                  <div className="text-xs text-gray-400">{user?.email || ''}</div>
-                </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-black text-[#111827]">Academic Dashboard</h1>
+                <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">
+                  {user?.role || 'User'}
+                </span>
               </div>
-
-              <button onClick={handleLogout} className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" title="Logout">
-                <LogOut className="w-5 h-5" />
-              </button>
+              <p className="text-xs text-[#57534E] mt-0.5">
+                Welcome back, <strong className="text-[#111827]">{user?.userName || user?.name || 'Academician'}</strong> &bull; {user?.email}
+              </p>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setLoading(true); fetchPapers(); }}
+              className="p-2.5 rounded-xl border border-[#E8E2D7] bg-[#FAF7F2] hover:bg-neutral-100 text-[#57534E] hover:text-[#111827] transition-all shadow-sm"
+              title="Refresh Papers"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => navigate('/upload')}
+              className="px-5 py-2.5 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-orange-500/20 hover:shadow-orange-500/35 hover:scale-105 transition-all flex items-center gap-2"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              Upload Paper
+            </button>
+            <button
+              onClick={handleLogout}
+              className="p-2.5 rounded-xl border border-[#E8E2D7] bg-[#FAF7F2] hover:bg-red-50 text-[#57534E] hover:text-red-600 hover:border-red-200 transition-all shadow-sm"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* ── MAIN ── */}
-      <main className="relative max-w-7xl mx-auto px-6 py-10">
-
+      {/* ── MAIN CONTENT ── */}
+      <main className="max-w-7xl mx-auto px-6 py-4">
         {/* Quick Actions */}
         <section className="mb-10">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-300 text-xs font-semibold uppercase tracking-widest">
-              ⚡ Quick Actions
-            </div>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xs font-bold uppercase tracking-wider text-orange-600 bg-orange-100/70 px-3 py-1 rounded-full">
+              ⚡ Action Center
+            </span>
           </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {quickActions.map((action, index) => (
               <button
                 key={index}
                 onClick={action.action}
-                className={`relative bg-gray-900/70 border border-gray-700/50 rounded-2xl p-6 text-left group hover:border-gray-600 hover:bg-gray-900 transition-all duration-300 hover:shadow-xl hover:${action.glow} hover:-translate-y-1 overflow-hidden`}
+                className="group relative bg-white border border-[#E8E2D7] rounded-2xl p-6 text-left shadow-sm hover:shadow-md hover:border-orange-300 transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between"
               >
-                {/* Top accent line */}
-                <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${action.color} opacity-60 group-hover:opacity-100 transition-opacity`} />
-                <div className={`w-12 h-12 bg-gradient-to-r ${action.color} rounded-xl flex items-center justify-center mb-4 text-white shadow-lg group-hover:scale-110 transition-transform`}>
-                  {action.icon}
+                <div>
+                  <div className={`w-12 h-12 bg-gradient-to-br ${action.color} rounded-xl flex items-center justify-center text-white mb-4 shadow-md group-hover:scale-110 transition-transform`}>
+                    {action.icon}
+                  </div>
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="text-base font-bold text-[#111827] group-hover:text-orange-600 transition-colors">
+                      {action.title}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-[#57534E] leading-relaxed">
+                    {action.description}
+                  </p>
                 </div>
-                <h3 className="text-white font-bold text-base mb-1 group-hover:text-blue-300 transition-colors">{action.title}</h3>
-                <p className="text-gray-400 text-sm">{action.description}</p>
-                <ArrowRight className="w-4 h-4 text-gray-600 group-hover:text-blue-400 group-hover:translate-x-1 transition-all mt-3" />
+
+                <div className="flex items-center text-xs font-bold text-orange-600 mt-4 group-hover:translate-x-1 transition-transform">
+                  <span>Explore</span>
+                  <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                </div>
               </button>
             ))}
           </div>
@@ -171,59 +207,89 @@ export default function UserDashboard() {
 
         {/* Recent Papers */}
         <section>
-          <div className="flex justify-between items-center mb-6">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-purple-500/30 bg-purple-500/10 text-purple-300 text-xs font-semibold uppercase tracking-widest">
-              📄 Recent Papers
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-orange-600 bg-orange-100/70 px-3 py-1 rounded-full">
+                📄 Recent Question Papers
+              </span>
             </div>
-            <button onClick={() => navigate('/papers')} className="text-blue-400 hover:text-blue-300 text-sm font-medium flex items-center gap-1 hover:bg-blue-500/10 px-3 py-2 rounded-lg transition-colors">
-              View All <ArrowRight className="w-4 h-4" />
+            <button
+              onClick={() => navigate('/papers')}
+              className="text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center gap-1 hover:underline"
+            >
+              <span>View All Papers</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {recentPapers.length > 0 ? (
-            <div className="bg-gray-900/70 border border-gray-700/50 rounded-2xl overflow-hidden shadow-xl">
+            <div className="bg-white border border-[#E8E2D7] rounded-2xl overflow-hidden shadow-sm">
               {recentPapers.map((paper, index) => (
                 <div
                   key={paper._id || index}
-                  className="p-6 border-b border-gray-800/60 last:border-b-0 hover:bg-gray-800/40 transition-colors group"
+                  className="p-5 border-b border-[#F2ECE1] last:border-b-0 hover:bg-[#FAF7F2]/60 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                 >
-                  <div className="flex justify-between items-start gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-blue-400 to-purple-400" />
-                        <h3 className="text-white font-semibold group-hover:text-blue-300 transition-colors">{paper['Course Name']}</h3>
-                      </div>
-                      <div className="flex flex-wrap gap-2 mt-2 text-xs">
-                        <span className="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-2.5 py-1 rounded-lg flex items-center gap-1">
-                          <BookOpen className="w-3 h-3" />{paper['Course Code']}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <div className="w-2 h-2 rounded-full bg-orange-500" />
+                      <h3 className="text-[#111827] font-bold text-base hover:text-orange-600 transition-colors">
+                        {paper['Course Name'] || 'Untitled Examination Paper'}
+                      </h3>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {paper['Course Code'] && (
+                        <span className="bg-orange-50 border border-orange-200 text-orange-700 font-semibold px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                          <BookOpen className="w-3 h-3" /> {paper['Course Code']}
                         </span>
-                        <span className="bg-gray-800 border border-gray-700 text-gray-300 px-2.5 py-1 rounded-lg">{paper['Branch']}</span>
-                        <span className="bg-teal-500/10 border border-teal-500/20 text-teal-300 px-2.5 py-1 rounded-lg">{paper['Year Of Study']} — Sem {paper['Semester']}</span>
+                      )}
+                      {paper['Branch'] && (
+                        <span className="bg-[#FAF7F2] border border-[#E8E2D7] text-[#57534E] font-medium px-2.5 py-0.5 rounded-md">
+                          {paper['Branch']}
+                        </span>
+                      )}
+                      {paper['Semester'] && (
+                        <span className="bg-[#FAF7F2] border border-[#E8E2D7] text-[#57534E] font-medium px-2.5 py-0.5 rounded-md">
+                          Sem {paper['Semester']}
+                        </span>
+                      )}
+                    </div>
+                    {paper['College Name'] && (
+                      <div className="text-[11px] text-[#78716C] mt-2 font-medium">
+                        {paper['College Name']}
                       </div>
-                      <div className="text-xs text-gray-500 mt-2">{paper['College Name']}</div>
+                    )}
+                  </div>
+
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 flex-shrink-0">
+                    <div className="text-[11px] text-[#78716C]">
+                      {paper.createdAt ? new Date(paper.createdAt).toLocaleDateString() : ''}
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-xs text-gray-500 mb-2">{new Date(paper.createdAt).toLocaleDateString()}</div>
-                      <button onClick={() => navigate(`/result/${paper._id}`)} className="text-xs text-blue-400 hover:text-blue-300 font-medium bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 px-3 py-1.5 rounded-lg transition-colors">
-                        View Analysis
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => navigate(`/result/${paper._id}`)}
+                      className="px-4 py-1.5 rounded-full bg-white border border-orange-300 hover:bg-orange-50 text-orange-600 hover:text-orange-700 text-xs font-bold transition-all shadow-sm flex items-center gap-1"
+                    >
+                      <span>Analysis</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="bg-gray-900/70 border border-gray-700/50 border-dashed rounded-2xl p-16 text-center">
-              <div className="w-16 h-16 bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <BookOpen className="w-8 h-8 text-gray-600" />
+            <div className="bg-white border border-[#E8E2D7] border-dashed rounded-2xl p-16 text-center shadow-sm">
+              <div className="w-16 h-16 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-orange-100">
+                <BookOpen className="w-8 h-8" />
               </div>
-              <h3 className="text-white font-semibold text-lg mb-2">No papers analyzed yet</h3>
-              <p className="text-gray-400 text-sm mb-6 max-w-xs mx-auto">Upload your first question paper to get started with our analysis</p>
+              <h3 className="text-[#111827] font-bold text-lg mb-1">No question papers analyzed yet</h3>
+              <p className="text-[#57534E] text-sm mb-6 max-w-sm mx-auto leading-relaxed">
+                Upload your first engineering examination paper to unlock instant Bloom's taxonomy & Course Outcome analytics.
+              </p>
               <button
                 onClick={() => navigate('/upload')}
-                className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:scale-105 transition-transform shadow-lg shadow-blue-500/25"
+                className="px-6 py-2.5 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-orange-500/25 hover:shadow-orange-500/40 hover:scale-105 transition-all inline-flex items-center gap-2"
               >
-                Upload Paper
+                <Upload className="w-4 h-4" />
+                Upload Paper Now
               </button>
             </div>
           )}

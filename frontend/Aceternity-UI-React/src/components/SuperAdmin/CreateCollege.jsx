@@ -55,32 +55,36 @@ export default function CreateCollege({ onClose, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate__animated animate__fadeIn animate__faster">
-      <div className="relative w-full max-w-xl bg-zinc-900 border border-zinc-700/80 rounded-2xl shadow-2xl p-6 sm:p-8 text-white">
-        <div className="flex items-center justify-between pb-4 mb-6 border-b border-zinc-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate__animated animate__fadeIn animate__faster" style={{ fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>
+      <div className="relative w-full max-w-xl bg-white border border-[#E8E2D7] rounded-2xl shadow-xl p-6 sm:p-8 text-[#111827]">
+        <div className="flex items-center justify-between pb-4 mb-6 border-b border-[#E8E2D7]">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
+            <div className="p-2.5 rounded-xl bg-orange-50 border border-orange-200 text-orange-600">
               <Building2 className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-xl font-bold tracking-tight">Add New College</h3>
-              <p className="text-xs text-zinc-400">Register a new institution in the QMetric system</p>
+              <h3 className="text-xl font-bold tracking-tight text-[#111827]">Add New College</h3>
+              <p className="text-xs text-[#78716C]">Register a new institution in the QMetric system</p>
             </div>
           </div>
-          <button type="button" onClick={handleClose} className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="p-1.5 text-[#78716C] hover:text-[#111827] rounded-xl hover:bg-neutral-100 transition-colors"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
+          <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
             <span>{error}</span>
           </div>
         )}
         {success && (
-          <div className="mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 text-sm flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 shrink-0" />
+          <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 shrink-0 text-emerald-600" />
             <span>{success}</span>
           </div>
         )}
@@ -93,7 +97,7 @@ export default function CreateCollege({ onClose, onSuccess }) {
 
             <div>
               <FormInput label="College Code" name="code" register={register} error={errors.code} placeholder="e.g. WCE001" required />
-              <p className="text-[11px] text-zinc-400 -mt-2 mb-2">Unique identifier used for teacher registration</p>
+              <p className="text-[11px] text-[#78716C] -mt-2 mb-2">Unique identifier used for teacher registration</p>
             </div>
 
             <FormInput label="City" name="city" register={register} error={errors.city} placeholder="e.g. Sangli" />
@@ -108,33 +112,37 @@ export default function CreateCollege({ onClose, onSuccess }) {
                   onChange={(e) => setIsActive(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-zinc-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
-                <span className="ml-3 text-sm font-medium text-zinc-300">
+                <div className="w-11 h-6 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500" />
+                <span className="ml-3 text-sm font-medium text-[#57534E]">
                   {isActive ? 'Active College' : 'Inactive'}
                 </span>
               </label>
             </div>
 
             <div className="sm:col-span-2 mb-4">
-              <label className="block text-sm font-medium text-neutral-300 mb-1.5">Full Address</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-[#374151] mb-2">Full Address</label>
               <textarea
                 rows={2}
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="Campus address / street details"
-                className="w-full px-4 py-2.5 rounded-lg bg-neutral-900 border border-neutral-700 text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className="w-full px-4 py-2.5 rounded-xl bg-[#FAF7F2] border border-[#E8E2D7] text-[#111827] placeholder-[#A8A29E] text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 resize-none transition-all"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-800">
-            <button type="button" onClick={handleClose} className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E8E2D7]">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="px-4 py-2 text-sm font-medium text-[#78716C] hover:text-[#111827] rounded-xl hover:bg-neutral-100 transition-colors"
+            >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-lg shadow-lg hover:shadow-blue-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 rounded-xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSubmitting ? (
                 <>

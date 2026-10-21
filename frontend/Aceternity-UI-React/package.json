@@ -21,7 +21,9 @@
     "axios": "^1.20.0",
     "clsx": "^2.1.1",
     "framer-motion": "^11.18.2",
+    "gsap": "^3.15.0",
     "lucide-react": "^0.545.0",
+    "motion": "^14.5.0",
     "papaparse": "^5.6.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -63,8 +65,12 @@
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "@types/node": "^26.6.5",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.39",
-    "tailwindcss": "^3.4.6"
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.9.3"
   }
 }

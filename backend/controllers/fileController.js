@@ -33,14 +33,14 @@ exports.convertToText = async (req, res) => {
 
   const inputFileName = req.file.originalname;
   const fileExtension = path.extname(inputFileName).toLowerCase();
-  const supportedExtensions = ['.xlsx', '.xls', '.csv'];
+  const supportedExtensions = ['.csv'];
 
   if (!supportedExtensions.includes(fileExtension)) {
     cleanupTempFile(req.file);
 
     return res.status(400).json({
       error: true,
-      message: 'Only Excel/CSV files (.xlsx, .xls, .csv) are supported.'
+      message: 'Only CSV files (.csv) are supported. Please convert your file to CSV format.'
     });
   }
 

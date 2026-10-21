@@ -1,0 +1,1381 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap');
+
+/* ==========================================================================
+   ROOT COLOR THEME & PAGE CANVAS
+   Warm Ivory / Beige (#FBF9F5) + Pure White (#FFFFFF) + Orange (#F97316) + Obsidian (#0F172A)
+   ========================================================================== */
+
+.qpqaPage {
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #FBF9F5;
+  background-image: 
+    radial-gradient(ellipse at 50% 0%, rgba(249, 115, 22, 0.05) 0%, transparent 60%),
+    radial-gradient(#E8E1D5 0.75px, transparent 0.75px);
+  background-size: 100% 100%, 28px 28px;
+  color: #0F172A;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.qpqaPage * {
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+   CARDS & CONTAINERS WITH DEPTH
+   ========================================================================== */
+
+.qpqaCard {
+  background: #FFFFFF;
+  border: 1px solid #E8E2D7;
+  border-radius: 20px;
+  box-shadow: 
+    0 1px 2px rgba(0, 0, 0, 0.02),
+    0 8px 24px -4px rgba(45, 30, 15, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.qpqaCard:hover {
+  border-color: rgba(249, 115, 22, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.03),
+    0 20px 40px -8px rgba(249, 115, 22, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+.qpqaCardActive {
+  border-color: #F97316 !important;
+  box-shadow: 
+    0 0 0 2px rgba(249, 115, 22, 0.2),
+    0 20px 44px -8px rgba(249, 115, 22, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+}
+
+.qpqaInnerBox {
+  background: #F8F5EE;
+  border: 1px solid #ECE5D8;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+/* ==========================================================================
+   LUXURY BADGES & CHIPS
+   ========================================================================== */
+
+.qpqaBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 15px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  box-shadow: 0 2px 10px rgba(249, 115, 22, 0.06);
+  color: #EA580C;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.qpqaBadgeDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #F97316;
+  box-shadow: 0 0 8px rgba(249, 115, 22, 0.8);
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+.qpqaPhaseTag {
+  font-size: 11px;
+  font-weight: 800;
+  color: #EA580C;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(249, 115, 22, 0.08);
+  border: 1px solid rgba(249, 115, 22, 0.2);
+  padding: 3px 9px;
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+}
+
+.qpqaStationNum {
+  font-size: 11px;
+  font-weight: 700;
+  color: #78716C;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.qpqaVerbChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #FFFFFF;
+  border: 1px solid #E8E2D7;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
+}
+
+.qpqaVerbChip:hover {
+  border-color: #F97316;
+  background: #FFFBF7;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.1);
+}
+
+.qpqaVerbLevel {
+  font-size: 10px;
+  font-weight: 800;
+  color: #EA580C;
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid rgba(249, 115, 22, 0.18);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.qpqaVerbLevelHigh {
+  font-size: 10px;
+  font-weight: 800;
+  color: #4F46E5;
+  background: rgba(79, 70, 229, 0.08);
+  border: 1px solid rgba(79, 70, 229, 0.2);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* ==========================================================================
+   HERO SECTION BEAUTIFICATION
+   ========================================================================== */
+
+.heroSection {
+  position: relative;
+  overflow: hidden;
+  padding: 80px 0 72px;
+  border-bottom: 1px solid #ECE5D8;
+}
+
+.heroGlow {
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 900px;
+  height: 480px;
+  background: radial-gradient(ellipse at center, rgba(249, 115, 22, 0.14) 0%, rgba(251, 146, 60, 0.05) 45%, transparent 70%);
+  pointer-events: none;
+}
+
+.heroTitleGradient {
+  background: linear-gradient(135deg, #EA580C 0%, #F97316 50%, #FB923C 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+.heroStatCard {
+  background: #FFFFFF;
+  border: 1px solid #E8E2D7;
+  border-radius: 18px;
+  padding: 22px 18px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.02),
+    0 8px 20px -4px rgba(45, 30, 15, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.heroStatCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #F97316, #FB923C);
+  opacity: 0.8;
+}
+
+.heroStatCard:hover {
+  transform: translateY(-3px);
+  border-color: rgba(249, 115, 22, 0.4);
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.03),
+    0 18px 36px -6px rgba(249, 115, 22, 0.12);
+}
+
+.qpqaStatValue {
+  font-size: 34px;
+  font-weight: 900;
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.qpqaStatLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #57534E;
+  margin-top: 6px;
+}
+
+.qpqaStatBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #15803D;
+  background: rgba(22, 163, 74, 0.08);
+  border: 1px solid rgba(22, 163, 74, 0.18);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+/* ==========================================================================
+   USER JOURNEY LEAD-IN SECTION
+   ========================================================================== */
+
+.journeyLeadIn {
+  background: #F5F1E8;
+  border-bottom: 1px solid #E6DFD2;
+  padding: 38px 24px;
+  text-align: center;
+}
+
+.qpqaSectionTitle {
+  font-size: clamp(30px, 4.4vw, 50px);
+  font-weight: 900;
+  color: #0F172A;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+.qpqaSectionSub {
+  font-size: 16px;
+  color: #57534E;
+  line-height: 1.6;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/* ==========================================================================
+   RAILWAY JOURNEY INTERACTIVE STATIONS
+   ========================================================================== */
+
+.railwaySection {
+  background-color: #FBF9F5;
+  position: relative;
+  padding: 50px 0 72px;
+  border-bottom: 1px solid #ECE5D8;
+}
+
+.railwayControlBar {
+  max-width: 1200px;
+  margin: 0 auto 36px;
+  padding: 0 24px;
+}
+
+.railwayControlCard {
+  background: #FFFFFF;
+  border: 1px solid #E8E2D7;
+  border-radius: 20px;
+  padding: 18px 22px;
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.02),
+    0 12px 32px -4px rgba(45, 30, 15, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.railwayTabsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.railwayTabsRow::-webkit-scrollbar {
+  display: none;
+}
+
+.stationJumpBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: #FBF9F5;
+  border: 1px solid #E8E2D7;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stationJumpBtn:hover {
+  background: #FFF7ED;
+  border-color: #F97316;
+  color: #EA580C;
+  transform: translateY(-1px);
+}
+
+.stationJumpBtnActive {
+  background: linear-gradient(135deg, #F97316 0%, #EA580C 100%) !important;
+  border-color: #C2410C !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 14px rgba(249, 115, 22, 0.35);
+  transform: translateY(-1px);
+}
+
+.stationJumpBtnActive .stationJumpBadge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+}
+
+.stationJumpBadge {
+  font-size: 11px;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  background: #ECE5D8;
+  color: #57534E;
+  padding: 2px 7px;
+  border-radius: 5px;
+}
+
+.railwayProgressHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.railwayProgressTrack {
+  flex: 1;
+  height: 6px;
+  background: #EAE3D6;
+  border-radius: 999px;
+  position: relative;
+  overflow: hidden;
+}
+
+.railwayProgressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #F97316, #FB923C);
+  border-radius: 999px;
+  transition: width 0.35s ease;
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.5);
+}
+
+.railwayNavBtns {
+  display: flex;
+  gap: 8px;
+}
+
+.railwayNavBtn {
+  background: #FFFFFF;
+  border: 1px solid #E8E2D7;
+  color: #1E293B;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.railwayNavBtn:hover:not(:disabled) {
+  border-color: #F97316;
+  color: #EA580C;
+  background: #FFF7ED;
+  transform: translateY(-1px);
+}
+
+.railwayNavBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Railway Stage & Nodes */
+.railwayStage {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  position: relative;
+}
+
+.stationTrackDisplay {
+  position: relative;
+  margin-bottom: 28px;
+  padding: 0 14px;
+}
+
+.stationTrackLine {
+  position: relative;
+  height: 4px;
+  background: #E4DCD0;
+  border-radius: 999px;
+  margin: 20px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stationTrackFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #F97316, #FB923C);
+  border-radius: 999px;
+  transition: width 0.35s ease;
+}
+
+.stationTrackNode {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: 3px solid #D6CEBE;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  color: #57534E;
+  z-index: 2;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stationTrackNodeActive {
+  background: #F97316 !important;
+  border-color: #FFFFFF !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.25), 0 4px 14px rgba(249, 115, 22, 0.45) !important;
+  transform: scale(1.18);
+}
+
+.stationTrackNodePassed {
+  background: #EA580C;
+  border-color: #FFFFFF;
+  color: #FFFFFF;
+}
+
+/* Active Station Main Card */
+.stationHeroCard {
+  background: #FFFFFF;
+  border: 1px solid #E8E2D7;
+  border-radius: 24px;
+  padding: 36px;
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.02),
+    0 20px 48px -8px rgba(45, 30, 15, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.stationHeroCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 26px;
+  flex-wrap: wrap;
+}
+
+.stationHeroCardTitle {
+  font-size: clamp(24px, 2.6vw, 30px);
+  font-weight: 900;
+  color: #0F172A;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  margin: 6px 0 6px;
+}
+
+.stationHeroCardDesc {
+  font-size: 15px;
+  color: #57534E;
+  line-height: 1.6;
+  max-width: 700px;
+  margin: 0;
+}
+
+/* ==========================================================================
+   STATION CONTENT MODULES
+   ========================================================================== */
+
+/* Station 01: Paper Ingestion */
+.stationPaperLayout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 32px;
+  align-items: stretch;
+}
+
+.paperDocPreviewBox {
+  background: #F7F4EC;
+  border: 1px solid #E2D9CB;
+  border-radius: 18px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.paperDocPreviewBox:hover {
+  border-color: #F97316;
+  box-shadow: 0 12px 28px rgba(249, 115, 22, 0.12);
+  transform: translateY(-2px);
+}
+
+.paperDocImage {
+  width: 100%;
+  height: 350px;
+  object-fit: contain;
+  background: #FFFFFF;
+  border-radius: 12px;
+  border: 1px solid #EBE5DB;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.07);
+}
+
+.paperDocZoomBadge {
+  position: absolute;
+  bottom: 22px;
+  background: rgba(15, 23, 42, 0.88);
+  color: #FFFFFF;
+  backdrop-filter: blur(6px);
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+.paperDocPreviewBox:hover .paperDocZoomBadge {
+  background: #EA580C;
+  transform: scale(1.05);
+  box-shadow: 0 4px 14px rgba(234, 88, 12, 0.4);
+}
+
+.paperMetricsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.paperMetricTile {
+  background: #FBF9F5;
+  border: 1px solid #ECE5D8;
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+
+.paperMetricTileVal {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0F172A;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.paperMetricTileLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: #78716C;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 3px;
+}
+
+/* Station 02: Verbs */
+.verbsContainerBox {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.verbsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+}
+
+.verbCard {
+  background: #FFFFFF;
+  border: 1px solid #E8E2D7;
+  border-radius: 14px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
+}
+
+.verbCard:hover {
+  border-color: #F97316;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(249, 115, 22, 0.09);
+}
+
+/* Station 03: Neural Engine (Automated Continuous Display) */
+.engineMonitorBox {
+  background: #09090B;
+  border: 2px solid #F97316;
+  border-radius: 22px;
+  padding: 20px;
+  color: #FFFFFF;
+  box-shadow: 
+    0 0 32px rgba(249, 115, 22, 0.22),
+    0 20px 48px -10px rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.engineMonitorHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding: 0 4px;
+}
+
+.engineLiveBeacon {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #22C55E;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.engineLiveBeaconDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22C55E;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+  animation: pulseDot 1.5s infinite ease-in-out;
+}
+
+.engineCanvasWrapper {
+  position: relative;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000000;
+  aspect-ratio: 16 / 9;
+  max-height: 440px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.engineCanvas {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Station 04: Distribution Stats */
+.distributionGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px;
+}
+
+.distributionBox {
+  background: #FBF9F5;
+  border: 1px solid #ECE5D8;
+  border-radius: 18px;
+  padding: 22px;
+}
+
+.distributionRow {
+  margin-bottom: 16px;
+}
+
+.distributionRow:last-child {
+  margin-bottom: 0;
+}
+
+.distributionRowLabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1E293B;
+  margin-bottom: 7px;
+}
+
+.distributionRowPct {
+  color: #EA580C;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 800;
+}
+
+.qpqaProgressBar {
+  height: 8px;
+  width: 100%;
+  background: #EAE3D6;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.qpqaProgressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #F97316, #EA580C);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+/* Station 05: Results & Certificate */
+.stationResultLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.resultHeroBanner {
+  background: #F7F4EC;
+  border: 1px solid #E2D9CB;
+  border-radius: 18px;
+  padding: 16px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.resultHeroBanner:hover {
+  border-color: #F97316;
+  box-shadow: 0 12px 28px rgba(249, 115, 22, 0.12);
+  transform: translateY(-2px);
+}
+
+.resultBannerImage {
+  width: 100%;
+  max-height: 330px;
+  object-fit: contain;
+  background: #FFFFFF;
+  border-radius: 12px;
+  display: block;
+}
+
+.resultStatsSummaryRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.resultSummaryTile {
+  background: #FBF9F5;
+  border: 1px solid #ECE5D8;
+  border-radius: 16px;
+  padding: 18px 20px;
+  text-align: center;
+}
+
+/* Lightbox Modal */
+.lightboxOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(10px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.lightboxCard {
+  background: #FFFFFF;
+  border-radius: 22px;
+  max-width: 920px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+}
+
+.lightboxHeader {
+  padding: 18px 26px;
+  border-bottom: 1px solid #E8E2D7;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lightboxBody {
+  padding: 26px;
+  overflow-y: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #F7F4EC;
+}
+
+.lightboxImage {
+  max-width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* ==========================================================================
+   FEATURES / CAPABILITIES SECTION
+   ========================================================================== */
+
+.featuresSection {
+  background: #F5F1E8;
+  border-bottom: 1px solid #E6DFD2;
+  padding: 88px 24px;
+}
+
+.featureCard {
+  background: #FFFFFF;
+  border: 1px solid #E8E2D7;
+  border-radius: 22px;
+  padding: 30px 26px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.02),
+    0 8px 24px -4px rgba(45, 30, 15, 0.04);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.featureCard:hover {
+  transform: translateY(-4px);
+  border-color: rgba(249, 115, 22, 0.45);
+  box-shadow: 0 16px 36px -6px rgba(249, 115, 22, 0.14);
+}
+
+.featureCardActive {
+  border-color: #F97316 !important;
+  box-shadow: 
+    0 0 0 2px rgba(249, 115, 22, 0.22),
+    0 16px 40px -6px rgba(249, 115, 22, 0.16) !important;
+}
+
+.featureAccent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #F97316, #FB923C);
+  opacity: 0.25;
+  transition: opacity 0.3s;
+}
+
+.featureAccentActive {
+  opacity: 1;
+}
+
+/* ==========================================================================
+   WHY SECTION
+   ========================================================================== */
+
+.whySection {
+  background-color: #FBF9F5;
+  border-bottom: 1px solid #ECE5D8;
+  padding: 88px 24px;
+}
+
+/* ==========================================================================
+   CTA SECTION
+   ========================================================================== */
+
+.ctaSection {
+  background-color: #FBF9F5;
+  padding: 88px 24px 104px;
+}
+
+.ctaCard {
+  background: #09090B;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  border-radius: 30px;
+  padding: 64px 40px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 
+    0 24px 64px -12px rgba(9, 9, 11, 0.35),
+    0 0 48px -12px rgba(249, 115, 22, 0.2);
+}
+
+.ctaGlow {
+  position: absolute;
+  top: -80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(249, 115, 22, 0.28) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes qpqaFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.qpqaFloat {
+  animation: qpqaFloat 2.5s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   FEATURE PAGE SECTION
+   ========================================================================== */
+
+.featurePageSection {
+  position: relative;
+  padding: 100px 24px;
+  overflow: hidden;
+}
+
+.featurePageBackground {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(249, 115, 22, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(79, 70, 229, 0.06) 0%, transparent 50%),
+    linear-gradient(180deg, #FBF9F5 0%, #F5F1E8 50%, #FBF9F5 100%);
+}
+
+.featurePageGlow1 {
+  position: absolute;
+  top: -150px;
+  left: -150px;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(249, 115, 22, 0.15) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.featurePageGlow2 {
+  position: absolute;
+  bottom: -150px;
+  right: -150px;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(79, 70, 229, 0.12) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.featurePagePattern {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(#E8E1D5 0.5px, transparent 0.5px),
+    linear-gradient(45deg, rgba(249, 115, 22, 0.02) 25%, transparent 25%);
+  background-size: 40px 40px, 80px 80px;
+  opacity: 0.5;
+}
+
+.featurePageContainer {
+  position: relative;
+  z-index: 1;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.featurePageHeader {
+  text-align: center;
+  margin-bottom: 64px;
+}
+
+.featurePageBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  border-radius: 999px;
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  color: #EA580C;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+.featurePageTitle {
+  font-size: clamp(36px, 5vw, 56px);
+  font-weight: 900;
+  color: #0F172A;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  margin: 0 0 16px;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+}
+
+.featurePageHighlight {
+  background: linear-gradient(135deg, #EA580C 0%, #F97316 50%, #FB923C 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+.featurePageSubtitle {
+  font-size: 18px;
+  color: #57534E;
+  line-height: 1.7;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.featurePageGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  margin-bottom: 48px;
+}
+
+.featurePageCard {
+  position: relative;
+  background: #FFFFFF;
+  border: 1px solid #E8E2D7;
+  border-radius: 24px;
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.02),
+    0 12px 32px -4px rgba(45, 30, 15, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.featurePageCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #F97316, #FB923C);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.featurePageCard:hover {
+  transform: translateY(-6px);
+  border-color: rgba(249, 115, 22, 0.5);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.03),
+    0 24px 48px -8px rgba(249, 115, 22, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+.featurePageCard:hover::before {
+  opacity: 1;
+}
+
+.featurePageCardIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(251, 146, 60, 0.08) 100%);
+  border: 1px solid rgba(249, 115, 22, 0.2);
+  color: #EA580C;
+  transition: all 0.3s ease;
+}
+
+.featurePageCard:hover .featurePageCardIcon {
+  background: linear-gradient(135deg, #F97316 0%, #EA580C 100%);
+  color: #FFFFFF;
+  transform: scale(1.08);
+  box-shadow: 0 8px 24px rgba(249, 115, 22, 0.35);
+}
+
+.featurePageCardTitle {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0F172A;
+  letter-spacing: -0.02em;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.featurePageCardDesc {
+  font-size: 15px;
+  color: #57534E;
+  line-height: 1.65;
+  margin: 0;
+  flex: 1;
+}
+
+.featurePageCardArrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #FBF9F5;
+  border: 1px solid #E8E2D7;
+  color: #78716C;
+  margin-top: auto;
+  transition: all 0.25s ease;
+}
+
+.featurePageCard:hover .featurePageCardArrow {
+  background: #F97316;
+  border-color: #F97316;
+  color: #FFFFFF;
+  transform: translateX(4px);
+}
+
+.featurePageFooter {
+  text-align: center;
+  padding-top: 24px;
+  border-top: 1px solid #ECE5D8;
+}
+
+.featurePageFooterText {
+  font-size: 14px;
+  font-weight: 600;
+  color: #78716C;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN BREAKPOINTS
+   ========================================================================== */
+
+@media (max-width: 900px) {
+  .stationPaperLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .paperDocImage {
+    height: 290px;
+  }
+
+  .distributionGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .resultStatsSummaryRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .stationHeroCard {
+    padding: 22px 18px;
+  }
+
+  .paperMetricsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ctaCard {
+    padding: 40px 22px;
+  }
+}
+
+.feedbackHelpfulBtn:hover {
+  background: #F0FDF4;
+  border-color: #22C55E;
+  color: #15803D;
+  transform: translateY(-1px);
+}
+
+/* Submit Section */
+.feedbackSubmitSection {
+  display: flex;
+  justify-content: center;
+}
+
+.feedbackSubmitCard {
+  background: #09090B;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 28px;
+  padding: 48px 40px;
+  text-align: center;
+  max-width: 480px;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 20px 48px -12px rgba(9, 9, 11, 0.3),
+    0 0 40px -12px rgba(34, 197, 94, 0.15);
+}
+
+.feedbackSubmitCard::before {
+  content: '';
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(34, 197, 94, 0.2) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+.feedbackSubmitIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  color: #22C55E;
+  margin-bottom: 20px;
+}
+
+.feedbackSubmitTitle {
+  font-size: clamp(22px, 3vw, 28px);
+  font-weight: 800;
+  color: #FFFFFF;
+  margin: 0 0 10px;
+  letter-spacing: -0.02em;
+}
+
+.feedbackSubmitDesc {
+  font-size: 15px;
+  color: #9CA3AF;
+  line-height: 1.65;
+  margin: 0 0 24px;
+  max-width: 360px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.feedbackSubmitBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 32px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
+  border: none;
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.35);
+}
+
+.feedbackSubmitBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.45);
+  background: linear-gradient(135deg, #16A34A 0%, #15803D 100%);
+}
+
+.feedbackSubmitBtn:active {
+  transform: translateY(0);
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN BREAKPOINTS
+   ========================================================================== */
+
+@media (max-width: 900px) {
+  .stationPaperLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .paperDocImage {
+    height: 290px;
+  }
+
+  .distributionGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .resultStatsSummaryRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .stationHeroCard {
+    padding: 22px 18px;
+  }
+
+  .paperMetricsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ctaCard {
+    padding: 40px 22px;
+  }
+}

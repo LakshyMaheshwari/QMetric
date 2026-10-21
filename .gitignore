@@ -1,27 +1,61 @@
+# ─── Dependencies ────────────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+.yarn/
+
+# ─── Environment / Secrets ───────────────────────────────────────────────────
 .env
-!.env.example
 .env.local
 .env.*.local
 .env.*
-node_modules/
+!.env.example
+
+# ─── Build outputs ───────────────────────────────────────────────────────────
 dist/
 build/
-/backend/dist
-/frontend/Aceternity-UI-React/dist
-/frontend/Aceternity-UI-React/build
-.DS_Store
-Thumbs.db
+/backend/dist/
+/frontend/Aceternity-UI-React/dist/
+/frontend/Aceternity-UI-React/build/
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ─── OS artifacts ────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# ─── Editor / IDE ────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
 
-# Playwright
+# ─── AI / Tool config (local only) ───────────────────────────────────────────
+.claude/
+.kilo/
+.gemini/
+
+# ─── Backup / temp files ─────────────────────────────────────────────────────
+*.bak
+*.tmp
+*.temp
+*.orig
+*.rej
+
+# ─── Testing ─────────────────────────────────────────────────────────────────
 /test-results/
 /playwright-report/
 /blob-report/
@@ -29,14 +63,18 @@ yarn-error.log*
 /playwright/.auth/
 qmetric_playwright_suite/test-results/
 qmetric_playwright_suite/playwright-report/
-
-# Coverage
 /coverage
 /backend/coverage
+/backend/test-results.json
 
-# Generated/local artifacts
-backend/test-results.json
-.kilo/
+# ─── Upload / converted files (runtime) ──────────────────────────────────────
+/backend/Converted/
+/backend/uploads/
 
-# CSV test data (optional — keep fixtures)
-# *.csv
+# ─── Animation frames (large binary assets — keep only source) ───────────────
+frontend/Aceternity-UI-React/public/qpqa-journey/QPQA_Engine_frames/
+frontend/Aceternity-UI-React/public/qpqa-engine/
+
+# ─── TypeScript compiled output ───────────────────────────────────────────────
+*.tsbuildinfo
+tsconfig.tsbuildinfo
